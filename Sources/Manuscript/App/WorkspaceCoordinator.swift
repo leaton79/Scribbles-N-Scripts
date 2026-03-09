@@ -93,6 +93,14 @@ final class WorkspaceCoordinator: ObservableObject {
         return nil
     }
 
+    func toggleSplit(windowWidth: CGFloat, preferredOrientation: SplitOrientation = .vertical) -> String? {
+        if splitEditorState.isSplit {
+            splitEditorState.closeSplit()
+            return nil
+        }
+        return openSplitFromCurrentContext(windowWidth: windowWidth, preferredOrientation: preferredOrientation)
+    }
+
     func handleModeChange(_ mode: ViewMode) {
         if mode == .modular, splitEditorState.isSplit {
             splitEditorState.closeSplit()

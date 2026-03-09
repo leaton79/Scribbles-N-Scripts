@@ -79,12 +79,6 @@ private struct WorkspaceView: View {
     }
 
     private func toggleSplit(windowWidth: CGFloat) {
-        if workspace.splitEditorState.isSplit {
-            workspace.splitEditorState.closeSplit()
-            splitNotice = nil
-            return
-        }
-
-        splitNotice = workspace.openSplitFromCurrentContext(windowWidth: windowWidth)
+        splitNotice = workspace.toggleSplit(windowWidth: windowWidth)
     }
 }

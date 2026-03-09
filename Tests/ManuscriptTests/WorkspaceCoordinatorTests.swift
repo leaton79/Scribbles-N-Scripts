@@ -160,4 +160,26 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNil(notice)
         XCTAssertFalse(coordinator.splitEditorState.isSplit)
     }
+
+    func testToggleSplitOpensThenClosesSplit() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ToggleSplit")
+
+        let openNotice = coordinator.toggleSplit(windowWidth: 900)
+        XCTAssertNil(openNotice)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+
+        let closeNotice = coordinator.toggleSplit(windowWidth: 900)
+        XCTAssertNil(closeNotice)
+        XCTAssertFalse(coordinator.splitEditorState.isSplit)
+    }
+
+    func testToggleSplitReturnsNoticeWhenFallbackApplied() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ToggleNarrow")
+
+        let notice = coordinator.toggleSplit(windowWidth: 480)
+
+        XCTAssertEqual(notice, "Window too narrow for side-by-side split. Using stacked layout.")
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertEqual(coordinator.splitEditorState.orientation, .horizontal)
+    }
 }
