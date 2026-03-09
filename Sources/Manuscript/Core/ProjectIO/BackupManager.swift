@@ -61,7 +61,7 @@ struct BackupManager {
         )) ?? []
 
         return urls
-            .filter { $0.pathExtension.lowercased() == "zip" }
+            .filter { isManagedBackupFilename($0.lastPathComponent) }
             .compactMap { url in
                 let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
                 guard let date = values?.contentModificationDate else { return nil }
@@ -76,7 +76,7 @@ struct BackupManager {
 
     static func restoreBackup(projectURL: URL, backupFilename: String, to destinationDir: URL) throws -> URL {
         let backupsURL = projectURL.appendingPathComponent("backups", isDirectory: true)
-        guard isSafeBackupFilename(backupFilename) else {
+        guard isManagedBackupFilename(backupFilename) else {
             throw ProjectIOError.backupNotFound(backupFilename)
         }
 
@@ -158,11 +158,12 @@ struct BackupManager {
         }
     }
 
-    private static func isSafeBackupFilename(_ value: String) -> Bool {
+    private static func isManagedBackupFilename(_ value: String) -> Bool {
         guard !value.isEmpty else { return false }
         let nsValue = NSString(string: value)
         guard nsValue.lastPathComponent == value else { return false }
         guard nsValue.pathExtension.lowercased() == "zip" else { return false }
+        guard value.hasPrefix("backup-") else { return false }
         guard !value.contains("..") else { return false }
         return true
     }

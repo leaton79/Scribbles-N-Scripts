@@ -572,6 +572,41 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(backups.count, 2)
     }
 
+    func testListBackupsIgnoresUnmanagedZipFiles() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupListFilter", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupListFilter")
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let unmanagedZip = root.appendingPathComponent("backups/manual-export.zip")
+        try Data("not-a-managed-backup".utf8).write(to: unmanagedZip, options: .atomic)
+
+        let backups = BackupManager.listBackups(projectURL: root)
+        XCTAssertFalse(backups.contains(where: { $0.filename == unmanagedZip.lastPathComponent }))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unmanagedZip.path))
+    }
+
+    func testPruneBackupsDoesNotDeleteUnmanagedZipFiles() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupPruneFilter", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupPruneFilter")
+
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let unmanagedZip = root.appendingPathComponent("backups/manual-export.zip")
+        try Data("not-a-managed-backup".utf8).write(to: unmanagedZip, options: .atomic)
+
+        try BackupManager.pruneBackups(projectURL: root, retentionCount: 1)
+
+        let backups = BackupManager.listBackups(projectURL: root)
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unmanagedZip.path))
+    }
+
     func testBackupRestoreReturnsSnapshotOfPriorState() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupRestore", at: tempDir)
