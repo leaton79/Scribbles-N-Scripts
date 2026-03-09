@@ -91,6 +91,12 @@ struct BackupManager {
             throw ProjectIOError.backupNotFound(backupFilename)
         }
 
+        let standardizedProjectPath = projectURL.standardizedFileURL.path
+        let standardizedDestinationPath = destinationDir.standardizedFileURL.path
+        if standardizedDestinationPath == standardizedProjectPath || standardizedDestinationPath.hasPrefix(standardizedProjectPath + "/") {
+            throw ProjectIOError.backupNotFound("Restore destination must be outside source project path")
+        }
+
         let candidate = destinationDir.appendingPathComponent(projectURL.lastPathComponent, isDirectory: true)
         if candidate.standardizedFileURL.path == projectURL.standardizedFileURL.path {
             throw ProjectIOError.backupNotFound("Restore destination conflicts with source project path")

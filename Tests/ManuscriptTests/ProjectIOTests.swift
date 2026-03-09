@@ -717,6 +717,29 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: sourceManifest), sourceManifestData)
     }
 
+    func testBackupRestoreRejectsDestinationInsideSourceProject() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupRestoreInsideSource", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupRestoreInsideSource")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let sourceManifest = root.appendingPathComponent("manifest.json")
+        let sourceManifestData = try Data(contentsOf: sourceManifest)
+        let restoreDir = root.appendingPathComponent("tmp-restore", isDirectory: true)
+
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: restoreDir)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("outside source project path"))
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: restoreDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+        XCTAssertEqual(try Data(contentsOf: sourceManifest), sourceManifestData)
+    }
+
     func testBackupRestoreRemovesStaleLockFromRestoredProject() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupLock", at: tempDir)
