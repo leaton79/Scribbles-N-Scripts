@@ -1,0 +1,192 @@
+import XCTest
+@testable import Manuscript
+
+final class ProjectIOTests: XCTestCase {
+    private var tempDir: URL!
+
+    override func setUpWithError() throws {
+        tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: tempDir)
+        tempDir = nil
+    }
+
+    func testCreateProjectCreatesCorrectDirectoryStructure() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "Test", at: tempDir)
+        let root = tempDir.appendingPathComponent("Test")
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("manifest.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("content").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("metadata").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("backups").path))
+
+        let version = try String(contentsOf: root.appendingPathComponent(".manuscript-version"), encoding: .utf8)
+        XCTAssertEqual(version.trimmingCharacters(in: .whitespacesAndNewlines), "1.0.0")
+
+        let manifest = manager.getManifest()
+        XCTAssertEqual(manifest.hierarchy.chapters.count, 1)
+        XCTAssertEqual(manifest.hierarchy.scenes.count, 1)
+        XCTAssertEqual(project.name, "Test")
+    }
+
+    func testOpenProjectLoadsMetadataButNotContent() throws {
+        let writer = FileSystemProjectManager()
+        _ = try writer.createProject(name: "Big", at: tempDir)
+
+        let chapterId = try XCTUnwrap(writer.getManifest().hierarchy.chapters.first?.id)
+        for i in 0..<49 {
+            let scene = try writer.addScene(to: chapterId, at: nil, title: "S\(i)")
+            try writer.saveSceneContent(sceneId: scene.id, content: String(repeating: "word ", count: 2000))
+        }
+        try writer.saveManifest()
+        try writer.closeProject()
+
+        let reader = FileSystemProjectManager()
+        let start = Date()
+        _ = try reader.openProject(at: tempDir.appendingPathComponent("Big"))
+        let elapsed = Date().timeIntervalSince(start)
+
+        XCTAssertEqual(reader.getManifest().hierarchy.scenes.count, 50)
+        XCTAssertEqual(reader.sceneContentLoadCount, 0)
+        XCTAssertLessThanOrEqual(elapsed, 2.0)
+    }
+
+    func testMoveSceneUpdatesBothChaptersCorrectly() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Move", at: tempDir)
+
+        let manifest0 = manager.getManifest()
+        let chapterA = try XCTUnwrap(manifest0.hierarchy.chapters.first)
+        let s1 = try XCTUnwrap(manifest0.hierarchy.scenes.first)
+        let s2 = try manager.addScene(to: chapterA.id, at: nil, title: "S2")
+        let s3 = try manager.addScene(to: chapterA.id, at: nil, title: "S3")
+
+        let chapterB = try manager.addChapter(to: nil, at: nil, title: "Chapter B")
+        let s4 = try manager.addScene(to: chapterB.id, at: nil, title: "S4")
+        let s5 = try manager.addScene(to: chapterB.id, at: nil, title: "S5")
+
+        _ = s1
+        _ = s3
+        _ = s4
+        _ = s5
+
+        try manager.moveScene(sceneId: s2.id, toChapterId: chapterB.id, atIndex: 1)
+
+        let manifest = manager.getManifest()
+        let finalA = try XCTUnwrap(manifest.hierarchy.chapters.first(where: { $0.id == chapterA.id }))
+        let finalB = try XCTUnwrap(manifest.hierarchy.chapters.first(where: { $0.id == chapterB.id }))
+
+        XCTAssertEqual(finalA.scenes.count, 2)
+        XCTAssertEqual(finalB.scenes.count, 3)
+        XCTAssertEqual(finalB.scenes[1], s2.id)
+
+        let movedScene = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.id == s2.id }))
+        XCTAssertEqual(movedScene.sequenceIndex, 1)
+
+        let root = tempDir.appendingPathComponent("Move")
+        let oldPath = root.appendingPathComponent("content/ch-\(chapterA.id.uuidString.lowercased())/scene-\(s2.id.uuidString.lowercased()).md")
+        let newPath = root.appendingPathComponent("content/ch-\(chapterB.id.uuidString.lowercased())/scene-\(s2.id.uuidString.lowercased()).md")
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldPath.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newPath.path))
+    }
+
+    func testDeleteSceneCreatesTrashEntryAndPreservesFile() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Trash", at: tempDir)
+
+        let manifest = manager.getManifest()
+        let chapter = try XCTUnwrap(manifest.hierarchy.chapters.first)
+        let scene = try XCTUnwrap(manifest.hierarchy.scenes.first)
+
+        try manager.deleteItem(id: scene.id, type: .scene)
+
+        let updatedManifest = manager.getManifest()
+        XCTAssertFalse(updatedManifest.hierarchy.scenes.contains(where: { $0.id == scene.id }))
+
+        let trashItem = try XCTUnwrap(manager.currentProject?.trash.first)
+        XCTAssertEqual(trashItem.originalParentId, chapter.id)
+        XCTAssertEqual(trashItem.originalIndex, 0)
+
+        let scenePath = tempDir
+            .appendingPathComponent("Trash")
+            .appendingPathComponent("content/ch-\(chapter.id.uuidString.lowercased())/scene-\(scene.id.uuidString.lowercased()).md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: scenePath.path))
+    }
+
+    func testRestoreFromTrashPutsSceneBackInOriginalPosition() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Restore", at: tempDir)
+
+        let chapterId = try XCTUnwrap(manager.getManifest().hierarchy.chapters.first?.id)
+        let s2 = try manager.addScene(to: chapterId, at: nil, title: "S2")
+        let s3 = try manager.addScene(to: chapterId, at: nil, title: "S3")
+        let s4 = try manager.addScene(to: chapterId, at: nil, title: "S4")
+
+        _ = s3
+        _ = s4
+
+        try manager.deleteItem(id: s2.id, type: .scene)
+        let trashedId = try XCTUnwrap(manager.currentProject?.trash.first?.id)
+
+        try manager.restoreFromTrash(trashedItemId: trashedId)
+
+        let manifest = manager.getManifest()
+        let chapter = try XCTUnwrap(manifest.hierarchy.chapters.first(where: { $0.id == chapterId }))
+        XCTAssertEqual(chapter.scenes[1], s2.id)
+        XCTAssertTrue((manager.currentProject?.trash.isEmpty) == true)
+    }
+
+    func testAtomicSaveDoesNotCorruptOnInterruption() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Atomic", at: tempDir)
+
+        let root = tempDir.appendingPathComponent("Atomic")
+        let manifestURL = root.appendingPathComponent("manifest.json")
+        let before = try Data(contentsOf: manifestURL)
+
+        let chapterId = try XCTUnwrap(manager.getManifest().hierarchy.chapters.first?.id)
+        _ = try manager.addScene(to: chapterId, at: nil, title: "Unsaved")
+
+        manager.manifestWriteInterceptor = { _, _ in
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)
+        }
+
+        XCTAssertThrowsError(try manager.saveManifest())
+
+        let after = try Data(contentsOf: manifestURL)
+        XCTAssertEqual(after, before)
+    }
+
+    func testAutosaveSkipsWhenNotDirty() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Autosave", at: tempDir)
+        let manifestURL = tempDir.appendingPathComponent("Autosave/manifest.json")
+
+        let before = try FileManager.default.attributesOfItem(atPath: manifestURL.path)[.modificationDate] as? Date
+
+        manager.startAutosave(intervalSeconds: 1)
+        Thread.sleep(forTimeInterval: 1.3)
+        manager.stopAutosave()
+
+        let after = try FileManager.default.attributesOfItem(atPath: manifestURL.path)[.modificationDate] as? Date
+        XCTAssertEqual(before, after)
+    }
+
+    func testLockFilePreventsConcurrentAccess() throws {
+        let first = FileSystemProjectManager()
+        _ = try first.createProject(name: "Lock", at: tempDir)
+
+        let second = FileSystemProjectManager()
+        XCTAssertThrowsError(try second.openProject(at: tempDir.appendingPathComponent("Lock"))) { error in
+            guard case ProjectIOError.concurrentAccess = error else {
+                return XCTFail("Expected concurrentAccess error")
+            }
+        }
+    }
+}
