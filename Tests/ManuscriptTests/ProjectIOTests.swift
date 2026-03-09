@@ -988,6 +988,38 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
     }
 
+    func testBackupRestoreRejectsArchiveWithNonDirectoryProjectRoot() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupRootFile", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupRootFile")
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+        let fakeName = "backup-root-file.zip"
+        let fakeZipURL = backupsDir.appendingPathComponent(fakeName)
+
+        let stageRoot = tempDir.appendingPathComponent("fake-backup-root-file-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: stageRoot, withIntermediateDirectories: true)
+        let stagedRootFile = stageRoot.appendingPathComponent("BackupRootFile")
+        try "not-a-directory".write(to: stagedRootFile, atomically: true, encoding: .utf8)
+
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        zip.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", stagedRootFile.path, fakeZipURL.path]
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-root-file-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: fakeName, to: restoreDir)
+        ) { error in
+            guard case ProjectIOError.backupNotFound = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+        }
+        let extractedRoot = restoreDir.appendingPathComponent("BackupRootFile", isDirectory: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
+    }
+
     func testFirstBackupArchiveDoesNotContainItselfInRestoredBackupsFolder() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupSelf", at: tempDir)

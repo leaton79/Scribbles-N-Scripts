@@ -112,6 +112,10 @@ struct BackupManager {
             throw ProjectIOError.backupNotFound("Could not locate restored project root in backup")
         }
         do {
+            let candidateValues = try candidate.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard candidateValues.isDirectory == true, candidateValues.isSymbolicLink != true else {
+                throw ProjectIOError.backupNotFound("Restored backup project root is invalid")
+            }
             let manifestURL = candidate.appendingPathComponent("manifest.json")
             guard FileManager.default.fileExists(atPath: manifestURL.path) else {
                 throw ProjectIOError.backupNotFound("Restored backup is missing manifest.json")
