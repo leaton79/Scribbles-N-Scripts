@@ -64,4 +64,31 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, existingSceneId)
         XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
     }
+
+    func testBackgroundPhasePersistsDirtyManifestToDisk() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackgroundSave")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let beforeCount = coordinator.projectManager.getManifest().hierarchy.scenes.count
+
+        _ = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Unsaved Scene")
+        coordinator.handleScenePhase(.background)
+
+        let root = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let diskManifest = try ManifestCoder.read(from: root.appendingPathComponent("manifest.json"))
+        XCTAssertEqual(diskManifest.hierarchy.scenes.count, beforeCount + 1)
+    }
+
+    func testBootstrapReopensExistingProjectData() throws {
+        let projectName = "Reopen"
+        var first: WorkspaceCoordinator? = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: projectName)
+        let chapterId = try XCTUnwrap(first?.projectManager.getManifest().hierarchy.chapters.first?.id)
+        _ = try first?.projectManager.addScene(to: chapterId, at: nil, title: "Persisted Scene")
+        try first?.projectManager.saveManifest()
+        try first?.projectManager.closeProject()
+        first = nil
+
+        let second = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: projectName)
+        let titles = second.projectManager.getManifest().hierarchy.scenes.map(\.title)
+        XCTAssertTrue(titles.contains("Persisted Scene"))
+    }
 }
