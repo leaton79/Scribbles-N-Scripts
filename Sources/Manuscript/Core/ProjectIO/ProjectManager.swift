@@ -812,8 +812,9 @@ final class FileSystemProjectManager: ProjectManager {
         let projectVersion = (try? String(contentsOf: versionFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines))
             ?? ManifestCoder.formatVersion
 
-        let supported = parseSemver(supportedFormatVersion)
-        let candidate = parseSemver(projectVersion)
+        guard let supported = parseSemver(supportedFormatVersion), let candidate = parseSemver(projectVersion) else {
+            throw ProjectIOError.incompatibleVersion(projectVersion: projectVersion, supportedVersion: supportedFormatVersion)
+        }
         if candidate.major > supported.major {
             throw ProjectIOError.incompatibleVersion(projectVersion: projectVersion, supportedVersion: supportedFormatVersion)
         }
@@ -822,12 +823,15 @@ final class FileSystemProjectManager: ProjectManager {
         }
     }
 
-    private func parseSemver(_ value: String) -> (major: Int, minor: Int, patch: Int) {
-        let parts = value.split(separator: ".").map { Int($0) ?? 0 }
+    private func parseSemver(_ value: String) -> (major: Int, minor: Int, patch: Int)? {
+        let parts = value.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        let parsed = parts.compactMap { Int($0) }
+        guard parsed.count == 3, parsed.allSatisfy({ $0 >= 0 }) else { return nil }
         return (
-            parts.count > 0 ? parts[0] : 0,
-            parts.count > 1 ? parts[1] : 0,
-            parts.count > 2 ? parts[2] : 0
+            parsed[0],
+            parsed[1],
+            parsed[2]
         )
     }
 

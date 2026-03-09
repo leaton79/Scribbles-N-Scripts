@@ -189,4 +189,55 @@ final class ProjectIOTests: XCTestCase {
             }
         }
     }
+
+    func testOpenProjectRejectsMalformedVersionString() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "BadVersion", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        try "not-semver".write(to: root.appendingPathComponent(".manuscript-version"), atomically: true, encoding: .utf8)
+        try manager.closeProject()
+
+        let opener = FileSystemProjectManager()
+        XCTAssertThrowsError(try opener.openProject(at: root)) { error in
+            guard case let ProjectIOError.incompatibleVersion(projectVersion, supportedVersion) = error else {
+                return XCTFail("Expected incompatibleVersion, got \(error)")
+            }
+            XCTAssertEqual(projectVersion, "not-semver")
+            XCTAssertEqual(supportedVersion, "1.0.0")
+        }
+    }
+
+    func testOpenProjectRejectsHigherMajorVersion() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "MajorVersion", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        try "2.0.0".write(to: root.appendingPathComponent(".manuscript-version"), atomically: true, encoding: .utf8)
+        try manager.closeProject()
+
+        let opener = FileSystemProjectManager()
+        XCTAssertThrowsError(try opener.openProject(at: root)) { error in
+            guard case let ProjectIOError.incompatibleVersion(projectVersion, supportedVersion) = error else {
+                return XCTFail("Expected incompatibleVersion, got \(error)")
+            }
+            XCTAssertEqual(projectVersion, "2.0.0")
+            XCTAssertEqual(supportedVersion, "1.0.0")
+        }
+    }
+
+    func testOpenProjectRejectsHigherMinorVersionForMigration() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "MinorVersion", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        try "1.1.0".write(to: root.appendingPathComponent(".manuscript-version"), atomically: true, encoding: .utf8)
+        try manager.closeProject()
+
+        let opener = FileSystemProjectManager()
+        XCTAssertThrowsError(try opener.openProject(at: root)) { error in
+            guard case let ProjectIOError.unsupportedMigration(projectVersion, supportedVersion) = error else {
+                return XCTFail("Expected unsupportedMigration, got \(error)")
+            }
+            XCTAssertEqual(projectVersion, "1.1.0")
+            XCTAssertEqual(supportedVersion, "1.0.0")
+        }
+    }
 }
