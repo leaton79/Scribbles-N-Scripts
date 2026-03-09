@@ -133,4 +133,31 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         XCTAssertFalse(coordinator.splitEditorState.isSplit)
     }
+
+    func testOpenSplitFromCurrentContextSkipsStaleSelectionAndUsesValidFallback() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "StaleSelection")
+        let validSceneId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.scenes.first?.id)
+        coordinator.navigationState.selectedSceneId = UUID()
+        coordinator.editorState.currentSceneId = UUID()
+
+        let notice = coordinator.openSplitFromCurrentContext(windowWidth: 900)
+
+        XCTAssertNil(notice)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, validSceneId)
+    }
+
+    func testOpenSplitFromCurrentContextReturnsNilWhenNoValidScenesExist() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NoScenes")
+        let existingSceneId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.scenes.first?.id)
+        try coordinator.projectManager.deleteItem(id: existingSceneId, type: .scene)
+        coordinator.linearState.reloadSequence()
+        coordinator.navigationState.selectedSceneId = nil
+        coordinator.editorState.currentSceneId = existingSceneId
+
+        let notice = coordinator.openSplitFromCurrentContext(windowWidth: 900)
+
+        XCTAssertNil(notice)
+        XCTAssertFalse(coordinator.splitEditorState.isSplit)
+    }
 }

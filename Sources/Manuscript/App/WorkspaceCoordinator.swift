@@ -76,7 +76,7 @@ final class WorkspaceCoordinator: ObservableObject {
 
     func openSplitFromCurrentContext(windowWidth: CGFloat, preferredOrientation: SplitOrientation = .vertical) -> String? {
         guard modeController.activeMode == .linear else { return nil }
-        guard let targetSceneId = navigationState.selectedSceneId ?? editorState.currentSceneId ?? linearState.orderedSceneIds.first else {
+        guard let targetSceneId = resolveSceneForSplitOpen() else {
             return nil
         }
 
@@ -172,5 +172,20 @@ final class WorkspaceCoordinator: ObservableObject {
     private func autosaveOpenEditors() {
         try? editorState.autosaveIfNeeded(projectManager: projectManager)
         splitEditorState.autosaveOpenPanes()
+    }
+
+    private func resolveSceneForSplitOpen() -> UUID? {
+        let validSceneIds = Set(projectManager.getManifest().hierarchy.scenes.map(\.id))
+        let candidates: [UUID?] = [
+            navigationState.selectedSceneId,
+            editorState.currentSceneId,
+            linearState.orderedSceneIds.first
+        ]
+        for candidate in candidates {
+            if let candidate, validSceneIds.contains(candidate) {
+                return candidate
+            }
+        }
+        return nil
     }
 }
