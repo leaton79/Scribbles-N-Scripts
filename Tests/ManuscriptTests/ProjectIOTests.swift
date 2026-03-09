@@ -479,4 +479,18 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: targetLock.path))
     }
+
+    func testOpenProjectSameRootIsNoOpAndKeepsLock() throws {
+        let manager = FileSystemProjectManager()
+        let initial = try manager.createProject(name: "SameRoot", at: tempDir)
+        let root = tempDir.appendingPathComponent("SameRoot")
+        let lockURL = root.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+
+        let reopened = try manager.openProject(at: root)
+
+        XCTAssertEqual(reopened.id, initial.id)
+        XCTAssertEqual(manager.projectRootURL, root)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+    }
 }
