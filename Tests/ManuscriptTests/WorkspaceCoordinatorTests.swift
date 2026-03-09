@@ -260,4 +260,42 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         let createdScene = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.title == "Recovered Scene" }))
         XCTAssertNotNil(createdScene.parentChapterId)
     }
+
+    func testNavigateToNextSceneAdvancesInLinearMode() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NextSceneCommand")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        _ = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        coordinator.linearState.reloadSequence()
+        let firstScene = try XCTUnwrap(coordinator.linearState.orderedSceneIds.first)
+        coordinator.editorState.navigateToScene(id: firstScene)
+
+        let moved = coordinator.navigateToNextScene()
+
+        XCTAssertTrue(moved)
+        XCTAssertNotEqual(coordinator.editorState.currentSceneId, firstScene)
+    }
+
+    func testNavigateToPreviousSceneReturnsFalseAtBeginning() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "PreviousSceneBoundary")
+        let firstScene = try XCTUnwrap(coordinator.linearState.orderedSceneIds.first)
+        coordinator.editorState.navigateToScene(id: firstScene)
+
+        let moved = coordinator.navigateToPreviousScene()
+
+        XCTAssertFalse(moved)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, firstScene)
+    }
+
+    func testNavigateCommandsNoOpOutsideLinearMode() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NavigationModeGate")
+        coordinator.setMode(.modular)
+        let before = coordinator.editorState.currentSceneId
+
+        let movedNext = coordinator.navigateToNextScene()
+        let movedPrevious = coordinator.navigateToPreviousScene()
+
+        XCTAssertFalse(movedNext)
+        XCTAssertFalse(movedPrevious)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, before)
+    }
 }

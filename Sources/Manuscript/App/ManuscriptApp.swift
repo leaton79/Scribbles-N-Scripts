@@ -39,6 +39,20 @@ struct ManuscriptApp: App {
                 }
                 .keyboardShortcut("\\", modifiers: [.command])
                 .disabled(workspace.modeController.activeMode != .linear && !workspace.splitEditorState.isSplit)
+
+                Divider()
+
+                Button("Previous Scene") {
+                    _ = workspace.navigateToPreviousScene()
+                }
+                .keyboardShortcut("[", modifiers: [.command])
+                .disabled(workspace.modeController.activeMode != .linear)
+
+                Button("Next Scene") {
+                    _ = workspace.navigateToNextScene()
+                }
+                .keyboardShortcut("]", modifiers: [.command])
+                .disabled(workspace.modeController.activeMode != .linear)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

@@ -172,6 +172,22 @@ final class WorkspaceCoordinator: ObservableObject {
         toggleSplit(windowWidth: defaultWindowWidth)
     }
 
+    @discardableResult
+    func navigateToNextScene() -> Bool {
+        guard modeController.activeMode == .linear else { return false }
+        let before = editorState.currentSceneId
+        linearState.goToNextScene()
+        return editorState.currentSceneId != before
+    }
+
+    @discardableResult
+    func navigateToPreviousScene() -> Bool {
+        guard modeController.activeMode == .linear else { return false }
+        let before = editorState.currentSceneId
+        linearState.goToPreviousScene()
+        return editorState.currentSceneId != before
+    }
+
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
