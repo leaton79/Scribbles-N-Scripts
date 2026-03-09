@@ -105,6 +105,11 @@ struct BackupManager {
         guard FileManager.default.fileExists(atPath: manifestURL.path) else {
             throw ProjectIOError.backupNotFound("Restored backup is missing manifest.json")
         }
+        do {
+            _ = try ManifestCoder.read(from: manifestURL)
+        } catch {
+            throw ProjectIOError.backupNotFound("Restored backup contains invalid manifest.json")
+        }
         let restoredLockURL = candidate.appendingPathComponent(".lock")
         if FileManager.default.fileExists(atPath: restoredLockURL.path) {
             try? FileManager.default.removeItem(at: restoredLockURL)

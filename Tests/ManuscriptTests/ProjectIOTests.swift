@@ -739,6 +739,41 @@ final class ProjectIOTests: XCTestCase {
         }
     }
 
+    func testBackupRestoreRejectsArchiveWithMalformedManifest() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupMalformedManifest", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupMalformedManifest")
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+        let fakeName = "backup-malformed-manifest.zip"
+        let fakeZipURL = backupsDir.appendingPathComponent(fakeName)
+
+        let stageRoot = tempDir.appendingPathComponent("fake-backup-malformed-\(UUID().uuidString)", isDirectory: true)
+        let stagedProject = stageRoot.appendingPathComponent("BackupMalformedManifest", isDirectory: true)
+        try FileManager.default.createDirectory(at: stagedProject, withIntermediateDirectories: true)
+        try "{".write(
+            to: stagedProject.appendingPathComponent("manifest.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        zip.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", stagedProject.path, fakeZipURL.path]
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-malformed-manifest-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: fakeName, to: restoreDir)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("invalid manifest.json"))
+        }
+    }
+
     func testFirstBackupArchiveDoesNotContainItselfInRestoredBackupsFolder() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupSelf", at: tempDir)
