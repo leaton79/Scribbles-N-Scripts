@@ -67,9 +67,7 @@ private struct WorkspaceView: View {
                     }
                 }
                 .onChange(of: workspace.modeController.activeMode) { _, mode in
-                    if mode == .modular, workspace.splitEditorState.isSplit {
-                        workspace.splitEditorState.closeSplit()
-                    }
+                    workspace.handleModeChange(mode)
                 }
             }
         }
@@ -87,14 +85,6 @@ private struct WorkspaceView: View {
             return
         }
 
-        if let selected = workspace.navigationState.selectedSceneId {
-            let applied = workspace.splitEditorState.openSplit(
-                sceneId: selected,
-                preferredOrientation: .vertical,
-                windowWidth: windowWidth
-            )
-            splitNotice = applied == .horizontal ? "Window too narrow for side-by-side split. Using stacked layout." : nil
-            workspace.splitEditorState.setActivePane(1)
-        }
+        splitNotice = workspace.openSplitFromCurrentContext(windowWidth: windowWidth)
     }
 }

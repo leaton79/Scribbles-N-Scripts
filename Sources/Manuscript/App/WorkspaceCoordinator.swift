@@ -74,6 +74,31 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    func openSplitFromCurrentContext(windowWidth: CGFloat, preferredOrientation: SplitOrientation = .vertical) -> String? {
+        guard modeController.activeMode == .linear else { return nil }
+        guard let targetSceneId = navigationState.selectedSceneId ?? editorState.currentSceneId ?? linearState.orderedSceneIds.first else {
+            return nil
+        }
+
+        let applied = splitEditorState.openSplit(
+            sceneId: targetSceneId,
+            preferredOrientation: preferredOrientation,
+            windowWidth: windowWidth
+        )
+        splitEditorState.setActivePane(1)
+
+        if preferredOrientation == .vertical, applied == .horizontal {
+            return "Window too narrow for side-by-side split. Using stacked layout."
+        }
+        return nil
+    }
+
+    func handleModeChange(_ mode: ViewMode) {
+        if mode == .modular, splitEditorState.isSplit {
+            splitEditorState.closeSplit()
+        }
+    }
+
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:

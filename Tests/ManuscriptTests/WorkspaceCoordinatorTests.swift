@@ -103,4 +103,34 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.goalsManager.sessionWordsWritten, 1)
         XCTAssertEqual(coordinator.goalsManager.sessionGrossWords, 1)
     }
+
+    func testOpenSplitFromCurrentContextUsesCurrentSceneWhenNoSidebarSelection() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitFromCurrent")
+        coordinator.navigationState.selectedSceneId = nil
+
+        let notice = coordinator.openSplitFromCurrentContext(windowWidth: 900)
+
+        XCTAssertNil(notice)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, coordinator.editorState.currentSceneId)
+    }
+
+    func testOpenSplitFromCurrentContextReturnsNarrowWindowNotice() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitNarrow")
+
+        let notice = coordinator.openSplitFromCurrentContext(windowWidth: 480)
+
+        XCTAssertEqual(notice, "Window too narrow for side-by-side split. Using stacked layout.")
+        XCTAssertEqual(coordinator.splitEditorState.orientation, .horizontal)
+    }
+
+    func testHandleModeChangeClosesOpenSplitWhenEnteringModular() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CloseOnMode")
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 900)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+
+        coordinator.handleModeChange(.modular)
+
+        XCTAssertFalse(coordinator.splitEditorState.isSplit)
+    }
 }
