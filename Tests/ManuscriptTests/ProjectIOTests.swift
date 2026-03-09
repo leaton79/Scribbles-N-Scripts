@@ -190,6 +190,20 @@ final class ProjectIOTests: XCTestCase {
         }
     }
 
+    func testCloseProjectRemovesLockFile() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "CloseLock", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        let lockURL = root.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+
+        try manager.closeProject()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: lockURL.path))
+        XCTAssertNil(manager.currentProject)
+        XCTAssertNil(manager.projectRootURL)
+    }
+
     func testOpenProjectRejectsMalformedVersionString() throws {
         let manager = FileSystemProjectManager()
         let project = try manager.createProject(name: "BadVersion", at: tempDir)
@@ -204,6 +218,14 @@ final class ProjectIOTests: XCTestCase {
             }
             XCTAssertEqual(projectVersion, "not-semver")
             XCTAssertEqual(supportedVersion, "1.0.0")
+        }
+
+        XCTAssertNil(opener.currentProject)
+        XCTAssertNil(opener.projectRootURL)
+        XCTAssertThrowsError(try opener.saveManifest()) { error in
+            guard case ProjectIOError.noOpenProject = error else {
+                return XCTFail("Expected noOpenProject after failed open")
+            }
         }
     }
 
