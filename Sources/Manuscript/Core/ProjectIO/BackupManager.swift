@@ -8,17 +8,29 @@ struct BackupManager {
     }()
 
     static func createBackup(projectURL: URL, retentionCount: Int) throws -> BackupInfo {
+        let fileManager = FileManager.default
         let backupsURL = projectURL.appendingPathComponent("backups", isDirectory: true)
-        try FileManager.default.createDirectory(at: backupsURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: backupsURL, withIntermediateDirectories: true)
 
         let timestamp = filenameFormatter.string(from: Date())
         let backupName = "backup-\(timestamp).zip"
         let backupURL = backupsURL.appendingPathComponent(backupName)
+        let tempZipURL = fileManager.temporaryDirectory
+            .appendingPathComponent("manuscript-backup-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(backupName)
+        try fileManager.createDirectory(at: tempZipURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer {
+            try? fileManager.removeItem(at: tempZipURL.deletingLastPathComponent())
+        }
 
-        try zipDirectory(source: projectURL, destinationZip: backupURL)
+        try zipDirectory(source: projectURL, destinationZip: tempZipURL)
+        if fileManager.fileExists(atPath: backupURL.path) {
+            try fileManager.removeItem(at: backupURL)
+        }
+        try fileManager.moveItem(at: tempZipURL, to: backupURL)
         try pruneBackups(projectURL: projectURL, retentionCount: retentionCount)
 
-        let attrs = try FileManager.default.attributesOfItem(atPath: backupURL.path)
+        let attrs = try fileManager.attributesOfItem(atPath: backupURL.path)
         let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
         return BackupInfo(filename: backupName, date: Date(), sizeBytes: size)
     }

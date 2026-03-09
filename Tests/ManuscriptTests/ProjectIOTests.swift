@@ -565,4 +565,22 @@ final class ProjectIOTests: XCTestCase {
         let opener = FileSystemProjectManager()
         XCTAssertNoThrow(try opener.openProject(at: restoredRoot))
     }
+
+    func testFirstBackupArchiveDoesNotContainItselfInRestoredBackupsFolder() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupSelf", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupSelf")
+
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let restoreDir = tempDir.appendingPathComponent("restore-self-temp", isDirectory: true)
+        let restoredRoot = try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: restoreDir)
+        let restoredBackupsDir = restoredRoot.appendingPathComponent("backups", isDirectory: true)
+        let restoredEntries = (try? FileManager.default.contentsOfDirectory(
+            at: restoredBackupsDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        XCTAssertFalse(restoredEntries.contains(where: { $0.pathExtension.lowercased() == "zip" }))
+    }
 }
