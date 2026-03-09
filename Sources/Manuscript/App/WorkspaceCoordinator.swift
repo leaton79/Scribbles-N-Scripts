@@ -207,6 +207,31 @@ final class WorkspaceCoordinator: ObservableObject {
         return editorState.currentSceneId != before
     }
 
+    @discardableResult
+    func saveProjectNow() -> String? {
+        do {
+            try projectManager.saveManifest()
+            return nil
+        } catch {
+            return "Could not save project: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func createBackupNow() -> String? {
+        let beforeCount = projectManager.listBackups().count
+        do {
+            try projectManager.createBackup()
+            let backups = projectManager.listBackups()
+            if let latest = backups.first, backups.count >= beforeCount {
+                return "Backup created: \(latest.filename)"
+            }
+            return "Backup created."
+        } catch {
+            return "Could not create backup: \(error.localizedDescription)"
+        }
+    }
+
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:

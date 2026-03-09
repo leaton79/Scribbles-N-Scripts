@@ -322,4 +322,29 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.navigationState.selectedSceneId, scene.id)
         XCTAssertEqual(coordinator.editorState.currentSceneId, scene.id)
     }
+
+    func testSaveProjectNowPersistsManifestChanges() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveProject")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        _ = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Unsaved")
+
+        let saveMessage = coordinator.saveProjectNow()
+
+        XCTAssertNil(saveMessage)
+        let root = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let manifestOnDisk = try ManifestCoder.read(from: root.appendingPathComponent("manifest.json"))
+        XCTAssertTrue(manifestOnDisk.hierarchy.scenes.contains(where: { $0.title == "Unsaved" }))
+    }
+
+    func testCreateBackupNowAddsBackupArchive() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackupNow")
+        let before = coordinator.projectManager.listBackups().count
+
+        let message = coordinator.createBackupNow()
+
+        XCTAssertNotNil(message)
+        let after = coordinator.projectManager.listBackups()
+        XCTAssertEqual(after.count, before + 1)
+        XCTAssertTrue(message?.contains("Backup created") == true)
+    }
 }

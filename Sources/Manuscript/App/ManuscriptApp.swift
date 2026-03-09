@@ -12,6 +12,11 @@ struct ManuscriptApp: App {
         }
         .commands {
             CommandMenu("Project") {
+                Button("Save Project") {
+                    _ = workspace.saveProjectNow()
+                }
+                .keyboardShortcut("s", modifiers: [.command])
+
                 Button("New Chapter") {
                     _ = workspace.createChapter()
                 }
@@ -21,6 +26,12 @@ struct ManuscriptApp: App {
                     _ = workspace.createScene()
                 }
                 .keyboardShortcut("n", modifiers: [.command])
+
+                Divider()
+
+                Button("Create Backup") {
+                    _ = workspace.createBackupNow()
+                }
             }
 
             CommandMenu("View") {
@@ -99,6 +110,10 @@ private struct WorkspaceView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
+                            Button("Save") {
+                                actionNotice = workspace.saveProjectNow() ?? "Project saved."
+                            }
+                            .keyboardShortcut("s", modifiers: [.command])
                             Button("New Chapter") {
                                 actionNotice = workspace.createChapter()
                             }
@@ -107,6 +122,9 @@ private struct WorkspaceView: View {
                                 actionNotice = workspace.createScene()
                             }
                             .keyboardShortcut("n", modifiers: [.command])
+                            Button("Backup") {
+                                actionNotice = workspace.createBackupNow()
+                            }
                             if workspace.modeController.activeMode == .linear {
                                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
                                     toggleSplit(windowWidth: geometry.size.width)
