@@ -115,7 +115,11 @@ struct BackupManager {
         if FileManager.default.fileExists(atPath: candidate.path) {
             try FileManager.default.removeItem(at: candidate)
         }
-        try unzipArchive(sourceZip: backupURL, destinationDir: destinationDir)
+        do {
+            try unzipArchive(sourceZip: backupURL, destinationDir: destinationDir)
+        } catch {
+            throw ProjectIOError.backupNotFound("Backup archive could not be extracted")
+        }
 
         guard FileManager.default.fileExists(atPath: candidate.path) else {
             throw ProjectIOError.backupNotFound("Could not locate restored project root in backup")

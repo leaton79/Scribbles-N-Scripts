@@ -999,6 +999,26 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
     }
 
+    func testBackupRestoreRejectsCorruptedArchiveBytes() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupCorruptZip", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupCorruptZip")
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+        let fakeName = "backup-corrupt.zip"
+        let fakeZipURL = backupsDir.appendingPathComponent(fakeName)
+        try "not-a-zip".write(to: fakeZipURL, atomically: true, encoding: .utf8)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-corrupt-zip-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: fakeName, to: restoreDir)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("could not be extracted"))
+        }
+    }
+
     func testBackupRestoreRejectsArchiveWithMalformedManifest() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupMalformedManifest", at: tempDir)
