@@ -100,7 +100,13 @@ enum ManifestCoder {
     }
 
     static func read(from url: URL) throws -> Manifest {
-        let data = try Data(contentsOf: url)
-        return try decode(data)
+        do {
+            let data = try Data(contentsOf: url)
+            return try decode(data)
+        } catch let error as ProjectIOError {
+            throw error
+        } catch {
+            throw ProjectIOError.corruptManifest(details: error.localizedDescription)
+        }
     }
 }

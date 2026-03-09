@@ -248,6 +248,30 @@ final class ProjectIOTests: XCTestCase {
         }
     }
 
+    func testOpenProjectMissingManifestReportsCorruptManifestAndKeepsNoOpenState() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "MissingManifest", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        let manifestURL = root.appendingPathComponent("manifest.json")
+        try manager.closeProject()
+        try FileManager.default.removeItem(at: manifestURL)
+
+        let opener = FileSystemProjectManager()
+        XCTAssertThrowsError(try opener.openProject(at: root)) { error in
+            guard case ProjectIOError.corruptManifest = error else {
+                return XCTFail("Expected corruptManifest, got \(error)")
+            }
+        }
+
+        XCTAssertNil(opener.currentProject)
+        XCTAssertNil(opener.projectRootURL)
+        XCTAssertThrowsError(try opener.saveManifest()) { error in
+            guard case ProjectIOError.noOpenProject = error else {
+                return XCTFail("Expected noOpenProject after failed open")
+            }
+        }
+    }
+
     func testOpenProjectRejectsHigherMajorVersion() throws {
         let manager = FileSystemProjectManager()
         let project = try manager.createProject(name: "MajorVersion", at: tempDir)
