@@ -87,7 +87,7 @@ struct BackupManager {
             throw ProjectIOError.backupNotFound(backupFilename)
         }
 
-        guard FileManager.default.fileExists(atPath: backupURL.path) else {
+        guard isManagedBackupURL(backupURL) else {
             throw ProjectIOError.backupNotFound(backupFilename)
         }
 

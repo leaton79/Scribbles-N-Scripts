@@ -772,6 +772,29 @@ final class ProjectIOTests: XCTestCase {
         }
     }
 
+    func testBackupRestoreRejectsSymlinkedBackupFile() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupRestoreSymlink", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupRestoreSymlink")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+
+        let symlinkName = "backup-symlinked.zip"
+        let symlinkURL = backupsDir.appendingPathComponent(symlinkName)
+        let target = backupsDir.appendingPathComponent(backup.filename)
+        try? FileManager.default.removeItem(at: symlinkURL)
+        try FileManager.default.createSymbolicLink(at: symlinkURL, withDestinationURL: target)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-symlink-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: symlinkName, to: restoreDir)
+        ) { error in
+            guard case ProjectIOError.backupNotFound = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+        }
+    }
+
     func testBackupRestoreRejectsArchiveMissingManifest() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupMissingManifest", at: tempDir)
