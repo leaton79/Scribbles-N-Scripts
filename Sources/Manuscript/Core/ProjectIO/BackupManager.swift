@@ -56,12 +56,12 @@ struct BackupManager {
         let backupsURL = projectURL.appendingPathComponent("backups", isDirectory: true)
         let urls = (try? FileManager.default.contentsOfDirectory(
             at: backupsURL,
-            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles]
         )) ?? []
 
         return urls
-            .filter { isManagedBackupFilename($0.lastPathComponent) }
+            .filter { isManagedBackupURL($0) }
             .compactMap { url in
                 let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
                 guard let date = values?.contentModificationDate else { return nil }
@@ -182,5 +182,12 @@ struct BackupManager {
         guard value.hasPrefix("backup-") else { return false }
         guard !value.contains("..") else { return false }
         return true
+    }
+
+    private static func isManagedBackupURL(_ url: URL) -> Bool {
+        guard isManagedBackupFilename(url.lastPathComponent) else { return false }
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values?.isSymbolicLink != true else { return false }
+        return values?.isRegularFile == true
     }
 }

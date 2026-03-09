@@ -586,6 +586,27 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: unmanagedZip.path))
     }
 
+    func testListBackupsIgnoresManagedNameDirectoryAndSymlink() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupListKinds", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupListKinds")
+        let managed = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+
+        let decoyDir = backupsDir.appendingPathComponent("backup-decoy-directory.zip", isDirectory: true)
+        try FileManager.default.createDirectory(at: decoyDir, withIntermediateDirectories: true)
+
+        let symlinkTarget = backupsDir.appendingPathComponent(managed.filename)
+        let decoyLink = backupsDir.appendingPathComponent("backup-decoy-link.zip")
+        try? FileManager.default.removeItem(at: decoyLink)
+        try FileManager.default.createSymbolicLink(at: decoyLink, withDestinationURL: symlinkTarget)
+
+        let backups = BackupManager.listBackups(projectURL: root)
+        XCTAssertTrue(backups.contains(where: { $0.filename == managed.filename }))
+        XCTAssertFalse(backups.contains(where: { $0.filename == decoyDir.lastPathComponent }))
+        XCTAssertFalse(backups.contains(where: { $0.filename == decoyLink.lastPathComponent }))
+    }
+
     func testPruneBackupsDoesNotDeleteUnmanagedZipFiles() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupPruneFilter", at: tempDir)
@@ -605,6 +626,32 @@ final class ProjectIOTests: XCTestCase {
         let backups = BackupManager.listBackups(projectURL: root)
         XCTAssertEqual(backups.count, 1)
         XCTAssertTrue(FileManager.default.fileExists(atPath: unmanagedZip.path))
+    }
+
+    func testPruneBackupsDoesNotDeleteManagedNameDirectoryOrSymlink() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupPruneKinds", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupPruneKinds")
+
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        let second = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+
+        let decoyDir = backupsDir.appendingPathComponent("backup-decoy-directory.zip", isDirectory: true)
+        try FileManager.default.createDirectory(at: decoyDir, withIntermediateDirectories: true)
+
+        let decoyLink = backupsDir.appendingPathComponent("backup-decoy-link.zip")
+        let target = backupsDir.appendingPathComponent(second.filename)
+        try? FileManager.default.removeItem(at: decoyLink)
+        try FileManager.default.createSymbolicLink(at: decoyLink, withDestinationURL: target)
+
+        try BackupManager.pruneBackups(projectURL: root, retentionCount: 1)
+
+        let backups = BackupManager.listBackups(projectURL: root)
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: decoyDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: decoyLink.path))
     }
 
     func testBackupRestoreReturnsSnapshotOfPriorState() throws {
