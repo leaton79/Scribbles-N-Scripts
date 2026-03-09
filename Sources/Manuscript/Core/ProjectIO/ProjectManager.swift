@@ -75,6 +75,11 @@ final class FileSystemProjectManager: ProjectManager {
     private(set) var currentProject: Project?
     var isDirty: Bool { isManifestDirty || !dirtySceneIds.isEmpty }
 
+    // Test hook for module-level metadata fixtures.
+    func _assignCurrentProjectForTesting(_ project: Project) {
+        currentProject = project
+    }
+
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
