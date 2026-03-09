@@ -91,10 +91,13 @@ struct BackupManager {
             throw ProjectIOError.backupNotFound(backupFilename)
         }
 
+        let candidate = destinationDir.appendingPathComponent(projectURL.lastPathComponent, isDirectory: true)
         try FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: candidate.path) {
+            try FileManager.default.removeItem(at: candidate)
+        }
         try unzipArchive(sourceZip: backupURL, destinationDir: destinationDir)
 
-        let candidate = destinationDir.appendingPathComponent(projectURL.lastPathComponent)
         guard FileManager.default.fileExists(atPath: candidate.path) else {
             throw ProjectIOError.backupNotFound("Could not locate restored project root in backup")
         }

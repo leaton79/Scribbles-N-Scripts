@@ -594,6 +594,26 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertFalse(restoredManifest.hierarchy.scenes.contains(where: { $0.title == "AfterBackup" }))
     }
 
+    func testBackupRestoreClearsExistingRestoreTargetDirectory() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupRestoreClean", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupRestoreClean")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-clean-temp", isDirectory: true)
+        let staleProjectDir = restoreDir.appendingPathComponent("BackupRestoreClean", isDirectory: true)
+        try FileManager.default.createDirectory(at: staleProjectDir, withIntermediateDirectories: true)
+        let staleFile = staleProjectDir.appendingPathComponent("stale.txt")
+        try "stale".write(to: staleFile, atomically: true, encoding: .utf8)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staleFile.path))
+
+        let restoredRoot = try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: restoreDir)
+
+        XCTAssertEqual(restoredRoot.standardizedFileURL.path, staleProjectDir.standardizedFileURL.path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleFile.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: restoredRoot.appendingPathComponent("manifest.json").path))
+    }
+
     func testBackupRestoreRemovesStaleLockFromRestoredProject() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupLock", at: tempDir)
