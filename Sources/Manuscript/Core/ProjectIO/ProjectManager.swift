@@ -202,6 +202,10 @@ final class FileSystemProjectManager: ProjectManager {
     func openProject(at url: URL) throws -> Project {
         let rootURL = url
         if projectURL == rootURL, let currentProject {
+            let lockURL = rootURL.appendingPathComponent(lockFilename)
+            if !fileManager.fileExists(atPath: lockURL.path) || !lockOwnedByCurrentProcess(at: lockURL) {
+                try createLockFileIfNeeded(at: rootURL)
+            }
             return currentProject
         }
         let lockURL = rootURL.appendingPathComponent(lockFilename)

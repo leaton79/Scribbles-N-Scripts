@@ -521,6 +521,20 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
     }
 
+    func testOpenProjectSameRootRecreatesMissingLock() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "SameRootRecreateLock", at: tempDir)
+        let root = tempDir.appendingPathComponent("SameRootRecreateLock")
+        let lockURL = root.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+
+        try FileManager.default.removeItem(at: lockURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: lockURL.path))
+
+        XCTAssertNoThrow(try manager.openProject(at: root))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+    }
+
     func testOpenProjectRemovesStaleLockFileAndSucceeds() throws {
         let creator = FileSystemProjectManager()
         _ = try creator.createProject(name: "StaleLock", at: tempDir)
