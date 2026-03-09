@@ -92,6 +92,9 @@ struct BackupManager {
         }
 
         let candidate = destinationDir.appendingPathComponent(projectURL.lastPathComponent, isDirectory: true)
+        if candidate.standardizedFileURL.path == projectURL.standardizedFileURL.path {
+            throw ProjectIOError.backupNotFound("Restore destination conflicts with source project path")
+        }
         try FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
         if FileManager.default.fileExists(atPath: candidate.path) {
             try FileManager.default.removeItem(at: candidate)

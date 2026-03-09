@@ -649,6 +649,27 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: restoredRoot.appendingPathComponent("manifest.json").path))
     }
 
+    func testBackupRestoreRejectsDestinationThatConflictsWithSourceProject() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupRestoreConflict", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupRestoreConflict")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let sourceManifest = root.appendingPathComponent("manifest.json")
+        let sourceManifestData = try Data(contentsOf: sourceManifest)
+
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: tempDir)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("conflicts"))
+        }
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+        XCTAssertEqual(try Data(contentsOf: sourceManifest), sourceManifestData)
+    }
+
     func testBackupRestoreRemovesStaleLockFromRestoredProject() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupLock", at: tempDir)
