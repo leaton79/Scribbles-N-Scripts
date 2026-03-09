@@ -120,6 +120,10 @@ struct BackupManager {
             guard FileManager.default.fileExists(atPath: manifestURL.path) else {
                 throw ProjectIOError.backupNotFound("Restored backup is missing manifest.json")
             }
+            let manifestValues = try manifestURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard manifestValues.isRegularFile == true, manifestValues.isSymbolicLink != true else {
+                throw ProjectIOError.backupNotFound("Restored backup contains invalid manifest entry")
+            }
             do {
                 _ = try ManifestCoder.read(from: manifestURL)
             } catch {

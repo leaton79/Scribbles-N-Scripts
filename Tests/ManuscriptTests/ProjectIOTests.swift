@@ -988,6 +988,48 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
     }
 
+    func testBackupRestoreRejectsArchiveWithSymlinkManifest() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupSymlinkManifest", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupSymlinkManifest")
+        let backupsDir = root.appendingPathComponent("backups", isDirectory: true)
+        let fakeName = "backup-symlink-manifest.zip"
+        let fakeZipURL = backupsDir.appendingPathComponent(fakeName)
+
+        let stageRoot = tempDir.appendingPathComponent("fake-backup-symlink-manifest-\(UUID().uuidString)", isDirectory: true)
+        let stagedProject = stageRoot.appendingPathComponent("BackupSymlinkManifest", isDirectory: true)
+        try FileManager.default.createDirectory(at: stagedProject, withIntermediateDirectories: true)
+
+        let targetManifest = stageRoot.appendingPathComponent("manifest-target.json")
+        let targetContent = """
+        {"schemaVersion":"1.0","project":{"id":"\(UUID().uuidString)","name":"X","author":"A","defaultSceneTemplate":"T","createdAt":"2026-01-01T00:00:00Z","modifiedAt":"2026-01-01T00:00:00Z"},"hierarchy":{"acts":[],"chapters":[],"scenes":[],"tags":[],"trashedItems":[]}}
+        """
+        try targetContent.write(to: targetManifest, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            at: stagedProject.appendingPathComponent("manifest.json"),
+            withDestinationURL: targetManifest
+        )
+
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        zip.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", stagedProject.path, fakeZipURL.path]
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-symlink-manifest-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: fakeName, to: restoreDir)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("invalid manifest entry"))
+        }
+        let extractedRoot = restoreDir.appendingPathComponent("BackupSymlinkManifest", isDirectory: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
+    }
+
     func testBackupRestoreRejectsArchiveWithNonDirectoryProjectRoot() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupRootFile", at: tempDir)
