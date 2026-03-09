@@ -14,6 +14,10 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @Published var loadError: String?
 
+    var projectDisplayName: String {
+        projectManager.currentProject?.name ?? "Scribbles N Scripts"
+    }
+
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
@@ -116,6 +120,48 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    @discardableResult
+    func createChapter(title: String? = nil) -> String? {
+        let base = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle: String
+        if let base, !base.isEmpty {
+            resolvedTitle = base
+        } else {
+            let chapterCount = projectManager.getManifest().hierarchy.chapters.count
+            resolvedTitle = "Chapter \(chapterCount + 1)"
+        }
+
+        do {
+            let chapter = try projectManager.addChapter(to: nil, at: nil, title: resolvedTitle)
+            refreshDerivedStates()
+            navigationState.navigateTo(chapterId: chapter.id)
+            return nil
+        } catch {
+            return "Could not create chapter: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func createScene(title: String = "Untitled Scene") -> String? {
+        do {
+            let chapterId = try resolveChapterForSceneCreation()
+            let scene = try projectManager.addScene(to: chapterId, at: nil, title: title)
+            refreshDerivedStates()
+            navigationState.navigateTo(sceneId: scene.id)
+            editorState.navigateToScene(id: scene.id)
+            if splitEditorState.isSplit, splitEditorState.activePaneIndex == 1 {
+                splitEditorState.secondarySceneId = scene.id
+                splitEditorState.secondaryEditor.navigateToScene(id: scene.id)
+            } else {
+                splitEditorState.primarySceneId = scene.id
+                splitEditorState.primaryEditor.navigateToScene(id: scene.id)
+            }
+            return nil
+        } catch {
+            return "Could not create scene: \(error.localizedDescription)"
+        }
+    }
+
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
@@ -205,6 +251,39 @@ final class WorkspaceCoordinator: ObservableObject {
     private func autosaveOpenEditors() {
         try? editorState.autosaveIfNeeded(projectManager: projectManager)
         splitEditorState.autosaveOpenPanes()
+    }
+
+    private func refreshDerivedStates() {
+        linearState.reloadSequence()
+        modularState.reload()
+    }
+
+    private func resolveChapterForSceneCreation() throws -> UUID {
+        let manifest = projectManager.getManifest()
+        let validChapterIds = Set(manifest.hierarchy.chapters.map(\.id))
+        if let selected = navigationState.selectedChapterId,
+           validChapterIds.contains(selected) {
+            return selected
+        }
+
+        if let selectedScene = navigationState.selectedSceneId,
+           let parent = manifest.hierarchy.scenes.first(where: { $0.id == selectedScene })?.parentChapterId,
+           validChapterIds.contains(parent) {
+            return parent
+        }
+
+        if let currentScene = editorState.currentSceneId,
+           let parent = manifest.hierarchy.scenes.first(where: { $0.id == currentScene })?.parentChapterId,
+           validChapterIds.contains(parent) {
+            return parent
+        }
+
+        if let firstChapter = manifest.hierarchy.chapters.sorted(by: { $0.sequenceIndex < $1.sequenceIndex }).first {
+            return firstChapter.id
+        }
+
+        let newChapter = try projectManager.addChapter(to: nil, at: nil, title: "Chapter 1")
+        return newChapter.id
     }
 
     private func resolveSceneForSplitOpen() -> UUID? {

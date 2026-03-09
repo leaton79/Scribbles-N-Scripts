@@ -19,6 +19,7 @@ struct ManuscriptApp: App {
 private struct WorkspaceView: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     @State private var splitNotice: String?
+    @State private var actionNotice: String?
 
     var body: some View {
         GeometryReader { geometry in
@@ -37,15 +38,28 @@ private struct WorkspaceView: View {
 
                     VStack(spacing: 0) {
                         HStack {
+                            Text(workspace.projectDisplayName)
+                                .font(.headline)
                             Text("Session: \(workspace.goalsManager.sessionProgressText())")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if let actionNotice {
+                                Text(actionNotice)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             if let splitNotice {
                                 Text(splitNotice)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
+                            Button("New Chapter") {
+                                actionNotice = workspace.createChapter()
+                            }
+                            Button("New Scene") {
+                                actionNotice = workspace.createScene()
+                            }
                             if workspace.modeController.activeMode == .linear {
                                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
                                     toggleSplit(windowWidth: geometry.size.width)

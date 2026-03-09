@@ -217,4 +217,47 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(reopenedProjectA.splitEditorState.orientation, .horizontal)
         XCTAssertEqual(reopenedProjectA.splitEditorState.splitRatio, 0.33, accuracy: 0.0001)
     }
+
+    func testCreateChapterAddsTopLevelChapterAndSelectsIt() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapter")
+        let before = coordinator.projectManager.getManifest().hierarchy.chapters.count
+
+        let message = coordinator.createChapter()
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertEqual(manifest.hierarchy.chapters.count, before + 1)
+        let created = try XCTUnwrap(manifest.hierarchy.chapters.max(by: { $0.sequenceIndex < $1.sequenceIndex }))
+        XCTAssertEqual(coordinator.navigationState.selectedChapterId, created.id)
+    }
+
+    func testCreateSceneUsesSelectedChapterAndSelectsNewScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneSelectedChapter")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        coordinator.navigationState.selectedChapterId = chapterId
+
+        let message = coordinator.createScene(title: "Scene Via Action")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        let added = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.title == "Scene Via Action" }))
+        XCTAssertEqual(added.parentChapterId, chapterId)
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, added.id)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, added.id)
+    }
+
+    func testCreateSceneCreatesFallbackChapterWhenHierarchyIsEmpty() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneFallbackChapter")
+        let initialChapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        try coordinator.projectManager.deleteItem(id: initialChapterId, type: .chapter)
+        coordinator.linearState.reloadSequence()
+
+        let message = coordinator.createScene(title: "Recovered Scene")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertEqual(manifest.hierarchy.chapters.count, 1)
+        let createdScene = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.title == "Recovered Scene" }))
+        XCTAssertNotNil(createdScene.parentChapterId)
+    }
 }
