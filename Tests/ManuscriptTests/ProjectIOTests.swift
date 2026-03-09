@@ -591,6 +591,23 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: staleLockURL.path))
     }
 
+    func testOpenProjectReplacesMalformedLockFileAndSucceeds() throws {
+        let creator = FileSystemProjectManager()
+        _ = try creator.createProject(name: "MalformedLock", at: tempDir)
+        let root = tempDir.appendingPathComponent("MalformedLock")
+        try creator.closeProject()
+
+        let lockURL = root.appendingPathComponent(".lock")
+        try Data("not-json".utf8).write(to: lockURL, options: .atomic)
+
+        let opener = FileSystemProjectManager()
+        XCTAssertNoThrow(try opener.openProject(at: root))
+
+        let lockData = try Data(contentsOf: lockURL)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: lockData) as? [String: Any])
+        XCTAssertNotNil(payload["pid"])
+    }
+
     func testBackupCreateAndListReturnsNewestFirst() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupList", at: tempDir)

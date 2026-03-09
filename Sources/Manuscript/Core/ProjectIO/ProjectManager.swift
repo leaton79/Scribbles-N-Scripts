@@ -878,7 +878,7 @@ final class FileSystemProjectManager: ProjectManager {
 
     private func lockRepresentsActiveSession(at lockURL: URL) -> Bool {
         let pidInfo = lockPIDInfo(at: lockURL)
-        guard pidInfo.readable else { return true }
+        guard pidInfo.readable else { return false }
         guard let pidValue = pidInfo.pid, pidValue > 0 else { return false }
         let check = kill(pid_t(pidValue), 0)
         if check == 0 { return true }
