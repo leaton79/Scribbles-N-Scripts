@@ -28,7 +28,9 @@ struct BackupManager {
             try fileManager.removeItem(at: backupURL)
         }
         try fileManager.moveItem(at: tempZipURL, to: backupURL)
-        try pruneBackups(projectURL: projectURL, retentionCount: retentionCount)
+        // Always keep the backup just created by this call.
+        let effectiveRetention = max(1, retentionCount)
+        try pruneBackups(projectURL: projectURL, retentionCount: effectiveRetention)
 
         let attrs = try fileManager.attributesOfItem(atPath: backupURL.path)
         let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0

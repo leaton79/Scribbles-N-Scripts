@@ -583,4 +583,20 @@ final class ProjectIOTests: XCTestCase {
 
         XCTAssertFalse(restoredEntries.contains(where: { $0.pathExtension.lowercased() == "zip" }))
     }
+
+    func testBackupCreateWithZeroRetentionStillKeepsLatestBackup() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupZeroRetention", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupZeroRetention")
+
+        let first = try BackupManager.createBackup(projectURL: root, retentionCount: 0)
+        XCTAssertTrue(first.filename.hasSuffix(".zip"))
+
+        Thread.sleep(forTimeInterval: 0.01)
+        let second = try BackupManager.createBackup(projectURL: root, retentionCount: 0)
+        let backups = BackupManager.listBackups(projectURL: root)
+
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertEqual(backups.first?.filename, second.filename)
+    }
 }
