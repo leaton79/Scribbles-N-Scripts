@@ -61,6 +61,10 @@ struct BackupManager {
         guard FileManager.default.fileExists(atPath: candidate.path) else {
             throw ProjectIOError.backupNotFound("Could not locate restored project root in backup")
         }
+        let restoredLockURL = candidate.appendingPathComponent(".lock")
+        if FileManager.default.fileExists(atPath: restoredLockURL.path) {
+            try? FileManager.default.removeItem(at: restoredLockURL)
+        }
         return candidate
     }
 

@@ -550,4 +550,19 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(restoredManifest.hierarchy.scenes.contains(where: { $0.title == "BeforeBackup" }))
         XCTAssertFalse(restoredManifest.hierarchy.scenes.contains(where: { $0.title == "AfterBackup" }))
     }
+
+    func testBackupRestoreRemovesStaleLockFromRestoredProject() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupLock", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupLock")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-lock-temp", isDirectory: true)
+        let restoredRoot = try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: restoreDir)
+        let restoredLock = restoredRoot.appendingPathComponent(".lock")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: restoredLock.path))
+
+        let opener = FileSystemProjectManager()
+        XCTAssertNoThrow(try opener.openProject(at: restoredRoot))
+    }
 }
