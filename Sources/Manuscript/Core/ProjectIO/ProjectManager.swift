@@ -184,13 +184,16 @@ final class FileSystemProjectManager: ProjectManager {
 
     func openProject(at url: URL) throws -> Project {
         let rootURL = url
-        if projectURL != nil {
-            try closeProject()
+        if projectURL == rootURL, let currentProject {
+            return currentProject
         }
         let lockURL = rootURL.appendingPathComponent(lockFilename)
         if fileManager.fileExists(atPath: lockURL.path) {
             throw ProjectIOError.concurrentAccess(lockFile: lockURL)
         }
+
+        var transitionedFromExistingProject = false
+        var assignedNewState = false
 
         do {
             try checkVersionCompatibility(projectRoot: rootURL)
@@ -204,20 +207,28 @@ final class FileSystemProjectManager: ProjectManager {
                 try writeManifest(manifest, to: manifestURL)
             }
 
+            if projectURL != nil {
+                try closeProject()
+                transitionedFromExistingProject = true
+            }
+
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
             isManifestDirty = false
             dirtySceneIds.removeAll()
+            assignedNewState = true
 
             try createLockFileIfNeeded(at: rootURL)
             return currentProject!
         } catch {
-            currentProject = nil
-            manifest = nil
-            projectURL = nil
-            dirtySceneIds.removeAll()
-            isManifestDirty = false
+            if transitionedFromExistingProject || assignedNewState {
+                currentProject = nil
+                manifest = nil
+                projectURL = nil
+                dirtySceneIds.removeAll()
+                isManifestDirty = false
+            }
             throw error
         }
     }

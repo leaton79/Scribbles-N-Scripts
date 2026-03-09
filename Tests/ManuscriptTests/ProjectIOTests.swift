@@ -348,6 +348,28 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(manager.projectRootURL, rootB)
     }
 
+    func testOpenLockedProjectDoesNotDropCurrentlyOpenProject() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Current", at: tempDir)
+        let currentRoot = tempDir.appendingPathComponent("Current")
+        let currentLock = currentRoot.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+
+        let holder = FileSystemProjectManager()
+        _ = try holder.createProject(name: "LockedTarget", at: tempDir)
+        let lockedRoot = tempDir.appendingPathComponent("LockedTarget")
+
+        XCTAssertThrowsError(try manager.openProject(at: lockedRoot)) { error in
+            guard case ProjectIOError.concurrentAccess = error else {
+                return XCTFail("Expected concurrentAccess, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(manager.projectRootURL, currentRoot)
+        XCTAssertNotNil(manager.currentProject)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+    }
+
     func testCreateProjectSwitchesProjectsAndReleasesPreviousLock() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "First", at: tempDir)
