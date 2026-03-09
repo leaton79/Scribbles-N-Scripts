@@ -208,8 +208,12 @@ final class FileSystemProjectManager: ProjectManager {
             throw ProjectIOError.concurrentAccess(lockFile: lockURL)
         }
 
-        var transitionedFromExistingProject = false
-        var assignedNewState = false
+        let previousProjectURL = projectURL
+        let previousManifest = manifest
+        let previousProject = currentProject
+        let previousDirtySceneIds = dirtySceneIds
+        let previousManifestDirty = isManifestDirty
+        var createdTargetLock = false
 
         do {
             try checkVersionCompatibility(projectRoot: rootURL)
@@ -223,28 +227,30 @@ final class FileSystemProjectManager: ProjectManager {
                 try writeManifest(manifest, to: manifestURL)
             }
 
-            if projectURL != nil {
-                try closeProject()
-                transitionedFromExistingProject = true
-            }
+            try createLockFileIfNeeded(at: rootURL)
+            createdTargetLock = true
 
+            stopAutosave()
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
             isManifestDirty = false
             dirtySceneIds.removeAll()
-            assignedNewState = true
 
-            try createLockFileIfNeeded(at: rootURL)
+            if let previousProjectURL, previousProjectURL != rootURL {
+                removeLockFileIfPresent(at: previousProjectURL)
+            }
+
             return currentProject!
         } catch {
-            if transitionedFromExistingProject || assignedNewState {
-                currentProject = nil
-                manifest = nil
-                projectURL = nil
-                dirtySceneIds.removeAll()
-                isManifestDirty = false
+            if createdTargetLock {
+                removeLockFileIfPresent(at: rootURL)
             }
+            self.projectURL = previousProjectURL
+            self.manifest = previousManifest
+            self.currentProject = previousProject
+            self.dirtySceneIds = previousDirtySceneIds
+            self.isManifestDirty = previousManifestDirty
             throw error
         }
     }

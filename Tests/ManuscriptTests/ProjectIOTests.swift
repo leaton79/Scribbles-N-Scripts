@@ -438,4 +438,45 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertNotNil(manager.currentProject)
         XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
     }
+
+    func testOpenProjectNormalizationWriteFailureKeepsCurrentProjectOpen() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Current", at: tempDir)
+        let currentRoot = tempDir.appendingPathComponent("Current")
+        let currentLock = currentRoot.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+
+        let creator = FileSystemProjectManager()
+        let targetProject = try creator.createProject(name: "Target", at: tempDir)
+        let targetChapterId = try XCTUnwrap(creator.getManifest().hierarchy.chapters.first?.id)
+        _ = try creator.addScene(to: targetChapterId, at: nil, title: "Scene 2")
+        try creator.saveManifest()
+        let targetRoot = tempDir.appendingPathComponent(targetProject.name)
+        let targetManifestURL = targetRoot.appendingPathComponent("manifest.json")
+        let targetLock = targetRoot.appendingPathComponent(".lock")
+        try creator.closeProject()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: targetLock.path))
+
+        var manifest = try ManifestCoder.read(from: targetManifestURL)
+        let firstId = try XCTUnwrap(manifest.hierarchy.scenes.first?.id)
+        let secondId = try XCTUnwrap(manifest.hierarchy.scenes.dropFirst().first?.id)
+        manifest.hierarchy.scenes[1].id = firstId
+        for chapterIndex in manifest.hierarchy.chapters.indices {
+            for sceneIndex in manifest.hierarchy.chapters[chapterIndex].scenes.indices where manifest.hierarchy.chapters[chapterIndex].scenes[sceneIndex] == secondId {
+                manifest.hierarchy.chapters[chapterIndex].scenes[sceneIndex] = firstId
+            }
+        }
+        let corruptData = try ManifestCoder.encode(manifest)
+        try corruptData.write(to: targetManifestURL, options: .atomic)
+
+        manager.manifestWriteInterceptor = { _, _ in
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)
+        }
+
+        XCTAssertThrowsError(try manager.openProject(at: targetRoot))
+        XCTAssertEqual(manager.projectRootURL, currentRoot)
+        XCTAssertNotNil(manager.currentProject)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: targetLock.path))
+    }
 }
