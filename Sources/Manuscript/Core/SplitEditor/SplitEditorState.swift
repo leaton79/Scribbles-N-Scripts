@@ -2,7 +2,7 @@ import Combine
 import CoreGraphics
 import Foundation
 
-enum SplitOrientation {
+enum SplitOrientation: String {
     case vertical
     case horizontal
 }
@@ -10,10 +10,14 @@ enum SplitOrientation {
 @MainActor
 final class SplitEditorState: ObservableObject {
     @Published var isSplit: Bool
-    @Published var orientation: SplitOrientation
+    @Published var orientation: SplitOrientation {
+        didSet { persistSettings() }
+    }
     @Published var primarySceneId: UUID?
     @Published var secondarySceneId: UUID?
-    @Published var splitRatio: CGFloat
+    @Published var splitRatio: CGFloat {
+        didSet { persistSettings() }
+    }
     @Published var activePaneIndex: Int
     @Published private(set) var isPrimarySearchBarVisible = false
     @Published private(set) var isSecondarySearchBarVisible = false
@@ -22,19 +26,25 @@ final class SplitEditorState: ObservableObject {
     let secondaryEditor: EditorState
 
     private let projectManager: ProjectManager
+    private let settingsStore: UserDefaults
+    private let settingsNamespace: String
 
     init(
         projectManager: ProjectManager,
         primarySceneId: UUID? = nil,
         orientation: SplitOrientation = .vertical,
-        splitRatio: CGFloat = 0.5
+        splitRatio: CGFloat = 0.5,
+        settingsStore: UserDefaults = .standard,
+        settingsNamespace: String = "splitEditor"
     ) {
         self.projectManager = projectManager
+        self.settingsStore = settingsStore
+        self.settingsNamespace = settingsNamespace
         self.isSplit = false
-        self.orientation = orientation
+        self.orientation = Self.loadOrientation(from: settingsStore, namespace: settingsNamespace) ?? orientation
         self.primarySceneId = primarySceneId
         self.secondarySceneId = nil
-        self.splitRatio = splitRatio
+        self.splitRatio = Self.loadSplitRatio(from: settingsStore, namespace: settingsNamespace) ?? splitRatio
         self.activePaneIndex = 0
 
         let loader: (UUID) -> String = { id in
@@ -166,5 +176,21 @@ final class SplitEditorState: ObservableObject {
         let newContent = source.getCurrentContent()
         let oldContent = target.getCurrentContent()
         target.replaceText(in: 0..<oldContent.count, with: newContent)
+    }
+
+    private static func loadOrientation(from store: UserDefaults, namespace: String) -> SplitOrientation? {
+        guard let raw = store.string(forKey: "\(namespace).orientation") else { return nil }
+        return SplitOrientation(rawValue: raw)
+    }
+
+    private static func loadSplitRatio(from store: UserDefaults, namespace: String) -> CGFloat? {
+        guard store.object(forKey: "\(namespace).splitRatio") != nil else { return nil }
+        let ratio = CGFloat(store.double(forKey: "\(namespace).splitRatio"))
+        return min(1, max(0, ratio))
+    }
+
+    private func persistSettings() {
+        settingsStore.set(orientation.rawValue, forKey: "\(settingsNamespace).orientation")
+        settingsStore.set(Double(splitRatio), forKey: "\(settingsNamespace).splitRatio")
     }
 }

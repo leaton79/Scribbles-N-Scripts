@@ -4,15 +4,24 @@ import XCTest
 @MainActor
 final class SplitEditorTests: XCTestCase {
     private var tempDir: URL!
+    private var defaults: UserDefaults!
+    private var defaultsSuiteName: String!
 
     override func setUpWithError() throws {
         tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defaultsSuiteName = "SplitEditorTests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
     }
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: tempDir)
+        if let defaultsSuiteName {
+            defaults?.removePersistentDomain(forName: defaultsSuiteName)
+        }
         tempDir = nil
+        defaults = nil
+        defaultsSuiteName = nil
     }
 
     func testOpenSplitShowsTwoIndependentPanes() throws {
@@ -116,6 +125,33 @@ final class SplitEditorTests: XCTestCase {
         XCTAssertTrue(state.isSplit)
     }
 
+    func testOrientationAndRatioPersistAcrossStateRecreation() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "PersistSplitPrefs", at: tempDir)
+        let sceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        let namespace = "persist-split-settings"
+
+        var state: SplitEditorState? = SplitEditorState(
+            projectManager: manager,
+            primarySceneId: sceneId,
+            settingsStore: defaults,
+            settingsNamespace: namespace
+        )
+        state?.toggleOrientation()
+        state?.updateSplitRatio(dividerPosition: 300, totalLength: 800)
+        state = nil
+
+        let reloaded = SplitEditorState(
+            projectManager: manager,
+            primarySceneId: sceneId,
+            settingsStore: defaults,
+            settingsNamespace: namespace
+        )
+
+        XCTAssertEqual(reloaded.orientation, .horizontal)
+        XCTAssertEqual(reloaded.splitRatio, 0.375, accuracy: 0.0001)
+    }
+
     private func makeFixture(name: String) throws -> (manager: FileSystemProjectManager, state: SplitEditorState, s3: UUID, s7: UUID) {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
@@ -127,7 +163,7 @@ final class SplitEditorTests: XCTestCase {
         try manager.saveSceneContent(sceneId: s3, content: "S3 content")
         try manager.saveSceneContent(sceneId: s7, content: "S7 content")
 
-        let state = SplitEditorState(projectManager: manager, primarySceneId: s3)
+        let state = SplitEditorState(projectManager: manager, primarySceneId: s3, settingsStore: defaults, settingsNamespace: "split-\(name)")
         return (manager, state, s3, s7)
     }
 }
