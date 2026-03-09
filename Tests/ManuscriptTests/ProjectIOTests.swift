@@ -737,6 +737,8 @@ final class ProjectIOTests: XCTestCase {
             }
             XCTAssertTrue(message.contains("manifest.json"))
         }
+        let extractedRoot = restoreDir.appendingPathComponent("BackupMissingManifest", isDirectory: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
     }
 
     func testBackupRestoreRejectsArchiveWithMalformedManifest() throws {
@@ -772,6 +774,8 @@ final class ProjectIOTests: XCTestCase {
             }
             XCTAssertTrue(message.contains("invalid manifest.json"))
         }
+        let extractedRoot = restoreDir.appendingPathComponent("BackupMalformedManifest", isDirectory: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))
     }
 
     func testFirstBackupArchiveDoesNotContainItselfInRestoredBackupsFolder() throws {
