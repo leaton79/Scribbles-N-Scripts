@@ -10,6 +10,37 @@ struct ManuscriptApp: App {
             WorkspaceView(workspace: workspace)
                 .frame(minWidth: 1000, minHeight: 700)
         }
+        .commands {
+            CommandMenu("Project") {
+                Button("New Chapter") {
+                    _ = workspace.createChapter()
+                }
+                .keyboardShortcut("N", modifiers: [.command, .shift])
+
+                Button("New Scene") {
+                    _ = workspace.createScene()
+                }
+                .keyboardShortcut("n", modifiers: [.command])
+            }
+
+            CommandMenu("View") {
+                Button("Linear Mode") {
+                    workspace.setMode(.linear)
+                }
+                .keyboardShortcut("1", modifiers: [.command])
+
+                Button("Modular Mode") {
+                    workspace.setMode(.modular)
+                }
+                .keyboardShortcut("2", modifiers: [.command])
+
+                Button(workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split") {
+                    _ = workspace.toggleSplitForCommand()
+                }
+                .keyboardShortcut("\\", modifiers: [.command])
+                .disabled(workspace.modeController.activeMode != .linear && !workspace.splitEditorState.isSplit)
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             workspace.handleScenePhase(newPhase)
         }
@@ -57,13 +88,16 @@ private struct WorkspaceView: View {
                             Button("New Chapter") {
                                 actionNotice = workspace.createChapter()
                             }
+                            .keyboardShortcut("N", modifiers: [.command, .shift])
                             Button("New Scene") {
                                 actionNotice = workspace.createScene()
                             }
+                            .keyboardShortcut("n", modifiers: [.command])
                             if workspace.modeController.activeMode == .linear {
                                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
                                     toggleSplit(windowWidth: geometry.size.width)
                                 }
+                                .keyboardShortcut("\\", modifiers: [.command])
                             }
                         }
                         .padding(.horizontal, 12)

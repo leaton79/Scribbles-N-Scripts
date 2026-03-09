@@ -120,6 +120,11 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    func setMode(_ mode: ViewMode) {
+        modeController.switchTo(mode)
+        handleModeChange(mode)
+    }
+
     @discardableResult
     func createChapter(title: String? = nil) -> String? {
         let base = title?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -160,6 +165,11 @@ final class WorkspaceCoordinator: ObservableObject {
         } catch {
             return "Could not create scene: \(error.localizedDescription)"
         }
+    }
+
+    @discardableResult
+    func toggleSplitForCommand(defaultWindowWidth: CGFloat = 1200) -> String? {
+        toggleSplit(windowWidth: defaultWindowWidth)
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
