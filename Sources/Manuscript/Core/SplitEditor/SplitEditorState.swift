@@ -69,6 +69,10 @@ final class SplitEditorState: ObservableObject {
         isSecondarySearchBarVisible = false
     }
 
+    func autosaveOpenPanes() {
+        try? autosaveAllPanes()
+    }
+
     func swapPanes() {
         guard isSplit else { return }
         (primarySceneId, secondarySceneId) = (secondarySceneId, primarySceneId)

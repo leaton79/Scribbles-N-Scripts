@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 @MainActor
 final class WorkspaceCoordinator: ObservableObject {
@@ -84,6 +85,25 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            if goalsManager.sessionStartTime == nil {
+                goalsManager.startSession(goal: nil)
+            }
+            goalsManager.handleAppFocusChanged(isFocused: true)
+        case .inactive:
+            goalsManager.handleAppFocusChanged(isFocused: false)
+            autosaveOpenEditors()
+        case .background:
+            goalsManager.handleAppFocusChanged(isFocused: false)
+            autosaveOpenEditors()
+            try? projectManager.saveManifest()
+        @unknown default:
+            break
+        }
+    }
+
     private static func bootstrapProject(using manager: FileSystemProjectManager) throws {
         let fm = FileManager.default
         let appSupport = try fm.url(
@@ -102,5 +122,10 @@ final class WorkspaceCoordinator: ObservableObject {
         } else {
             _ = try manager.createProject(name: defaultProjectName, at: root)
         }
+    }
+
+    private func autosaveOpenEditors() {
+        try? editorState.autosaveIfNeeded(projectManager: projectManager)
+        splitEditorState.autosaveOpenPanes()
     }
 }

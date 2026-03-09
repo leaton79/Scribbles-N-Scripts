@@ -2,12 +2,16 @@ import SwiftUI
 
 @main
 struct ManuscriptApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var workspace = WorkspaceCoordinator()
 
     var body: some SwiftUI.Scene {
         WindowGroup {
             WorkspaceView(workspace: workspace)
                 .frame(minWidth: 1000, minHeight: 700)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            workspace.handleScenePhase(newPhase)
         }
     }
 }
@@ -59,10 +63,6 @@ private struct WorkspaceView: View {
                 if mode == .modular, workspace.splitEditorState.isSplit {
                     workspace.splitEditorState.closeSplit()
                 }
-            }
-            .task {
-                workspace.goalsManager.startSession(goal: nil)
-                workspace.goalsManager.startTimer()
             }
         }
     }
