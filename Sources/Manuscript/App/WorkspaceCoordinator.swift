@@ -14,55 +14,42 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @Published var loadError: String?
 
-    init() {
-        let manager = FileSystemProjectManager()
+    init(
+        projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
+        bootstrapRootURL: URL? = nil,
+        bootstrapProjectName: String = "Sandbox"
+    ) {
         self.projectManager = manager
 
         do {
-            try Self.bootstrapProject(using: manager)
-            let navigationState = NavigationState(projectProvider: { manager.currentProject })
-            let editorState = EditorState(sceneLoader: { id in
-                (try? manager.loadSceneContent(sceneId: id)) ?? ""
-            })
-            let linearState = LinearModeState(projectManager: manager, navigationState: navigationState, editorState: editorState)
-            let modularState = ModularModeState(projectManager: manager, navigationState: navigationState, editorState: editorState)
-            let modeController = ModeController(
-                projectManager: manager,
-                navigationState: navigationState,
-                editorState: editorState,
-                linearState: linearState,
-                modularState: modularState
+            try Self.bootstrapProject(
+                using: manager,
+                rootURL: bootstrapRootURL,
+                projectName: bootstrapProjectName
             )
-            let splitEditorState = SplitEditorState(projectManager: manager, primarySceneId: editorState.currentSceneId)
-            let goalsManager = GoalsManager(projectManager: manager)
+            let dependencies = Self.makeDependencies(manager: manager)
+            self.navigationState = dependencies.navigationState
+            self.editorState = dependencies.editorState
+            self.linearState = dependencies.linearState
+            self.modularState = dependencies.modularState
+            self.modeController = dependencies.modeController
+            self.splitEditorState = dependencies.splitEditorState
+            self.goalsManager = dependencies.goalsManager
 
-            self.navigationState = navigationState
-            self.editorState = editorState
-            self.linearState = linearState
-            self.modularState = modularState
-            self.modeController = modeController
-            self.splitEditorState = splitEditorState
-            self.goalsManager = goalsManager
-
-            if editorState.currentSceneId == nil, let first = linearState.orderedSceneIds.first {
-                linearState.goToScene(id: first)
-                splitEditorState.primarySceneId = first
+            if dependencies.editorState.currentSceneId == nil, let first = dependencies.linearState.orderedSceneIds.first {
+                dependencies.linearState.goToScene(id: first)
+                dependencies.splitEditorState.primarySceneId = first
             }
         } catch {
             self.loadError = error.localizedDescription
-            self.navigationState = NavigationState()
-            self.editorState = EditorState()
-            self.linearState = LinearModeState(projectManager: manager, navigationState: navigationState, editorState: editorState)
-            self.modularState = ModularModeState(projectManager: manager, navigationState: navigationState, editorState: editorState)
-            self.modeController = ModeController(
-                projectManager: manager,
-                navigationState: navigationState,
-                editorState: editorState,
-                linearState: linearState,
-                modularState: modularState
-            )
-            self.splitEditorState = SplitEditorState(projectManager: manager)
-            self.goalsManager = GoalsManager(projectManager: manager)
+            let dependencies = Self.makeDependencies(manager: manager)
+            self.navigationState = dependencies.navigationState
+            self.editorState = dependencies.editorState
+            self.linearState = dependencies.linearState
+            self.modularState = dependencies.modularState
+            self.modeController = dependencies.modeController
+            self.splitEditorState = dependencies.splitEditorState
+            self.goalsManager = dependencies.goalsManager
         }
     }
 
@@ -104,24 +91,55 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
-    private static func bootstrapProject(using manager: FileSystemProjectManager) throws {
+    private static func bootstrapProject(using manager: FileSystemProjectManager, rootURL: URL?, projectName: String) throws {
         let fm = FileManager.default
-        let appSupport = try fm.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let root = appSupport.appendingPathComponent("Manuscript", isDirectory: true)
+        let root: URL
+        if let rootURL {
+            root = rootURL
+        } else {
+            let appSupport = try fm.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            root = appSupport.appendingPathComponent("Manuscript", isDirectory: true)
+        }
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
 
-        let defaultProjectName = "Sandbox"
-        let projectRoot = root.appendingPathComponent(defaultProjectName, isDirectory: true)
+        let projectRoot = root.appendingPathComponent(projectName, isDirectory: true)
         if fm.fileExists(atPath: projectRoot.appendingPathComponent("manifest.json").path) {
             _ = try manager.openProject(at: projectRoot)
         } else {
-            _ = try manager.createProject(name: defaultProjectName, at: root)
+            _ = try manager.createProject(name: projectName, at: root)
         }
+    }
+
+    private static func makeDependencies(manager: FileSystemProjectManager) -> (
+        navigationState: NavigationState,
+        editorState: EditorState,
+        linearState: LinearModeState,
+        modularState: ModularModeState,
+        modeController: ModeController,
+        splitEditorState: SplitEditorState,
+        goalsManager: GoalsManager
+    ) {
+        let navigationState = NavigationState(projectProvider: { manager.currentProject })
+        let editorState = EditorState(sceneLoader: { id in
+            (try? manager.loadSceneContent(sceneId: id)) ?? ""
+        })
+        let linearState = LinearModeState(projectManager: manager, navigationState: navigationState, editorState: editorState)
+        let modularState = ModularModeState(projectManager: manager, navigationState: navigationState, editorState: editorState)
+        let modeController = ModeController(
+            projectManager: manager,
+            navigationState: navigationState,
+            editorState: editorState,
+            linearState: linearState,
+            modularState: modularState
+        )
+        let splitEditorState = SplitEditorState(projectManager: manager, primarySceneId: editorState.currentSceneId)
+        let goalsManager = GoalsManager(projectManager: manager)
+        return (navigationState, editorState, linearState, modularState, modeController, splitEditorState, goalsManager)
     }
 
     private func autosaveOpenEditors() {
