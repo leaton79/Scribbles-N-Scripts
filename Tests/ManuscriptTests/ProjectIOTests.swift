@@ -493,4 +493,61 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(manager.projectRootURL, root)
         XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
     }
+
+    func testBackupCreateAndListReturnsNewestFirst() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupList", at: tempDir)
+        let chapterId = try XCTUnwrap(manager.getManifest().hierarchy.chapters.first?.id)
+        _ = try manager.addScene(to: chapterId, at: nil, title: "S2")
+        try manager.saveManifest()
+
+        let root = tempDir.appendingPathComponent("BackupList")
+        let first = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        let second = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let backups = BackupManager.listBackups(projectURL: root)
+
+        XCTAssertGreaterThanOrEqual(backups.count, 2)
+        XCTAssertEqual(backups[0].filename, second.filename)
+        XCTAssertEqual(backups[1].filename, first.filename)
+    }
+
+    func testBackupRetentionPrunesOldBackups() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupPrune", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupPrune")
+
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        try BackupManager.pruneBackups(projectURL: root, retentionCount: 2)
+        let backups = BackupManager.listBackups(projectURL: root)
+
+        XCTAssertEqual(backups.count, 2)
+    }
+
+    func testBackupRestoreReturnsSnapshotOfPriorState() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupRestore", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupRestore")
+        let chapterId = try XCTUnwrap(manager.getManifest().hierarchy.chapters.first?.id)
+        _ = try manager.addScene(to: chapterId, at: nil, title: "BeforeBackup")
+        try manager.saveManifest()
+
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        _ = try manager.addScene(to: chapterId, at: nil, title: "AfterBackup")
+        try manager.saveManifest()
+
+        let restoreDir = tempDir.appendingPathComponent("restore-temp", isDirectory: true)
+        let restoredRoot = try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: restoreDir)
+        let restoredManifest = try ManifestCoder.read(from: restoredRoot.appendingPathComponent("manifest.json"))
+
+        XCTAssertEqual(restoredManifest.hierarchy.scenes.count, 2)
+        XCTAssertTrue(restoredManifest.hierarchy.scenes.contains(where: { $0.title == "BeforeBackup" }))
+        XCTAssertFalse(restoredManifest.hierarchy.scenes.contains(where: { $0.title == "AfterBackup" }))
+    }
 }
