@@ -35,6 +35,7 @@ final class WorkspaceCoordinator: ObservableObject {
             self.modeController = dependencies.modeController
             self.splitEditorState = dependencies.splitEditorState
             self.goalsManager = dependencies.goalsManager
+            self.goalsManager.bind(to: self.editorState)
 
             if dependencies.editorState.currentSceneId == nil, let first = dependencies.linearState.orderedSceneIds.first {
                 dependencies.linearState.goToScene(id: first)
@@ -50,6 +51,7 @@ final class WorkspaceCoordinator: ObservableObject {
             self.modeController = dependencies.modeController
             self.splitEditorState = dependencies.splitEditorState
             self.goalsManager = dependencies.goalsManager
+            self.goalsManager.bind(to: self.editorState)
         }
     }
 

@@ -183,6 +183,20 @@ final class GoalsTests: XCTestCase {
         XCTAssertEqual(todayRecord?.wordsGross, 30)
     }
 
+    func testBindingToEditorTracksWordCountDeltas() throws {
+        let manager = try makeManager(name: "BindEditor")
+        let goals = GoalsManager(projectManager: manager)
+        let editor = EditorState(initialContent: "one two")
+        goals.bind(to: editor)
+        goals.startSession(goal: nil)
+
+        editor.insertText(" three", at: editor.getCurrentContent().count)
+        editor.replaceText(in: 0..<1, with: "") // mutate content without changing word-count
+
+        XCTAssertEqual(goals.sessionWordsWritten, 1)
+        XCTAssertEqual(goals.sessionGrossWords, 1)
+    }
+
     private func makeManager(name: String) throws -> FileSystemProjectManager {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)

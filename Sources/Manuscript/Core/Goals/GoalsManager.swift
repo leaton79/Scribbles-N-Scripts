@@ -72,7 +72,6 @@ final class GoalsManager: ObservableObject {
         sessionGrossWords = 0
         sessionElapsedSeconds = 0
         sessionStartTime = Date()
-        currentEditorWordCount = nil
         sessionAggregatesByDay.removeAll()
         lastGoalNotificationMessage = nil
     }
