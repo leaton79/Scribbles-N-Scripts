@@ -177,25 +177,34 @@ final class FileSystemProjectManager: ProjectManager {
             throw ProjectIOError.concurrentAccess(lockFile: lockURL)
         }
 
-        try checkVersionCompatibility(projectRoot: rootURL)
+        do {
+            try checkVersionCompatibility(projectRoot: rootURL)
 
-        let manifestURL = rootURL.appendingPathComponent("manifest.json")
-        var manifest = try ManifestCoder.read(from: manifestURL)
-        let changed = try normalizeDuplicateSceneIDs(manifest: &manifest, rootURL: rootURL)
-        try validateHierarchy(manifest)
+            let manifestURL = rootURL.appendingPathComponent("manifest.json")
+            var manifest = try ManifestCoder.read(from: manifestURL)
+            let changed = try normalizeDuplicateSceneIDs(manifest: &manifest, rootURL: rootURL)
+            try validateHierarchy(manifest)
 
-        if changed {
-            try writeManifest(manifest, to: manifestURL)
+            if changed {
+                try writeManifest(manifest, to: manifestURL)
+            }
+
+            self.projectURL = rootURL
+            self.manifest = manifest
+            self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
+            isManifestDirty = false
+            dirtySceneIds.removeAll()
+
+            try createLockFileIfNeeded(at: rootURL)
+            return currentProject!
+        } catch {
+            currentProject = nil
+            manifest = nil
+            projectURL = nil
+            dirtySceneIds.removeAll()
+            isManifestDirty = false
+            throw error
         }
-
-        self.projectURL = rootURL
-        self.manifest = manifest
-        self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
-        isManifestDirty = false
-        dirtySceneIds.removeAll()
-
-        try createLockFileIfNeeded(at: rootURL)
-        return currentProject!
     }
 
     func closeProject() throws {

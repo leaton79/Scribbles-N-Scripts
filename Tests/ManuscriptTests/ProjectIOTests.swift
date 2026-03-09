@@ -262,4 +262,49 @@ final class ProjectIOTests: XCTestCase {
             XCTAssertEqual(supportedVersion, "1.0.0")
         }
     }
+
+    func testOpenProjectFailureDuringLateLockCreationLeavesNoOpenState() throws {
+        let creator = FileSystemProjectManager()
+        let project = try creator.createProject(name: "LateLockFailure", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        let manifestURL = root.appendingPathComponent("manifest.json")
+
+        let chapterId = try XCTUnwrap(creator.getManifest().hierarchy.chapters.first?.id)
+        _ = try creator.addScene(to: chapterId, at: nil, title: "Scene 2")
+        try creator.saveManifest()
+        try creator.closeProject()
+
+        var manifest = try ManifestCoder.read(from: manifestURL)
+        let firstId = try XCTUnwrap(manifest.hierarchy.scenes.first?.id)
+        let secondId = try XCTUnwrap(manifest.hierarchy.scenes.dropFirst().first?.id)
+        XCTAssertGreaterThanOrEqual(manifest.hierarchy.scenes.count, 2)
+        manifest.hierarchy.scenes[1].id = firstId
+        for chapterIndex in manifest.hierarchy.chapters.indices {
+            for sceneIndex in manifest.hierarchy.chapters[chapterIndex].scenes.indices where manifest.hierarchy.chapters[chapterIndex].scenes[sceneIndex] == secondId {
+                manifest.hierarchy.chapters[chapterIndex].scenes[sceneIndex] = firstId
+            }
+        }
+        let data = try ManifestCoder.encode(manifest)
+        try data.write(to: manifestURL, options: .atomic)
+
+        let opener = FileSystemProjectManager()
+        opener.manifestWriteInterceptor = { url, data in
+            let lockURL = url.deletingLastPathComponent().appendingPathComponent(".lock")
+            try Data("{}".utf8).write(to: lockURL, options: .atomic)
+            try data.write(to: url, options: .atomic)
+        }
+
+        XCTAssertThrowsError(try opener.openProject(at: root)) { error in
+            guard case ProjectIOError.concurrentAccess = error else {
+                return XCTFail("Expected concurrentAccess, got \(error)")
+            }
+        }
+        XCTAssertNil(opener.currentProject)
+        XCTAssertNil(opener.projectRootURL)
+        XCTAssertThrowsError(try opener.saveManifest()) { error in
+            guard case ProjectIOError.noOpenProject = error else {
+                return XCTFail("Expected noOpenProject after failed open")
+            }
+        }
+    }
 }
