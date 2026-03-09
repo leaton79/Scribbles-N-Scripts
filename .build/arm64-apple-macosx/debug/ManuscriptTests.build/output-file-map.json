@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/master.swiftdeps"
+  },
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/Tests/ManuscriptTests/ManuscriptTests.swift": {
+    "dependencies": "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.d",
+    "object": "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.swift.o",
+    "swiftmodule": "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.swiftdeps",
+    "diagnostics": "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.dia"
+  }
+}

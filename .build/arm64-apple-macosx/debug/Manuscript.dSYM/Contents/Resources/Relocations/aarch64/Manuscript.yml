@@ -1,0 +1,30 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript'
+relocations:
+  - { offset: 0xC8DC0, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV4bodyQrvg', symObjAddr: 0x0, symBinAddr: 0x100000E38, symSize: 0x160 }
+  - { offset: 0xC8E6A, size: 0x8, addend: 0x0, symName: ___swift_instantiateConcreteTypeFromMangledNameV2, symObjAddr: 0x160, symBinAddr: 0x100000F98, symSize: 0x80 }
+  - { offset: 0xC8E7E, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI15ModifiedContentVyAA4TextVAA16_FlexFrameLayoutVGACyxq_GAA4ViewA2aJRzAA0I8ModifierR_rlWl', symObjAddr: 0x5F0, symBinAddr: 0x100001428, symSize: 0x8C }
+  - { offset: 0xC8E92, size: 0x8, addend: 0x0, symName: ___swift_instantiateConcreteTypeFromMangledNameAbstractV2, symObjAddr: 0x67C, symBinAddr: 0x1000014B4, symSize: 0x78 }
+  - { offset: 0xC8EA6, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI11WindowGroupVyAA15ModifiedContentVyAA4TextVAA16_FlexFrameLayoutVGGACyxGAA5SceneAAWl', symObjAddr: 0x738, symBinAddr: 0x100001570, symSize: 0x74 }
+  - { offset: 0xC8EBA, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppVAC7SwiftUI0B0AAWl', symObjAddr: 0x7E0, symBinAddr: 0x100001618, symSize: 0x68 }
+  - { offset: 0xC8ECE, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV7SwiftUI0B0AA4BodyAdEP_AD5ScenePWT', symObjAddr: 0x88C, symBinAddr: 0x1000016C4, symSize: 0x24 }
+  - { offset: 0xC8EE2, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppVMa', symObjAddr: 0x8B0, symBinAddr: 0x1000016E8, symSize: 0x14 }
+  - { offset: 0xC8EF6, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI4TextVWOh', symObjAddr: 0x8D8, symBinAddr: 0x100001710, symSize: 0x44 }
+  - { offset: 0xC8F0A, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI4TextV7StorageOWOe', symObjAddr: 0x91C, symBinAddr: 0x100001754, symSize: 0x40 }
+  - { offset: 0xC8F1E, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI15ModifiedContentVyAA4TextVAA16_FlexFrameLayoutVGWOh', symObjAddr: 0x95C, symBinAddr: 0x100001794, symSize: 0x44 }
+  - { offset: 0xC8F32, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI15ModifiedContentVyAA4TextVAA16_FlexFrameLayoutVGWOc', symObjAddr: 0x9A0, symBinAddr: 0x1000017D8, symSize: 0xA0 }
+  - { offset: 0xC8F46, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI4TextV7StorageOWOy', symObjAddr: 0xA40, symBinAddr: 0x100001878, symSize: 0x40 }
+  - { offset: 0xC8F62, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV4bodyQrvg', symObjAddr: 0x0, symBinAddr: 0x100000E38, symSize: 0x160 }
+  - { offset: 0xC8F86, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV4bodyQrvg7SwiftUI4ViewPAEE5frame8minWidth05idealI003maxI00H6Height0jL00kL09alignmentQr12CoreGraphics7CGFloatVSg_A5sE9AlignmentVtFQOyAE4TextV_Qo_ycfU_', symObjAddr: 0x1E0, symBinAddr: 0x100001018, symSize: 0x234 }
+  - { offset: 0xC8FAB, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI4ViewPAAE5frame8minWidth05idealF003maxF00E6Height0gI00hI09alignmentQr12CoreGraphics7CGFloatVSg_A5oA9AlignmentVtFfA5_', symObjAddr: 0x414, symBinAddr: 0x10000124C, symSize: 0x20 }
+  - { offset: 0xC9073, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI11ViewBuilderV15buildExpressionyxxAA0C0RzlFZ', symObjAddr: 0x434, symBinAddr: 0x10000126C, symSize: 0x44 }
+  - { offset: 0xC9095, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI11ViewBuilderV10buildBlockyxxAA0C0RzlFZ', symObjAddr: 0x478, symBinAddr: 0x1000012B0, symSize: 0x44 }
+  - { offset: 0xC90C1, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI11WindowGroupV11makeContentACyxGxyc_tcfC', symObjAddr: 0x4BC, symBinAddr: 0x1000012F4, symSize: 0x134 }
+  - { offset: 0xC911B, size: 0x8, addend: 0x0, symName: '_$s7SwiftUI12SceneBuilderV15buildExpressionyxxAA0C0RzlFZ', symObjAddr: 0x6F4, symBinAddr: 0x10000152C, symSize: 0x44 }
+  - { offset: 0xC9150, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV5$mainyyFZ', symObjAddr: 0x7AC, symBinAddr: 0x1000015E4, symSize: 0x34 }
+  - { offset: 0xC9170, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppVACycfC', symObjAddr: 0x848, symBinAddr: 0x100001680, symSize: 0x4 }
+  - { offset: 0xC9191, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV7SwiftUI0B0AadEP4body4BodyQzvgTW', symObjAddr: 0x84C, symBinAddr: 0x100001684, symSize: 0x14 }
+  - { offset: 0xC91AC, size: 0x8, addend: 0x0, symName: '_$s10Manuscript0A3AppV7SwiftUI0B0AadEPxycfCTW', symObjAddr: 0x860, symBinAddr: 0x100001698, symSize: 0x14 }
+  - { offset: 0xC91D9, size: 0x8, addend: 0x0, symName: _Manuscript_main, symObjAddr: 0x874, symBinAddr: 0x1000016AC, symSize: 0x18 }
+...

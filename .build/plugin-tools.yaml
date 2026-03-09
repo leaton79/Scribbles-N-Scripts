@@ -1,0 +1,146 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "Manuscript-arm64-apple-macosx26.0-debug.exe": ["<Manuscript-arm64-apple-macosx26.0-debug.exe>"]
+  "Manuscript-arm64-apple-macosx26.0-debug.module": ["<Manuscript-arm64-apple-macosx26.0-debug.module>"]
+  "ManuscriptPackageTests-arm64-apple-macosx26.0-debug.module": ["<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.module>"]
+  "ManuscriptPackageTests-arm64-apple-macosx26.0-debug.test": ["<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.test>"]
+  "ManuscriptTests-arm64-apple-macosx26.0-debug.module": ["<ManuscriptTests-arm64-apple-macosx26.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<Manuscript-arm64-apple-macosx26.0-debug.exe>","<Manuscript-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<Manuscript-arm64-apple-macosx26.0-debug.exe>","<Manuscript-arm64-apple-macosx26.0-debug.module>","<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.test>","<ManuscriptTests-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/Sources/Manuscript/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/Tests/ManuscriptTests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript":
+    is-mutated: true
+commands:
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript-entitlement.plist"]
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript-entitlement.plist"
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/l.eatonnortheastern.edu/Documents/App - Writing/Sources/Manuscript/App/ManuscriptApp.swift"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/sources"]
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/sources"
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/ManuscriptApp.swift.o"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.product/Objects.LinkFileList"
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.derived/runner.swift"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/sources"]
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/sources"
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.derived/runner.swift"]
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/ManuscriptApp.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/runner.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.swift.o"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.product/Objects.LinkFileList"
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/l.eatonnortheastern.edu/Documents/App - Writing/Tests/ManuscriptTests/ManuscriptTests.swift"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/sources"]
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/sources"
+
+  "/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<Manuscript-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<Manuscript-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<Manuscript-arm64-apple-macosx26.0-debug.exe>"]
+
+  "<Manuscript-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/ManuscriptApp.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/Manuscript.swiftmodule"]
+    outputs: ["<Manuscript-arm64-apple-macosx26.0-debug.module>"]
+
+  "<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/runner.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptPackageTests.swiftmodule"]
+    outputs: ["<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.module>"]
+
+  "<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.test>":
+    tool: phony
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.xctest/Contents/MacOS/ManuscriptPackageTests"]
+    outputs: ["<ManuscriptPackageTests-arm64-apple-macosx26.0-debug.test>"]
+
+  "<ManuscriptTests-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptTests.swiftmodule"]
+    outputs: ["<ManuscriptTests-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.Manuscript-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/ManuscriptApp.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.product/Objects.LinkFileList"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/Manuscript"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug","-o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript","-module-name","Manuscript","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_Manuscript_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/Manuscript.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.Manuscript-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript-entitlement.plist"]
+    outputs: ["<Manuscript-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/Manuscript"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript-entitlement.plist","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript"]
+
+  "C.Manuscript-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/Sources/Manuscript/App/ManuscriptApp.swift","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/sources"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/ManuscriptApp.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/Manuscript.swiftmodule"]
+    description: "Compiling Swift Module 'Manuscript' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","Manuscript","-emit-dependencies","-emit-module","-emit-module-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/Manuscript.swiftmodule","-output-file-map","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/output-file-map.json","-incremental","-c","@/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/sources","-I","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","Manuscript_main","-parse-as-library","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","app___writing"]
+
+  "C.ManuscriptPackageTests-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.derived/runner.swift","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptTests.swiftmodule","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/sources"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/runner.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptPackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'ManuscriptPackageTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ManuscriptPackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptPackageTests.swiftmodule","-output-file-map","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/sources","-I","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/include/ManuscriptPackageTests-Swift.h","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","app___writing"]
+
+  "C.ManuscriptPackageTests-arm64-apple-macosx26.0-debug.test":
+    tool: shell
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript.build/ManuscriptApp.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.build/runner.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.xctest/Contents/MacOS/ManuscriptPackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/ManuscriptPackageTests.xctest/Contents/MacOS/ManuscriptPackageTests"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug","-o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.xctest/Contents/MacOS/ManuscriptPackageTests","-module-name","ManuscriptPackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptPackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/Manuscript.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptPackageTests.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptTests.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.ManuscriptTests-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/Tests/ManuscriptTests/ManuscriptTests.swift","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Manuscript","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/sources"]
+    outputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/ManuscriptTests.swift.o","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptTests.swiftmodule"]
+    description: "Compiling Swift Module 'ManuscriptTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ManuscriptTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules/ManuscriptTests.swiftmodule","-output-file-map","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ManuscriptTests.build/sources","-I","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/l.eatonnortheastern.edu/Documents/App - Writing/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","app___writing"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/l.eatonnortheastern.edu/Documents/App - Writing/Sources/Manuscript/","/Users/l.eatonnortheastern.edu/Documents/App - Writing/Tests/ManuscriptTests/","/Users/l.eatonnortheastern.edu/Documents/App - Writing/Package.swift","/Users/l.eatonnortheastern.edu/Documents/App - Writing/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
