@@ -861,6 +861,29 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: unexpectedRestoreRoot.path))
     }
 
+    func testBackupRestoreRejectsDestinationWhenPathIsFile() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupDestinationFile", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupDestinationFile")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        let sourceManifest = root.appendingPathComponent("manifest.json")
+        let sourceManifestData = try Data(contentsOf: sourceManifest)
+
+        let fileDestination = tempDir.appendingPathComponent("restore-file-destination")
+        try "not a directory".write(to: fileDestination, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: fileDestination)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("must be a directory"))
+        }
+
+        XCTAssertEqual(try Data(contentsOf: sourceManifest), sourceManifestData)
+    }
+
     func testBackupRestoreRemovesStaleLockFromRestoredProject() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupLock", at: tempDir)

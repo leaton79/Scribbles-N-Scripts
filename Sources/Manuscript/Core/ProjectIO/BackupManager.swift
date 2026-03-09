@@ -97,9 +97,12 @@ struct BackupManager {
             throw ProjectIOError.backupNotFound("Restore destination must be outside source project path")
         }
         if FileManager.default.fileExists(atPath: destinationDir.path) {
-            let destinationValues = try destinationDir.resourceValues(forKeys: [.isSymbolicLinkKey])
+            let destinationValues = try destinationDir.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             if destinationValues.isSymbolicLink == true {
                 throw ProjectIOError.backupNotFound("Restore destination cannot be a symbolic link")
+            }
+            if destinationValues.isDirectory != true {
+                throw ProjectIOError.backupNotFound("Restore destination must be a directory")
             }
         }
 
