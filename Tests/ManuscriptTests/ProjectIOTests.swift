@@ -329,4 +329,38 @@ final class ProjectIOTests: XCTestCase {
             }
         }
     }
+
+    func testOpenProjectSwitchesProjectsAndReleasesPreviousLock() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "A", at: tempDir)
+        let rootA = tempDir.appendingPathComponent("A")
+        let lockA = rootA.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockA.path))
+
+        let creator = FileSystemProjectManager()
+        _ = try creator.createProject(name: "B", at: tempDir)
+        try creator.closeProject()
+        let rootB = tempDir.appendingPathComponent("B")
+
+        _ = try manager.openProject(at: rootB)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: lockA.path))
+        XCTAssertEqual(manager.projectRootURL, rootB)
+    }
+
+    func testCreateProjectSwitchesProjectsAndReleasesPreviousLock() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "First", at: tempDir)
+        let rootFirst = tempDir.appendingPathComponent("First")
+        let lockFirst = rootFirst.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockFirst.path))
+
+        _ = try manager.createProject(name: "Second", at: tempDir)
+        let rootSecond = tempDir.appendingPathComponent("Second")
+        let lockSecond = rootSecond.appendingPathComponent(".lock")
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: lockFirst.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockSecond.path))
+        XCTAssertEqual(manager.projectRootURL, rootSecond)
+    }
 }

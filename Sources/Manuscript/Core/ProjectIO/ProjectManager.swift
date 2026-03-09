@@ -88,6 +88,9 @@ final class FileSystemProjectManager: ProjectManager {
 
     func createProject(name: String, at url: URL) throws -> Project {
         let rootURL = url.appendingPathComponent(name, isDirectory: true)
+        if projectURL != nil {
+            try closeProject()
+        }
         do {
             try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
 
@@ -181,6 +184,9 @@ final class FileSystemProjectManager: ProjectManager {
 
     func openProject(at url: URL) throws -> Project {
         let rootURL = url
+        if projectURL != nil {
+            try closeProject()
+        }
         let lockURL = rootURL.appendingPathComponent(lockFilename)
         if fileManager.fileExists(atPath: lockURL.path) {
             throw ProjectIOError.concurrentAccess(lockFile: lockURL)
