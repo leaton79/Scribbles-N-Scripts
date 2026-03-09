@@ -599,4 +599,25 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(backups.count, 1)
         XCTAssertEqual(backups.first?.filename, second.filename)
     }
+
+    func testSecondBackupDoesNotEmbedPriorBackupsInRestoredProject() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupNoRecursion", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupNoRecursion")
+
+        _ = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+        Thread.sleep(forTimeInterval: 0.01)
+        let second = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-norecursion-temp", isDirectory: true)
+        let restoredRoot = try BackupManager.restoreBackup(projectURL: root, backupFilename: second.filename, to: restoreDir)
+        let restoredBackupsDir = restoredRoot.appendingPathComponent("backups", isDirectory: true)
+        let restoredEntries = (try? FileManager.default.contentsOfDirectory(
+            at: restoredBackupsDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        XCTAssertFalse(restoredEntries.contains(where: { $0.pathExtension.lowercased() == "zip" }))
+    }
 }

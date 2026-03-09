@@ -15,15 +15,30 @@ struct BackupManager {
         let timestamp = filenameFormatter.string(from: Date())
         let backupName = "backup-\(timestamp).zip"
         let backupURL = backupsURL.appendingPathComponent(backupName)
+        let stagingRootURL = fileManager.temporaryDirectory
+            .appendingPathComponent("manuscript-backup-stage-\(UUID().uuidString)", isDirectory: true)
+        let stagedProjectURL = stagingRootURL.appendingPathComponent(projectURL.lastPathComponent, isDirectory: true)
         let tempZipURL = fileManager.temporaryDirectory
             .appendingPathComponent("manuscript-backup-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent(backupName)
+        try fileManager.createDirectory(at: stagingRootURL, withIntermediateDirectories: true)
+        try fileManager.copyItem(at: projectURL, to: stagedProjectURL)
+        let stagedBackupsURL = stagedProjectURL.appendingPathComponent("backups", isDirectory: true)
+        if fileManager.fileExists(atPath: stagedBackupsURL.path) {
+            try fileManager.removeItem(at: stagedBackupsURL)
+        }
+        try fileManager.createDirectory(at: stagedBackupsURL, withIntermediateDirectories: true)
+        let stagedLockURL = stagedProjectURL.appendingPathComponent(".lock")
+        if fileManager.fileExists(atPath: stagedLockURL.path) {
+            try? fileManager.removeItem(at: stagedLockURL)
+        }
         try fileManager.createDirectory(at: tempZipURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         defer {
+            try? fileManager.removeItem(at: stagingRootURL)
             try? fileManager.removeItem(at: tempZipURL.deletingLastPathComponent())
         }
 
-        try zipDirectory(source: projectURL, destinationZip: tempZipURL)
+        try zipDirectory(source: stagedProjectURL, destinationZip: tempZipURL)
         if fileManager.fileExists(atPath: backupURL.path) {
             try fileManager.removeItem(at: backupURL)
         }
