@@ -88,6 +88,9 @@ final class FileSystemProjectManager: ProjectManager {
 
     func createProject(name: String, at url: URL) throws -> Project {
         let rootURL = url.appendingPathComponent(name, isDirectory: true)
+        if fileManager.fileExists(atPath: rootURL.path) {
+            throw ProjectIOError.projectAlreadyExists(rootURL)
+        }
         let previousProjectURL = projectURL
         let previousManifest = manifest
         let previousProject = currentProject

@@ -14,6 +14,7 @@ enum ProjectIOError: Error, LocalizedError {
     case invalidHierarchy(details: String)
     case backupNotFound(String)
     case unsupportedMigration(projectVersion: String, supportedVersion: String)
+    case projectAlreadyExists(URL)
 
     var errorDescription: String? {
         switch self {
@@ -43,6 +44,8 @@ enum ProjectIOError: Error, LocalizedError {
             return "Backup not found: \(backupId)"
         case let .unsupportedMigration(projectVersion, supportedVersion):
             return "Cannot migrate project format \(projectVersion) with app support \(supportedVersion)."
+        case let .projectAlreadyExists(url):
+            return "A project already exists at \(url.path)."
         }
     }
 }

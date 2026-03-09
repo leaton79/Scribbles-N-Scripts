@@ -402,4 +402,40 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertNotNil(manager.currentProject)
         XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
     }
+
+    func testCreateProjectFailsWhenTargetAlreadyExists() throws {
+        let existingRoot = tempDir.appendingPathComponent("Existing")
+        try FileManager.default.createDirectory(at: existingRoot, withIntermediateDirectories: true)
+
+        let manager = FileSystemProjectManager()
+        XCTAssertThrowsError(try manager.createProject(name: "Existing", at: tempDir)) { error in
+            guard case let ProjectIOError.projectAlreadyExists(url) = error else {
+                return XCTFail("Expected projectAlreadyExists, got \(error)")
+            }
+            XCTAssertEqual(url.standardizedFileURL.path, existingRoot.standardizedFileURL.path)
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: existingRoot.appendingPathComponent("manifest.json").path))
+    }
+
+    func testCreateProjectExistingTargetKeepsCurrentProjectOpen() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Current", at: tempDir)
+        let currentRoot = tempDir.appendingPathComponent("Current")
+        let currentLock = currentRoot.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+
+        let existingRoot = tempDir.appendingPathComponent("Existing")
+        try FileManager.default.createDirectory(at: existingRoot, withIntermediateDirectories: true)
+
+        XCTAssertThrowsError(try manager.createProject(name: "Existing", at: tempDir)) { error in
+            guard case ProjectIOError.projectAlreadyExists = error else {
+                return XCTFail("Expected projectAlreadyExists, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(manager.projectRootURL, currentRoot)
+        XCTAssertNotNil(manager.currentProject)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+    }
 }
