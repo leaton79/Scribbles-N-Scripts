@@ -75,9 +75,17 @@ struct BackupManager {
     }
 
     static func restoreBackup(projectURL: URL, backupFilename: String, to destinationDir: URL) throws -> URL {
-        let backupURL = projectURL
-            .appendingPathComponent("backups", isDirectory: true)
-            .appendingPathComponent(backupFilename)
+        let backupsURL = projectURL.appendingPathComponent("backups", isDirectory: true)
+        guard isSafeBackupFilename(backupFilename) else {
+            throw ProjectIOError.backupNotFound(backupFilename)
+        }
+
+        let backupURL = backupsURL.appendingPathComponent(backupFilename)
+        let standardizedBackupsPath = backupsURL.standardizedFileURL.path
+        let standardizedBackupPath = backupURL.standardizedFileURL.path
+        guard standardizedBackupPath.hasPrefix(standardizedBackupsPath + "/") else {
+            throw ProjectIOError.backupNotFound(backupFilename)
+        }
 
         guard FileManager.default.fileExists(atPath: backupURL.path) else {
             throw ProjectIOError.backupNotFound(backupFilename)
@@ -141,5 +149,14 @@ struct BackupManager {
             let msg = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "Backup process failed"
             throw ProjectIOError.invalidHierarchy(details: msg)
         }
+    }
+
+    private static func isSafeBackupFilename(_ value: String) -> Bool {
+        guard !value.isEmpty else { return false }
+        let nsValue = NSString(string: value)
+        guard nsValue.lastPathComponent == value else { return false }
+        guard nsValue.pathExtension.lowercased() == "zip" else { return false }
+        guard !value.contains("..") else { return false }
+        return true
     }
 }

@@ -609,6 +609,46 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertNoThrow(try opener.openProject(at: restoredRoot))
     }
 
+    func testBackupRestoreRejectsPathTraversalFilename() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupTraversal", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupTraversal")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-traversal-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(
+                projectURL: root,
+                backupFilename: "../\(backup.filename)",
+                to: restoreDir
+            )
+        ) { error in
+            guard case ProjectIOError.backupNotFound = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+        }
+    }
+
+    func testBackupRestoreRejectsNestedPathFilename() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupNestedPath", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupNestedPath")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let restoreDir = tempDir.appendingPathComponent("restore-nested-temp", isDirectory: true)
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(
+                projectURL: root,
+                backupFilename: "nested/\(backup.filename)",
+                to: restoreDir
+            )
+        ) { error in
+            guard case ProjectIOError.backupNotFound = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+        }
+    }
+
     func testFirstBackupArchiveDoesNotContainItselfInRestoredBackupsFolder() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupSelf", at: tempDir)
