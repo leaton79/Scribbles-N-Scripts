@@ -17,7 +17,8 @@ final class WorkspaceCoordinator: ObservableObject {
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
-        bootstrapProjectName: String = "Sandbox"
+        bootstrapProjectName: String = "Sandbox",
+        splitSettingsStore: UserDefaults = .standard
     ) {
         self.projectManager = manager
 
@@ -27,7 +28,11 @@ final class WorkspaceCoordinator: ObservableObject {
                 rootURL: bootstrapRootURL,
                 projectName: bootstrapProjectName
             )
-            let dependencies = Self.makeDependencies(manager: manager)
+            let dependencies = Self.makeDependencies(
+                manager: manager,
+                splitSettingsStore: splitSettingsStore,
+                splitSettingsNamespace: Self.splitSettingsNamespace(for: manager)
+            )
             self.navigationState = dependencies.navigationState
             self.editorState = dependencies.editorState
             self.linearState = dependencies.linearState
@@ -43,7 +48,11 @@ final class WorkspaceCoordinator: ObservableObject {
             }
         } catch {
             self.loadError = error.localizedDescription
-            let dependencies = Self.makeDependencies(manager: manager)
+            let dependencies = Self.makeDependencies(
+                manager: manager,
+                splitSettingsStore: splitSettingsStore,
+                splitSettingsNamespace: Self.splitSettingsNamespace(for: manager)
+            )
             self.navigationState = dependencies.navigationState
             self.editorState = dependencies.editorState
             self.linearState = dependencies.linearState
@@ -150,7 +159,11 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
-    private static func makeDependencies(manager: FileSystemProjectManager) -> (
+    private static func makeDependencies(
+        manager: FileSystemProjectManager,
+        splitSettingsStore: UserDefaults,
+        splitSettingsNamespace: String
+    ) -> (
         navigationState: NavigationState,
         editorState: EditorState,
         linearState: LinearModeState,
@@ -172,9 +185,21 @@ final class WorkspaceCoordinator: ObservableObject {
             linearState: linearState,
             modularState: modularState
         )
-        let splitEditorState = SplitEditorState(projectManager: manager, primarySceneId: editorState.currentSceneId)
+        let splitEditorState = SplitEditorState(
+            projectManager: manager,
+            primarySceneId: editorState.currentSceneId,
+            settingsStore: splitSettingsStore,
+            settingsNamespace: splitSettingsNamespace
+        )
         let goalsManager = GoalsManager(projectManager: manager)
         return (navigationState, editorState, linearState, modularState, modeController, splitEditorState, goalsManager)
+    }
+
+    private static func splitSettingsNamespace(for manager: FileSystemProjectManager) -> String {
+        guard let root = manager.projectRootURL else { return "splitEditor.default" }
+        let sanitized = root.path.unicodeScalars
+            .map { CharacterSet.alphanumerics.contains($0) ? Character($0) : "_" }
+        return "splitEditor.\(String(sanitized))"
     }
 
     private func autosaveOpenEditors() {

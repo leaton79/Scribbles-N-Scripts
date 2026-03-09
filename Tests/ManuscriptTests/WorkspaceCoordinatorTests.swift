@@ -182,4 +182,39 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.splitEditorState.isSplit)
         XCTAssertEqual(coordinator.splitEditorState.orientation, .horizontal)
     }
+
+    func testSplitSettingsAreScopedPerProjectPath() throws {
+        let suiteName = "WorkspaceCoordinatorTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let projectA = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "ProjectA",
+            splitSettingsStore: defaults
+        )
+        projectA.splitEditorState.orientation = .horizontal
+        projectA.splitEditorState.splitRatio = 0.33
+
+        let projectB = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "ProjectB",
+            splitSettingsStore: defaults
+        )
+        XCTAssertEqual(projectB.splitEditorState.orientation, .vertical)
+        XCTAssertEqual(projectB.splitEditorState.splitRatio, 0.5, accuracy: 0.0001)
+
+        try projectA.projectManager.closeProject()
+        try projectB.projectManager.closeProject()
+
+        let reopenedProjectA = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "ProjectA",
+            splitSettingsStore: defaults
+        )
+        XCTAssertEqual(reopenedProjectA.splitEditorState.orientation, .horizontal)
+        XCTAssertEqual(reopenedProjectA.splitEditorState.splitRatio, 0.33, accuracy: 0.0001)
+    }
 }
