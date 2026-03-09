@@ -204,6 +204,25 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertNil(manager.projectRootURL)
     }
 
+    func testCloseProjectDoesNotRemoveForeignLockFile() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "ForeignLock", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        let lockURL = root.appendingPathComponent(".lock")
+
+        let foreignPayload = try JSONSerialization.data(withJSONObject: [
+            "pid": ProcessInfo.processInfo.processIdentifier + 9999,
+            "openedAt": ISO8601DateFormatter().string(from: Date())
+        ])
+        try foreignPayload.write(to: lockURL, options: .atomic)
+
+        try manager.closeProject()
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+        XCTAssertNil(manager.currentProject)
+        XCTAssertNil(manager.projectRootURL)
+    }
+
     func testOpenProjectRejectsMalformedVersionString() throws {
         let manager = FileSystemProjectManager()
         let project = try manager.createProject(name: "BadVersion", at: tempDir)

@@ -262,10 +262,7 @@ final class FileSystemProjectManager: ProjectManager {
     func closeProject() throws {
         stopAutosave()
         if let rootURL = projectURL {
-            let lockURL = rootURL.appendingPathComponent(lockFilename)
-            if fileManager.fileExists(atPath: lockURL.path) {
-                try? fileManager.removeItem(at: lockURL)
-            }
+            removeLockFileIfPresent(at: rootURL)
         }
         currentProject = nil
         manifest = nil
@@ -872,21 +869,9 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     private func lockRepresentsActiveSession(at lockURL: URL) -> Bool {
-        guard let data = try? Data(contentsOf: lockURL),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return true
-        }
-
-        let pidValue: Int?
-        if let pidString = object["pid"] as? String {
-            pidValue = Int(pidString)
-        } else if let pidNumber = object["pid"] as? NSNumber {
-            pidValue = pidNumber.intValue
-        } else {
-            pidValue = nil
-        }
-
-        guard let pidValue, pidValue > 0 else { return false }
+        let pidInfo = lockPIDInfo(at: lockURL)
+        guard pidInfo.readable else { return true }
+        guard let pidValue = pidInfo.pid, pidValue > 0 else { return false }
         let check = kill(pid_t(pidValue), 0)
         if check == 0 { return true }
         return errno != ESRCH
@@ -895,8 +880,34 @@ final class FileSystemProjectManager: ProjectManager {
     private func removeLockFileIfPresent(at rootURL: URL) {
         let lockURL = rootURL.appendingPathComponent(lockFilename)
         if fileManager.fileExists(atPath: lockURL.path) {
-            try? fileManager.removeItem(at: lockURL)
+            if lockOwnedByCurrentProcess(at: lockURL) {
+                try? fileManager.removeItem(at: lockURL)
+            }
         }
+    }
+
+    private func lockPIDInfo(at lockURL: URL) -> (readable: Bool, pid: Int?) {
+        guard let data = try? Data(contentsOf: lockURL),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (false, nil)
+        }
+
+        if let pidString = object["pid"] as? String {
+            return (true, Int(pidString))
+        }
+        if let pidNumber = object["pid"] as? NSNumber {
+            return (true, pidNumber.intValue)
+        }
+        return (true, nil)
+    }
+
+    private func lockOwnedByCurrentProcess(at lockURL: URL) -> Bool {
+        let pidInfo = lockPIDInfo(at: lockURL)
+        guard pidInfo.readable, let pid = pidInfo.pid else {
+            // Preserve unknown lock owners to avoid deleting another process's lock.
+            return false
+        }
+        return pid == ProcessInfo.processInfo.processIdentifier
     }
 
     private func checkVersionCompatibility(projectRoot: URL) throws {
