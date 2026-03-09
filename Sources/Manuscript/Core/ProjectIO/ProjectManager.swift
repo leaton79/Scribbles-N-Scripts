@@ -33,6 +33,7 @@ protocol ProjectManager {
 
     var currentProject: Project? { get }
     var isDirty: Bool { get }
+    var projectRootURL: URL? { get }
 }
 
 struct BackupInfo {
@@ -74,6 +75,7 @@ final class FileSystemProjectManager: ProjectManager {
 
     private(set) var currentProject: Project?
     var isDirty: Bool { isManifestDirty || !dirtySceneIds.isEmpty }
+    var projectRootURL: URL? { projectURL }
 
     // Test hook for module-level metadata fixtures.
     func _assignCurrentProjectForTesting(_ project: Project) {
