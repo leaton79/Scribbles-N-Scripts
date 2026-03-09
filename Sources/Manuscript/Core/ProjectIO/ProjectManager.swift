@@ -454,12 +454,14 @@ final class FileSystemProjectManager: ProjectManager {
 
         let oldURL = rootURL.appendingPathComponent(oldPath)
         let newURL = rootURL.appendingPathComponent(newPath)
-        try fileManager.createDirectory(at: newURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if fileManager.fileExists(atPath: oldURL.path) {
-            if fileManager.fileExists(atPath: newURL.path) {
-                try fileManager.removeItem(at: newURL)
+        if oldURL.path != newURL.path {
+            try fileManager.createDirectory(at: newURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if fileManager.fileExists(atPath: oldURL.path) {
+                if fileManager.fileExists(atPath: newURL.path) {
+                    try fileManager.removeItem(at: newURL)
+                }
+                try fileManager.moveItem(at: oldURL, to: newURL)
             }
-            try fileManager.moveItem(at: oldURL, to: newURL)
         }
 
         self.manifest = manifest
