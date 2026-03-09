@@ -55,6 +55,22 @@ final class SplitEditorState: ObservableObject {
         isSecondarySearchBarVisible = false
     }
 
+    @discardableResult
+    func openSplit(
+        sceneId: UUID,
+        preferredOrientation: SplitOrientation,
+        windowWidth: CGFloat,
+        minimumPaneWidth: CGFloat = 250
+    ) -> SplitOrientation {
+        if preferredOrientation == .vertical, !canUseVerticalSplit(windowWidth: windowWidth, minimumPaneWidth: minimumPaneWidth) {
+            orientation = .horizontal
+        } else {
+            orientation = preferredOrientation
+        }
+        openSplit(sceneId: sceneId)
+        return orientation
+    }
+
     func closeSplit() {
         try? autosaveAllPanes()
 

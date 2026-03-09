@@ -94,6 +94,28 @@ final class SplitEditorTests: XCTestCase {
         XCTAssertEqual(state.splitRatio, 0.3125, accuracy: 0.0001)
     }
 
+    func testOpenSplitFallsBackToHorizontalWhenWindowTooNarrow() throws {
+        let fixture = try makeFixture(name: "NarrowWindow")
+        let state = fixture.state
+
+        let applied = state.openSplit(sceneId: fixture.s7, preferredOrientation: .vertical, windowWidth: 480)
+
+        XCTAssertEqual(applied, .horizontal)
+        XCTAssertEqual(state.orientation, .horizontal)
+        XCTAssertTrue(state.isSplit)
+    }
+
+    func testOpenSplitKeepsVerticalWhenWindowIsWideEnough() throws {
+        let fixture = try makeFixture(name: "WideWindow")
+        let state = fixture.state
+
+        let applied = state.openSplit(sceneId: fixture.s7, preferredOrientation: .vertical, windowWidth: 900)
+
+        XCTAssertEqual(applied, .vertical)
+        XCTAssertEqual(state.orientation, .vertical)
+        XCTAssertTrue(state.isSplit)
+    }
+
     private func makeFixture(name: String) throws -> (manager: FileSystemProjectManager, state: SplitEditorState, s3: UUID, s7: UUID) {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
