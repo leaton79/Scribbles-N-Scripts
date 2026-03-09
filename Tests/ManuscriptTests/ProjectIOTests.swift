@@ -385,4 +385,21 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: lockSecond.path))
         XCTAssertEqual(manager.projectRootURL, rootSecond)
     }
+
+    func testCreateProjectFailureBeforeSwitchKeepsCurrentProjectOpen() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "Current", at: tempDir)
+        let currentRoot = tempDir.appendingPathComponent("Current")
+        let currentLock = currentRoot.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+
+        let conflictingRoot = tempDir.appendingPathComponent("AlreadyExists")
+        try Data("occupied".utf8).write(to: conflictingRoot, options: .atomic)
+
+        XCTAssertThrowsError(try manager.createProject(name: "AlreadyExists", at: tempDir))
+
+        XCTAssertEqual(manager.projectRootURL, currentRoot)
+        XCTAssertNotNil(manager.currentProject)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+    }
 }

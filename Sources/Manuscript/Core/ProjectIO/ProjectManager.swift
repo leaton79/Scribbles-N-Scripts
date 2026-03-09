@@ -88,9 +88,13 @@ final class FileSystemProjectManager: ProjectManager {
 
     func createProject(name: String, at url: URL) throws -> Project {
         let rootURL = url.appendingPathComponent(name, isDirectory: true)
-        if projectURL != nil {
-            try closeProject()
-        }
+        let previousProjectURL = projectURL
+        let previousManifest = manifest
+        let previousProject = currentProject
+        let previousDirtySceneIds = dirtySceneIds
+        let previousManifestDirty = isManifestDirty
+        var createdLock = false
+
         do {
             try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
 
@@ -164,20 +168,29 @@ final class FileSystemProjectManager: ProjectManager {
             try saveSupportMetadataFiles(at: rootURL)
             try writeManifest(manifest, to: rootURL.appendingPathComponent("manifest.json"))
             try writeStringAtomically(ManifestCoder.formatVersion, to: rootURL.appendingPathComponent(".manuscript-version"))
+            try createLockFileIfNeeded(at: rootURL)
+            createdLock = true
 
+            stopAutosave()
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
-            try createLockFileIfNeeded(at: rootURL)
             isManifestDirty = false
             dirtySceneIds.removeAll()
+
+            if let previousProjectURL, previousProjectURL != rootURL {
+                removeLockFileIfPresent(at: previousProjectURL)
+            }
             return currentProject!
         } catch {
-            currentProject = nil
-            manifest = nil
-            projectURL = nil
-            dirtySceneIds.removeAll()
-            isManifestDirty = false
+            if createdLock {
+                removeLockFileIfPresent(at: rootURL)
+            }
+            self.projectURL = previousProjectURL
+            self.manifest = previousManifest
+            self.currentProject = previousProject
+            self.dirtySceneIds = previousDirtySceneIds
+            self.isManifestDirty = previousManifestDirty
             throw error
         }
     }
@@ -840,6 +853,13 @@ final class FileSystemProjectManager: ProjectManager {
         ]
         let lockData = try JSONSerialization.data(withJSONObject: lockPayload, options: [.sortedKeys])
         try lockData.write(to: lockURL, options: .atomic)
+    }
+
+    private func removeLockFileIfPresent(at rootURL: URL) {
+        let lockURL = rootURL.appendingPathComponent(lockFilename)
+        if fileManager.fileExists(atPath: lockURL.path) {
+            try? fileManager.removeItem(at: lockURL)
+        }
     }
 
     private func checkVersionCompatibility(projectRoot: URL) throws {
