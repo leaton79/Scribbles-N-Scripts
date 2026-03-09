@@ -2,10 +2,85 @@ import SwiftUI
 
 @main
 struct ManuscriptApp: App {
+    @StateObject private var workspace = WorkspaceCoordinator()
+
     var body: some SwiftUI.Scene {
         WindowGroup {
-            Text("Manuscript — Building...")
-                .frame(minWidth: 800, minHeight: 600)
+            WorkspaceView(workspace: workspace)
+                .frame(minWidth: 1000, minHeight: 700)
+        }
+    }
+}
+
+private struct WorkspaceView: View {
+    @ObservedObject var workspace: WorkspaceCoordinator
+
+    var body: some View {
+        if let loadError = workspace.loadError {
+            ContentUnavailableView("Could not open project", systemImage: "exclamationmark.triangle", description: Text(loadError))
+        } else {
+            HStack(spacing: 0) {
+                SidebarView(
+                    navigationState: workspace.navigationState,
+                    nodes: sidebarNodes,
+                    onSelect: workspace.select(node:)
+                )
+                .frame(minWidth: 260, idealWidth: 300, maxWidth: 360)
+
+                Divider()
+
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Session: \(workspace.goalsManager.sessionProgressText())")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if workspace.modeController.activeMode == .linear {
+                            Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
+                                toggleSplit()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
+
+                    ModeContainerView(
+                        modeController: workspace.modeController,
+                        linearState: workspace.linearState,
+                        modularState: workspace.modularState,
+                        navigationState: workspace.navigationState,
+                        editorState: workspace.editorState,
+                        splitState: workspace.splitEditorState
+                    )
+                }
+            }
+            .onChange(of: workspace.modeController.activeMode) { _, mode in
+                if mode == .modular, workspace.splitEditorState.isSplit {
+                    workspace.splitEditorState.closeSplit()
+                }
+            }
+            .task {
+                workspace.goalsManager.startSession(goal: nil)
+                workspace.goalsManager.startTimer()
+            }
+        }
+    }
+
+    private var sidebarNodes: [SidebarNode] {
+        guard let project = workspace.projectManager.currentProject else { return [] }
+        return SidebarHierarchyBuilder.build(project: project, filters: workspace.navigationState.activeFilters)
+    }
+
+    private func toggleSplit() {
+        if workspace.splitEditorState.isSplit {
+            workspace.splitEditorState.closeSplit()
+            return
+        }
+
+        if let selected = workspace.navigationState.selectedSceneId {
+            workspace.splitEditorState.openSplit(sceneId: selected)
+            workspace.splitEditorState.setActivePane(1)
         }
     }
 }

@@ -6,15 +6,22 @@ struct ModeContainerView: View {
     @ObservedObject var modularState: ModularModeState
     @ObservedObject var navigationState: NavigationState
     @ObservedObject var editorState: EditorState
+    @ObservedObject var splitState: SplitEditorState
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             if modeController.activeMode == .linear {
-                LinearModeView(
-                    navigationState: navigationState,
-                    editorState: editorState,
-                    linearState: linearState
-                )
+                Group {
+                    if splitState.isSplit {
+                        SplitEditorView(state: splitState)
+                    } else {
+                        LinearModeView(
+                            navigationState: navigationState,
+                            editorState: editorState,
+                            linearState: linearState
+                        )
+                    }
+                }
                 .transition(.opacity)
             } else {
                 ModularModeView(
