@@ -91,14 +91,15 @@ struct BackupManager {
             throw ProjectIOError.backupNotFound(backupFilename)
         }
 
-        let standardizedProjectPath = projectURL.standardizedFileURL.path
-        let standardizedDestinationPath = destinationDir.standardizedFileURL.path
-        if standardizedDestinationPath == standardizedProjectPath || standardizedDestinationPath.hasPrefix(standardizedProjectPath + "/") {
+        let canonicalProjectPath = projectURL.resolvingSymlinksInPath().standardizedFileURL.path
+        let canonicalDestinationPath = destinationDir.resolvingSymlinksInPath().standardizedFileURL.path
+        if canonicalDestinationPath == canonicalProjectPath || canonicalDestinationPath.hasPrefix(canonicalProjectPath + "/") {
             throw ProjectIOError.backupNotFound("Restore destination must be outside source project path")
         }
 
         let candidate = destinationDir.appendingPathComponent(projectURL.lastPathComponent, isDirectory: true)
-        if candidate.standardizedFileURL.path == projectURL.standardizedFileURL.path {
+        let canonicalCandidatePath = candidate.resolvingSymlinksInPath().standardizedFileURL.path
+        if canonicalCandidatePath == canonicalProjectPath {
             throw ProjectIOError.backupNotFound("Restore destination conflicts with source project path")
         }
         try FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
