@@ -204,6 +204,10 @@ final class FileSystemProjectManager: ProjectManager {
         if projectURL == rootURL, let currentProject {
             let lockURL = rootURL.appendingPathComponent(lockFilename)
             if !fileManager.fileExists(atPath: lockURL.path) || !lockOwnedByCurrentProcess(at: lockURL) {
+                // Same-process reopen should self-heal lock drift/corruption.
+                if fileManager.fileExists(atPath: lockURL.path) {
+                    try? fileManager.removeItem(at: lockURL)
+                }
                 try createLockFileIfNeeded(at: rootURL)
             }
             return currentProject

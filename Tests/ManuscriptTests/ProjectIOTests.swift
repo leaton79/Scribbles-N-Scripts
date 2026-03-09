@@ -535,6 +535,22 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
     }
 
+    func testOpenProjectSameRootRepairsCorruptLock() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "SameRootRepairLock", at: tempDir)
+        let root = tempDir.appendingPathComponent("SameRootRepairLock")
+        let lockURL = root.appendingPathComponent(".lock")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+
+        try Data("not-json".utf8).write(to: lockURL, options: .atomic)
+
+        XCTAssertNoThrow(try manager.openProject(at: root))
+        let lockData = try Data(contentsOf: lockURL)
+        let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: lockData) as? [String: Any])
+        let pidText = (payload["pid"] as? String) ?? String((payload["pid"] as? NSNumber)?.intValue ?? -1)
+        XCTAssertEqual(pidText, String(ProcessInfo.processInfo.processIdentifier))
+    }
+
     func testOpenProjectRemovesStaleLockFileAndSucceeds() throws {
         let creator = FileSystemProjectManager()
         _ = try creator.createProject(name: "StaleLock", at: tempDir)
