@@ -87,6 +87,25 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    func select(breadcrumb: BreadcrumbItem) {
+        switch breadcrumb.type {
+        case .scene:
+            navigationState.navigateTo(sceneId: breadcrumb.id)
+            editorState.navigateToScene(id: breadcrumb.id)
+            if splitEditorState.activePaneIndex == 1, splitEditorState.isSplit {
+                splitEditorState.secondarySceneId = breadcrumb.id
+                splitEditorState.secondaryEditor.navigateToScene(id: breadcrumb.id)
+            } else {
+                splitEditorState.primarySceneId = breadcrumb.id
+                splitEditorState.primaryEditor.navigateToScene(id: breadcrumb.id)
+            }
+        case .chapter:
+            navigationState.navigateTo(chapterId: breadcrumb.id)
+        case .part, .manuscript:
+            break
+        }
+    }
+
     func openSplitFromCurrentContext(windowWidth: CGFloat, preferredOrientation: SplitOrientation = .vertical) -> String? {
         guard modeController.activeMode == .linear else { return nil }
         guard let targetSceneId = resolveSceneForSplitOpen() else {

@@ -298,4 +298,28 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(movedPrevious)
         XCTAssertEqual(coordinator.editorState.currentSceneId, before)
     }
+
+    func testSelectBreadcrumbChapterNavigatesChapterAndFirstScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BreadcrumbChapter")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+
+        let chapterCrumb = BreadcrumbItem(id: chapterId, title: "Chapter", type: .chapter)
+        coordinator.select(breadcrumb: chapterCrumb)
+
+        XCTAssertEqual(coordinator.navigationState.selectedChapterId, chapterId)
+        XCTAssertNotNil(coordinator.navigationState.selectedSceneId)
+    }
+
+    func testSelectBreadcrumbSceneNavigatesEditorAndNavigation() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BreadcrumbScene")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let scene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Breadcrumb Target")
+        coordinator.linearState.reloadSequence()
+
+        let sceneCrumb = BreadcrumbItem(id: scene.id, title: scene.title, type: .scene)
+        coordinator.select(breadcrumb: sceneCrumb)
+
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, scene.id)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, scene.id)
+    }
 }

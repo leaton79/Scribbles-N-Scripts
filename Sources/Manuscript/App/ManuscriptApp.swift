@@ -115,8 +115,31 @@ private struct WorkspaceView: View {
                             }
                         }
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                         .background(.ultraThinMaterial)
+
+                        if !workspace.navigationState.breadcrumb.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(Array(workspace.navigationState.breadcrumb.enumerated()), id: \.offset) { index, item in
+                                        Button(item.title) {
+                                            workspace.select(breadcrumb: item)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .foregroundStyle(index == workspace.navigationState.breadcrumb.count - 1 ? .primary : .secondary)
+
+                                        if index < workspace.navigationState.breadcrumb.count - 1 {
+                                            Text(">")
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                            }
+                            .background(.ultraThinMaterial.opacity(0.5))
+                        }
 
                         ModeContainerView(
                             modeController: workspace.modeController,
