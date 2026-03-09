@@ -290,7 +290,11 @@ final class ProjectIOTests: XCTestCase {
         let opener = FileSystemProjectManager()
         opener.manifestWriteInterceptor = { url, data in
             let lockURL = url.deletingLastPathComponent().appendingPathComponent(".lock")
-            try Data("{}".utf8).write(to: lockURL, options: .atomic)
+            let lockPayload = try JSONSerialization.data(withJSONObject: [
+                "pid": ProcessInfo.processInfo.processIdentifier,
+                "openedAt": ISO8601DateFormatter().string(from: Date())
+            ])
+            try lockPayload.write(to: lockURL, options: .atomic)
             try data.write(to: url, options: .atomic)
         }
 
@@ -312,7 +316,11 @@ final class ProjectIOTests: XCTestCase {
         let manager = FileSystemProjectManager()
         manager.manifestWriteInterceptor = { url, data in
             let lockURL = url.deletingLastPathComponent().appendingPathComponent(".lock")
-            try Data("{}".utf8).write(to: lockURL, options: .atomic)
+            let lockPayload = try JSONSerialization.data(withJSONObject: [
+                "pid": ProcessInfo.processInfo.processIdentifier,
+                "openedAt": ISO8601DateFormatter().string(from: Date())
+            ])
+            try lockPayload.write(to: lockURL, options: .atomic)
             try data.write(to: url, options: .atomic)
         }
 
@@ -492,6 +500,22 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(reopened.id, initial.id)
         XCTAssertEqual(manager.projectRootURL, root)
         XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path))
+    }
+
+    func testOpenProjectRemovesStaleLockFileAndSucceeds() throws {
+        let creator = FileSystemProjectManager()
+        _ = try creator.createProject(name: "StaleLock", at: tempDir)
+        let root = tempDir.appendingPathComponent("StaleLock")
+        try creator.closeProject()
+
+        let staleLockURL = root.appendingPathComponent(".lock")
+        let stalePayload = try JSONSerialization.data(withJSONObject: ["pid": "-1", "openedAt": "2000-01-01T00:00:00Z"])
+        try stalePayload.write(to: staleLockURL, options: .atomic)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staleLockURL.path))
+
+        let opener = FileSystemProjectManager()
+        XCTAssertNoThrow(try opener.openProject(at: root))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staleLockURL.path))
     }
 
     func testBackupCreateAndListReturnsNewestFirst() throws {

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 protocol ProjectManager {
     func createProject(name: String, at url: URL) throws -> Project
@@ -205,7 +206,10 @@ final class FileSystemProjectManager: ProjectManager {
         }
         let lockURL = rootURL.appendingPathComponent(lockFilename)
         if fileManager.fileExists(atPath: lockURL.path) {
-            throw ProjectIOError.concurrentAccess(lockFile: lockURL)
+            if lockRepresentsActiveSession(at: lockURL) {
+                throw ProjectIOError.concurrentAccess(lockFile: lockURL)
+            }
+            try? fileManager.removeItem(at: lockURL)
         }
 
         let previousProjectURL = projectURL
@@ -853,7 +857,10 @@ final class FileSystemProjectManager: ProjectManager {
     private func createLockFileIfNeeded(at rootURL: URL) throws {
         let lockURL = rootURL.appendingPathComponent(lockFilename)
         if fileManager.fileExists(atPath: lockURL.path) {
-            throw ProjectIOError.concurrentAccess(lockFile: lockURL)
+            if lockRepresentsActiveSession(at: lockURL) {
+                throw ProjectIOError.concurrentAccess(lockFile: lockURL)
+            }
+            try? fileManager.removeItem(at: lockURL)
         }
 
         let lockPayload = [
@@ -862,6 +869,27 @@ final class FileSystemProjectManager: ProjectManager {
         ]
         let lockData = try JSONSerialization.data(withJSONObject: lockPayload, options: [.sortedKeys])
         try lockData.write(to: lockURL, options: .atomic)
+    }
+
+    private func lockRepresentsActiveSession(at lockURL: URL) -> Bool {
+        guard let data = try? Data(contentsOf: lockURL),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return true
+        }
+
+        let pidValue: Int?
+        if let pidString = object["pid"] as? String {
+            pidValue = Int(pidString)
+        } else if let pidNumber = object["pid"] as? NSNumber {
+            pidValue = pidNumber.intValue
+        } else {
+            pidValue = nil
+        }
+
+        guard let pidValue, pidValue > 0 else { return false }
+        let check = kill(pid_t(pidValue), 0)
+        if check == 0 { return true }
+        return errno != ESRCH
     }
 
     private func removeLockFileIfPresent(at rootURL: URL) {
