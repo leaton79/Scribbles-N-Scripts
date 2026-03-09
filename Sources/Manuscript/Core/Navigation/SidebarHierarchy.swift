@@ -6,6 +6,7 @@ struct SidebarNode: Identifiable, Equatable {
     var level: HierarchyLevel
     var wordCount: Int
     var colorLabel: ColorLabel?
+    var goalProgressText: String?
     var children: [SidebarNode]
     var matchingCount: Int?
 }
@@ -34,6 +35,7 @@ enum SidebarHierarchyBuilder {
                         level: .part,
                         wordCount: partWordCount,
                         colorLabel: nil,
+                        goalProgressText: nil,
                         children: chapterNodes,
                         matchingCount: filters.isActive ? matching : nil
                     )
@@ -51,6 +53,7 @@ enum SidebarHierarchyBuilder {
                     level: .scene,
                     wordCount: $0.wordCount,
                     colorLabel: $0.colorLabel,
+                    goalProgressText: nil,
                     children: [],
                     matchingCount: nil
                 )
@@ -65,6 +68,7 @@ enum SidebarHierarchyBuilder {
                     level: .chapter,
                     wordCount: stagingScenes.reduce(0) { $0 + $1.wordCount },
                     colorLabel: nil,
+                    goalProgressText: nil,
                     children: stagingScenes,
                     matchingCount: filters.isActive ? stagingScenes.count : nil
                 )
@@ -101,9 +105,17 @@ enum SidebarHierarchyBuilder {
                 level: .scene,
                 wordCount: $0.wordCount,
                 colorLabel: $0.colorLabel,
+                goalProgressText: nil,
                 children: [],
                 matchingCount: nil
             )
+        }
+
+        let goalProgressText: String?
+        if let goal = chapter.goalWordCount {
+            goalProgressText = "\(formatWordCount(chapter.scenes.reduce(0) { $0 + $1.wordCount })) / \(formatWordCount(goal))"
+        } else {
+            goalProgressText = nil
         }
 
         return SidebarNode(
@@ -112,8 +124,15 @@ enum SidebarHierarchyBuilder {
             level: .chapter,
             wordCount: chapter.scenes.reduce(0) { $0 + $1.wordCount },
             colorLabel: nil,
+            goalProgressText: goalProgressText,
             children: sceneNodes,
             matchingCount: filters.isActive ? filteredScenes.count : nil
         )
+    }
+
+    private static func formatWordCount(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }
