@@ -836,6 +836,31 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: sourceManifest), sourceManifestData)
     }
 
+    func testBackupRestoreRejectsSymlinkDestinationOutsideSourceProject() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "BackupSymlinkOutside", at: tempDir)
+        let root = tempDir.appendingPathComponent("BackupSymlinkOutside")
+        let backup = try BackupManager.createBackup(projectURL: root, retentionCount: 10)
+
+        let externalTarget = tempDir.appendingPathComponent("external-restore-target", isDirectory: true)
+        try FileManager.default.createDirectory(at: externalTarget, withIntermediateDirectories: true)
+        let symlinkDestination = tempDir.appendingPathComponent("restore-link-external", isDirectory: true)
+        try? FileManager.default.removeItem(at: symlinkDestination)
+        try FileManager.default.createSymbolicLink(at: symlinkDestination, withDestinationURL: externalTarget)
+
+        XCTAssertThrowsError(
+            try BackupManager.restoreBackup(projectURL: root, backupFilename: backup.filename, to: symlinkDestination)
+        ) { error in
+            guard case let ProjectIOError.backupNotFound(message) = error else {
+                return XCTFail("Expected backupNotFound, got \(error)")
+            }
+            XCTAssertTrue(message.contains("cannot be a symbolic link"))
+        }
+
+        let unexpectedRestoreRoot = externalTarget.appendingPathComponent("BackupSymlinkOutside", isDirectory: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unexpectedRestoreRoot.path))
+    }
+
     func testBackupRestoreRemovesStaleLockFromRestoredProject() throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "BackupLock", at: tempDir)

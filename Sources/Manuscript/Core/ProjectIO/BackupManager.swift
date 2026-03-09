@@ -96,6 +96,12 @@ struct BackupManager {
         if canonicalDestinationPath == canonicalProjectPath || canonicalDestinationPath.hasPrefix(canonicalProjectPath + "/") {
             throw ProjectIOError.backupNotFound("Restore destination must be outside source project path")
         }
+        if FileManager.default.fileExists(atPath: destinationDir.path) {
+            let destinationValues = try destinationDir.resourceValues(forKeys: [.isSymbolicLinkKey])
+            if destinationValues.isSymbolicLink == true {
+                throw ProjectIOError.backupNotFound("Restore destination cannot be a symbolic link")
+            }
+        }
 
         let candidate = destinationDir.appendingPathComponent(projectURL.lastPathComponent, isDirectory: true)
         let canonicalCandidatePath = candidate.resolvingSymlinksInPath().standardizedFileURL.path
