@@ -88,86 +88,95 @@ final class FileSystemProjectManager: ProjectManager {
 
     func createProject(name: String, at url: URL) throws -> Project {
         let rootURL = url.appendingPathComponent(name, isDirectory: true)
-        try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        do {
+            try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
 
-        let contentURL = rootURL.appendingPathComponent("content", isDirectory: true)
-        let metadataURL = rootURL.appendingPathComponent("metadata", isDirectory: true)
-        let snapshotsURL = metadataURL.appendingPathComponent("snapshots", isDirectory: true)
-        let baselinesURL = snapshotsURL.appendingPathComponent("baselines", isDirectory: true)
+            let contentURL = rootURL.appendingPathComponent("content", isDirectory: true)
+            let metadataURL = rootURL.appendingPathComponent("metadata", isDirectory: true)
+            let snapshotsURL = metadataURL.appendingPathComponent("snapshots", isDirectory: true)
+            let baselinesURL = snapshotsURL.appendingPathComponent("baselines", isDirectory: true)
 
-        try fileManager.createDirectory(at: contentURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: contentURL.appendingPathComponent("staging", isDirectory: true), withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: metadataURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: snapshotsURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: baselinesURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: rootURL.appendingPathComponent("notes/attachments", isDirectory: true), withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: rootURL.appendingPathComponent("research", isDirectory: true), withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: rootURL.appendingPathComponent("backups", isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: contentURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: contentURL.appendingPathComponent("staging", isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: metadataURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: snapshotsURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: baselinesURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: rootURL.appendingPathComponent("notes/attachments", isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: rootURL.appendingPathComponent("research", isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: rootURL.appendingPathComponent("backups", isDirectory: true), withIntermediateDirectories: true)
 
-        let now = Date()
-        let projectId = UUID()
-        let chapterId = UUID()
-        let sceneId = UUID()
+            let now = Date()
+            let projectId = UUID()
+            let chapterId = UUID()
+            let sceneId = UUID()
 
-        let chapterDirName = "ch-\(chapterId.uuidString.lowercased())"
-        let sceneFilename = "scene-\(sceneId.uuidString.lowercased()).md"
-        let chapterDirURL = contentURL.appendingPathComponent(chapterDirName, isDirectory: true)
-        try fileManager.createDirectory(at: chapterDirURL, withIntermediateDirectories: true)
+            let chapterDirName = "ch-\(chapterId.uuidString.lowercased())"
+            let sceneFilename = "scene-\(sceneId.uuidString.lowercased()).md"
+            let chapterDirURL = contentURL.appendingPathComponent(chapterDirName, isDirectory: true)
+            try fileManager.createDirectory(at: chapterDirURL, withIntermediateDirectories: true)
 
-        let sceneFileURL = chapterDirURL.appendingPathComponent(sceneFilename)
-        try writeStringAtomically("", to: sceneFileURL)
+            let sceneFileURL = chapterDirURL.appendingPathComponent(sceneFilename)
+            try writeStringAtomically("", to: sceneFileURL)
 
-        let manifest = Manifest(
-            schema: ManifestCoder.schemaVersion,
-            formatVersion: ManifestCoder.formatVersion,
-            project: ManifestProject(id: projectId, name: name, createdAt: now, modifiedAt: now),
-            hierarchy: ManifestHierarchy(
-                parts: [],
-                chapters: [
-                    ManifestChapter(
-                        id: chapterId,
-                        title: "Chapter 1",
-                        synopsis: "",
-                        status: .todo,
-                        sequenceIndex: 0,
-                        parentPartId: nil,
-                        goalWordCount: nil,
-                        scenes: [sceneId]
-                    )
-                ],
-                scenes: [
-                    ManifestScene(
-                        id: sceneId,
-                        title: "Untitled Scene",
-                        synopsis: "",
-                        status: .todo,
-                        tags: [],
-                        colorLabel: nil,
-                        metadata: [:],
-                        sequenceIndex: 0,
-                        parentChapterId: chapterId,
-                        wordCount: 0,
-                        filePath: "content/\(chapterDirName)/\(sceneFilename)",
-                        createdAt: now,
-                        modifiedAt: now
-                    )
-                ],
-                stagingScenes: []
-            ),
-            settings: Self.defaultSettings()
-        )
+            let manifest = Manifest(
+                schema: ManifestCoder.schemaVersion,
+                formatVersion: ManifestCoder.formatVersion,
+                project: ManifestProject(id: projectId, name: name, createdAt: now, modifiedAt: now),
+                hierarchy: ManifestHierarchy(
+                    parts: [],
+                    chapters: [
+                        ManifestChapter(
+                            id: chapterId,
+                            title: "Chapter 1",
+                            synopsis: "",
+                            status: .todo,
+                            sequenceIndex: 0,
+                            parentPartId: nil,
+                            goalWordCount: nil,
+                            scenes: [sceneId]
+                        )
+                    ],
+                    scenes: [
+                        ManifestScene(
+                            id: sceneId,
+                            title: "Untitled Scene",
+                            synopsis: "",
+                            status: .todo,
+                            tags: [],
+                            colorLabel: nil,
+                            metadata: [:],
+                            sequenceIndex: 0,
+                            parentChapterId: chapterId,
+                            wordCount: 0,
+                            filePath: "content/\(chapterDirName)/\(sceneFilename)",
+                            createdAt: now,
+                            modifiedAt: now
+                        )
+                    ],
+                    stagingScenes: []
+                ),
+                settings: Self.defaultSettings()
+            )
 
-        try saveSupportMetadataFiles(at: rootURL)
-        try writeManifest(manifest, to: rootURL.appendingPathComponent("manifest.json"))
-        try writeStringAtomically(ManifestCoder.formatVersion, to: rootURL.appendingPathComponent(".manuscript-version"))
+            try saveSupportMetadataFiles(at: rootURL)
+            try writeManifest(manifest, to: rootURL.appendingPathComponent("manifest.json"))
+            try writeStringAtomically(ManifestCoder.formatVersion, to: rootURL.appendingPathComponent(".manuscript-version"))
 
-        self.projectURL = rootURL
-        self.manifest = manifest
-        self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
-        try createLockFileIfNeeded(at: rootURL)
-        isManifestDirty = false
-        dirtySceneIds.removeAll()
-        return currentProject!
+            self.projectURL = rootURL
+            self.manifest = manifest
+            self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
+            try createLockFileIfNeeded(at: rootURL)
+            isManifestDirty = false
+            dirtySceneIds.removeAll()
+            return currentProject!
+        } catch {
+            currentProject = nil
+            manifest = nil
+            projectURL = nil
+            dirtySceneIds.removeAll()
+            isManifestDirty = false
+            throw error
+        }
     }
 
     func openProject(at url: URL) throws -> Project {
