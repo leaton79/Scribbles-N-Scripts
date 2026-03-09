@@ -140,6 +140,49 @@ final class GoalsTests: XCTestCase {
         XCTAssertEqual(chapterNode.goalProgressText, "3,200 / 5,000")
     }
 
+    func testCorruptedHistoryFileIsBackedUpAndReset() throws {
+        let manager = try makeManager(name: "CorruptHistory")
+        let root = try XCTUnwrap(manager.projectRootURL)
+        let historyURL = root.appendingPathComponent("metadata/writing-history.json")
+        try Data("{bad json".utf8).write(to: historyURL, options: .atomic)
+
+        let goals = GoalsManager(projectManager: manager)
+
+        XCTAssertEqual(goals.writingHistory.count, 0)
+        XCTAssertEqual(goals.lastWarningMessage, "Writing history could not be loaded. Previous data has been backed up.")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: historyURL.path))
+
+        let metadataDir = root.appendingPathComponent("metadata", isDirectory: true)
+        let files = try FileManager.default.contentsOfDirectory(atPath: metadataDir.path)
+        XCTAssertTrue(files.contains(where: { $0.hasPrefix("writing-history.corrupt-") && $0.hasSuffix(".json") }))
+    }
+
+    func testSessionSpanningMidnightSplitsWordAttributionByDay() throws {
+        let manager = try makeManager(name: "MidnightSplit")
+        let goals = GoalsManager(projectManager: manager)
+        goals.startSession(goal: nil)
+
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+        let todayStart = calendar.startOfDay(for: now)
+        let justBeforeMidnight = calendar.date(byAdding: .second, value: 86_399, to: todayStart)!
+        let justAfterMidnight = calendar.date(byAdding: .second, value: 1, to: justBeforeMidnight)!
+
+        goals.recordWordCountChange(previous: 100, new: 120, at: justBeforeMidnight)
+        goals.recordWordCountChange(previous: 120, new: 150, at: justAfterMidnight)
+        goals.endSession()
+
+        let yesterdayKey = dayKey(justBeforeMidnight)
+        let todayKey = dayKey(justAfterMidnight)
+        let yesterdayRecord = goals.writingHistory.first(where: { $0.date == yesterdayKey })
+        let todayRecord = goals.writingHistory.first(where: { $0.date == todayKey })
+
+        XCTAssertEqual(yesterdayRecord?.wordsWritten, 20)
+        XCTAssertEqual(yesterdayRecord?.wordsGross, 20)
+        XCTAssertEqual(todayRecord?.wordsWritten, 30)
+        XCTAssertEqual(todayRecord?.wordsGross, 30)
+    }
+
     private func makeManager(name: String) throws -> FileSystemProjectManager {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
