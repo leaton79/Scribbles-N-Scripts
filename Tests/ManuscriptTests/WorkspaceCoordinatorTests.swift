@@ -91,4 +91,16 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         let titles = second.projectManager.getManifest().hierarchy.scenes.map(\.title)
         XCTAssertTrue(titles.contains("Persisted Scene"))
     }
+
+    func testLiveTypingUpdatesSessionWordStatsThroughCoordinatorBinding() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "LiveGoals")
+        coordinator.goalsManager.startSession(goal: nil)
+        let startingWords = coordinator.editorState.wordCount
+
+        coordinator.editorState.insertText(" hello", at: coordinator.editorState.getCurrentContent().count)
+
+        XCTAssertEqual(coordinator.editorState.wordCount, startingWords + 1)
+        XCTAssertEqual(coordinator.goalsManager.sessionWordsWritten, 1)
+        XCTAssertEqual(coordinator.goalsManager.sessionGrossWords, 1)
+    }
 }
