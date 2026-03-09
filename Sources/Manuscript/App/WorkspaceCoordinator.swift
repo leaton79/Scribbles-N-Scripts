@@ -210,6 +210,7 @@ final class WorkspaceCoordinator: ObservableObject {
     @discardableResult
     func saveProjectNow() -> String? {
         do {
+            autosaveOpenEditors()
             try projectManager.saveManifest()
             return nil
         } catch {

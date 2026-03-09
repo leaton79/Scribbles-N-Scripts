@@ -336,6 +336,36 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(manifestOnDisk.hierarchy.scenes.contains(where: { $0.title == "Unsaved" }))
     }
 
+    func testSaveProjectNowPersistsDirtyEditorContent() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveEditorContent")
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.editorState.insertText("manual save content", at: 0)
+
+        let saveMessage = coordinator.saveProjectNow()
+
+        XCTAssertNil(saveMessage)
+        let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: sceneId)
+        XCTAssertEqual(diskContent, "manual save content")
+    }
+
+    func testSaveProjectNowPersistsSplitPaneDirtyContent() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveSplitContent")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let scene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Secondary")
+        coordinator.linearState.reloadSequence()
+        coordinator.editorState.navigateToScene(id: scene.id)
+        coordinator.navigationState.navigateTo(sceneId: scene.id)
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 1200)
+        let secondarySceneId = try XCTUnwrap(coordinator.splitEditorState.secondarySceneId)
+        coordinator.splitEditorState.secondaryEditor.insertText("split pane save", at: 0)
+
+        let saveMessage = coordinator.saveProjectNow()
+
+        XCTAssertNil(saveMessage)
+        let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: secondarySceneId)
+        XCTAssertEqual(diskContent, "split pane save")
+    }
+
     func testCreateBackupNowAddsBackupArchive() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackupNow")
         let before = coordinator.projectManager.listBackups().count
