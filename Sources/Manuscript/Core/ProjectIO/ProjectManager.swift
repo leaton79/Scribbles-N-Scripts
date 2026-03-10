@@ -293,6 +293,7 @@ final class FileSystemProjectManager: ProjectManager {
         try writeManifest(manifest, to: manifestURL)
         currentProject = try makeProject(from: manifest, loadSceneContent: false)
         isManifestDirty = false
+        dirtySceneIds.removeAll()
     }
 
     func getManifest() -> Manifest {

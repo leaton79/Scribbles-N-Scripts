@@ -18,6 +18,16 @@ final class WorkspaceCoordinator: ObservableObject {
         projectManager.currentProject?.name ?? "Scribbles N Scripts"
     }
 
+    var hasUnsavedChanges: Bool {
+        if projectManager.isDirty || editorState.isModified {
+            return true
+        }
+        if splitEditorState.isSplit && (splitEditorState.primaryEditor.isModified || splitEditorState.secondaryEditor.isModified) {
+            return true
+        }
+        return false
+    }
+
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,

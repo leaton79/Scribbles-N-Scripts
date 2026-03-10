@@ -96,6 +96,9 @@ private struct WorkspaceView: View {
                         HStack {
                             Text(workspace.projectDisplayName)
                                 .font(.headline)
+                            Text(workspace.hasUnsavedChanges ? "Unsaved changes" : "All changes saved")
+                                .font(.caption)
+                                .foregroundStyle(workspace.hasUnsavedChanges ? .orange : .secondary)
                             Text("Session: \(workspace.goalsManager.sessionProgressText())")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

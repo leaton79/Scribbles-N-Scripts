@@ -366,6 +366,33 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(diskContent, "split pane save")
     }
 
+    func testHasUnsavedChangesReflectsEditorDirtyAndSave() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DirtyIndicator")
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+
+        coordinator.editorState.insertText("dirty", at: 0)
+        XCTAssertTrue(coordinator.hasUnsavedChanges)
+
+        _ = coordinator.saveProjectNow()
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+    }
+
+    func testHasUnsavedChangesReflectsSplitPaneDirtyState() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DirtySplitIndicator")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let scene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "SplitDirtyScene")
+        coordinator.linearState.reloadSequence()
+        coordinator.navigationState.navigateTo(sceneId: scene.id)
+        coordinator.editorState.navigateToScene(id: scene.id)
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 1200)
+
+        coordinator.splitEditorState.secondaryEditor.insertText("dirty split", at: 0)
+        XCTAssertTrue(coordinator.hasUnsavedChanges)
+
+        _ = coordinator.saveProjectNow()
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+    }
+
     func testCreateBackupNowAddsBackupArchive() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackupNow")
         let before = coordinator.projectManager.listBackups().count
