@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AppKit
 
 @main
 struct ManuscriptApp: App {
@@ -561,11 +562,11 @@ private struct SearchPanelSheet: View {
                 .font(.headline)
 
             HStack(spacing: 8) {
-                TextField("Find", text: $workspace.searchQueryText)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        commands.navigateToNextSearchResult()
-                    }
+                SearchQueryField(
+                    text: $workspace.searchQueryText,
+                    onNext: { commands.navigateToNextSearchResult() },
+                    onPrevious: { commands.navigateToPreviousSearchResult() }
+                )
                 Button("Search") {
                     commands.runSearch()
                 }
@@ -679,6 +680,62 @@ private struct SearchPanelSheet: View {
     private var replacePreview: (replacementCount: Int, scenesAffected: Int) {
         let scenesAffected = Set(workspace.searchResults.map(\.sceneId)).count
         return (workspace.searchResults.count, scenesAffected)
+    }
+}
+
+private struct SearchQueryField: NSViewRepresentable {
+    @Binding var text: String
+    let onNext: () -> Void
+    let onPrevious: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onNext: onNext, onPrevious: onPrevious)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = "Find"
+        field.delegate = context.coordinator
+        field.isBezeled = true
+        field.bezelStyle = .roundedBezel
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+        context.coordinator.text = $text
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var text: Binding<String>
+        let onNext: () -> Void
+        let onPrevious: () -> Void
+
+        init(text: Binding<String>, onNext: @escaping () -> Void, onPrevious: @escaping () -> Void) {
+            self.text = text
+            self.onNext = onNext
+            self.onPrevious = onPrevious
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            text.wrappedValue = field.stringValue
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) ||
+                commandSelector == #selector(NSResponder.insertLineBreak(_:)) {
+                if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+                    onPrevious()
+                } else {
+                    onNext()
+                }
+                return true
+            }
+            return false
+        }
     }
 }
 
