@@ -126,4 +126,19 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         bindings.setModeLinear()
         XCTAssertEqual(workspace.modeController.activeMode, .linear)
     }
+
+    func testNoProjectSplitToggleIsNoOpWhenSplitAlreadyOpen() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsNoProjectOpenSplit")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertNil(bindings.toggleSplit())
+        XCTAssertTrue(workspace.splitEditorState.isSplit)
+        XCTAssertEqual(bindings.splitToggleTitle, "Close Split")
+
+        try workspace.projectManager.closeProject()
+        XCTAssertFalse(bindings.canToggleSplitEditor)
+        XCTAssertEqual(bindings.toggleSplit(), "No project is currently open.")
+        XCTAssertTrue(workspace.splitEditorState.isSplit)
+        XCTAssertEqual(bindings.splitToggleTitle, "Close Split")
+    }
 }
