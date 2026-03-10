@@ -39,6 +39,7 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published var searchIsWholeWord = false
     @Published private(set) var searchResults: [SearchResult] = []
     @Published private(set) var searchErrorMessage: String?
+    @Published private(set) var currentSearchResultIndex: Int?
 
     var hasOpenProject: Bool {
         projectManager.currentProject != nil
@@ -378,11 +379,19 @@ final class WorkspaceCoordinator: ObservableObject {
         guard hasOpenProject else {
             searchResults = []
             searchErrorMessage = nil
+            currentSearchResultIndex = nil
             return
         }
         let query = makeSearchQuery()
         searchResults = searchEngine.search(query: query)
         searchErrorMessage = searchEngine.lastErrorMessage
+        if searchResults.isEmpty {
+            currentSearchResultIndex = nil
+        } else if let currentSearchResultIndex, currentSearchResultIndex < searchResults.count {
+            self.currentSearchResultIndex = currentSearchResultIndex
+        } else {
+            currentSearchResultIndex = 0
+        }
     }
 
     @discardableResult
@@ -402,6 +411,41 @@ final class WorkspaceCoordinator: ObservableObject {
         } catch {
             return "Could not replace: \(error.localizedDescription)"
         }
+    }
+
+    var searchResultPositionText: String {
+        guard let currentSearchResultIndex, !searchResults.isEmpty else {
+            return "0 of 0"
+        }
+        return "\(currentSearchResultIndex + 1) of \(searchResults.count)"
+    }
+
+    func selectSearchResult(at index: Int) {
+        guard searchResults.indices.contains(index) else { return }
+        currentSearchResultIndex = index
+        applySearchResult(searchResults[index])
+    }
+
+    func navigateToNextSearchResult() {
+        guard !searchResults.isEmpty else { return }
+        let next: Int
+        if let currentSearchResultIndex {
+            next = (currentSearchResultIndex + 1) % searchResults.count
+        } else {
+            next = 0
+        }
+        selectSearchResult(at: next)
+    }
+
+    func navigateToPreviousSearchResult() {
+        guard !searchResults.isEmpty else { return }
+        let previous: Int
+        if let currentSearchResultIndex {
+            previous = (currentSearchResultIndex - 1 + searchResults.count) % searchResults.count
+        } else {
+            previous = searchResults.count - 1
+        }
+        selectSearchResult(at: previous)
     }
 
     @discardableResult
@@ -878,6 +922,37 @@ final class WorkspaceCoordinator: ObservableObject {
     private func refreshDerivedStates() {
         linearState.reloadSequence()
         modularState.reload()
+    }
+
+    private func applySearchResult(_ result: SearchResult) {
+        let activeSceneId = splitEditorState.isSplit && splitEditorState.activePaneIndex == 1
+            ? splitEditorState.secondarySceneId
+            : splitEditorState.primarySceneId
+        if activeSceneId != result.sceneId {
+            navigateToSceneInActivePane(result.sceneId)
+        }
+
+        let content = editorState.getCurrentContent()
+        let clamped = clamp(range: result.matchRange, maxLength: content.count)
+        editorState.selection = clamped
+        editorState.cursorPosition = clamped.upperBound
+
+        let activeEditor = activeEditorState()
+        activeEditor.selection = clamped
+        activeEditor.cursorPosition = clamped.upperBound
+    }
+
+    private func activeEditorState() -> EditorState {
+        if splitEditorState.isSplit, splitEditorState.activePaneIndex == 1 {
+            return splitEditorState.secondaryEditor
+        }
+        return splitEditorState.primaryEditor
+    }
+
+    private func clamp(range: Range<Int>, maxLength: Int) -> Range<Int> {
+        let lower = max(0, min(range.lowerBound, maxLength))
+        let upper = max(lower, min(range.upperBound, maxLength))
+        return lower..<upper
     }
 
     private func reloadOpenEditorScenes() {

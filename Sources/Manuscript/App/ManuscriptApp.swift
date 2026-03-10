@@ -563,11 +563,27 @@ private struct SearchPanelSheet: View {
                 TextField("Find", text: $workspace.searchQueryText)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit {
-                        commands.runSearch()
+                        commands.navigateToNextSearchResult()
                     }
                 Button("Search") {
                     commands.runSearch()
                 }
+            }
+
+            HStack(spacing: 8) {
+                Text(commands.searchResultPositionText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Previous") {
+                    commands.navigateToPreviousSearchResult()
+                }
+                .keyboardShortcut(.return, modifiers: [.shift])
+                .disabled(workspace.searchResults.isEmpty)
+                Button("Next") {
+                    commands.navigateToNextSearchResult()
+                }
+                .keyboardShortcut(.return)
+                .disabled(workspace.searchResults.isEmpty)
             }
 
             HStack(spacing: 8) {
@@ -603,24 +619,13 @@ private struct SearchPanelSheet: View {
             }
 
             List {
-                ForEach(Array(workspace.searchResults.enumerated()), id: \.offset) { _, result in
+                ForEach(Array(workspace.searchResults.enumerated()), id: \.offset) { index, result in
                     Button {
-                        workspace.select(
-                            node: SidebarNode(
-                                id: result.sceneId,
-                                title: result.sceneTitle,
-                                level: .scene,
-                                wordCount: 0,
-                                colorLabel: nil,
-                                goalProgressText: nil,
-                                children: [],
-                                matchingCount: nil
-                            )
-                        )
+                        commands.selectSearchResult(at: index)
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(result.chapterTitle) • \(result.sceneTitle)")
-                                .font(.subheadline)
+                                .font(.subheadline.weight(workspace.currentSearchResultIndex == index ? .semibold : .regular))
                             Text(result.contextSnippet)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

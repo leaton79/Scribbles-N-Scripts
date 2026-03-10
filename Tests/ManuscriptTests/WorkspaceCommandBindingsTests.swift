@@ -172,6 +172,26 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertFalse(workspace.isSearchPanelVisible)
     }
 
+    func testSearchBindingsNavigateResults() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsSearchNavigation")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        workspace.editorState.replaceText(in: 0..<workspace.editorState.getCurrentContent().count, with: "one one one")
+        workspace.searchQueryText = "one"
+
+        bindings.showInlineSearch()
+        XCTAssertEqual(bindings.searchResultPositionText, "1 of 3")
+
+        bindings.navigateToNextSearchResult()
+        XCTAssertEqual(bindings.searchResultPositionText, "2 of 3")
+
+        bindings.navigateToPreviousSearchResult()
+        XCTAssertEqual(bindings.searchResultPositionText, "1 of 3")
+
+        bindings.selectSearchResult(at: 2)
+        XCTAssertEqual(bindings.currentSearchResultIndex, 2)
+        XCTAssertEqual(bindings.searchResultPositionText, "3 of 3")
+    }
+
     func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
         let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

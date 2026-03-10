@@ -327,6 +327,49 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "colour")
     }
 
+    func testSearchResultNavigationWrapsAndUpdatesCursorSelection() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchNavigation")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "cat sat cat")
+        coordinator.searchQueryText = "cat"
+
+        coordinator.showInlineSearchPanel()
+        XCTAssertEqual(coordinator.searchResultPositionText, "1 of 2")
+
+        coordinator.navigateToNextSearchResult()
+        XCTAssertEqual(coordinator.searchResultPositionText, "2 of 2")
+        XCTAssertEqual(coordinator.editorState.selection, 8..<11)
+        XCTAssertEqual(coordinator.editorState.cursorPosition, 11)
+
+        coordinator.navigateToNextSearchResult()
+        XCTAssertEqual(coordinator.searchResultPositionText, "1 of 2")
+        XCTAssertEqual(coordinator.editorState.selection, 0..<3)
+        XCTAssertEqual(coordinator.editorState.cursorPosition, 3)
+
+        coordinator.navigateToPreviousSearchResult()
+        XCTAssertEqual(coordinator.searchResultPositionText, "2 of 2")
+        XCTAssertEqual(coordinator.editorState.selection, 8..<11)
+    }
+
+    func testSelectingProjectSearchResultNavigatesToMatchingScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchSelectResult")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "apple")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "banana")
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "banana"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.count, 1)
+
+        coordinator.selectSearchResult(at: 0)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, secondScene.id)
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, secondScene.id)
+        XCTAssertEqual(coordinator.editorState.selection, 0..<6)
+    }
+
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
         let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

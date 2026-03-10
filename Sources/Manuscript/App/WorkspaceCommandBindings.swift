@@ -73,6 +73,14 @@ struct WorkspaceCommandBindings {
         workspace.hasOpenProject
     }
 
+    var searchResultPositionText: String {
+        workspace.searchResultPositionText
+    }
+
+    var currentSearchResultIndex: Int? {
+        workspace.currentSearchResultIndex
+    }
+
     var splitToggleTitle: String {
         workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split"
     }
@@ -185,5 +193,17 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func replaceAllSearchResults() -> String? {
         workspace.replaceAllSearchResults()
+    }
+
+    func selectSearchResult(at index: Int) {
+        workspace.selectSearchResult(at: index)
+    }
+
+    func navigateToNextSearchResult() {
+        workspace.navigateToNextSearchResult()
+    }
+
+    func navigateToPreviousSearchResult() {
+        workspace.navigateToPreviousSearchResult()
     }
 }
