@@ -294,6 +294,17 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter 2" }))
     }
 
+    func testCreateChapterGeneratedTitleParsesLegacySpacingAndCase() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapterLegacySpacing")
+        _ = coordinator.createChapter(title: "chapter   2")
+
+        let message = coordinator.createChapter()
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter 3" }))
+    }
+
     func testCreateSceneUsesSelectedChapterAndSelectsNewScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneSelectedChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
@@ -343,6 +354,18 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNil(message)
         let manifest = coordinator.projectManager.getManifest()
         XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Scene 2" }))
+    }
+
+    func testCreateSceneGeneratedTitleParsesLegacySpacingAndCase() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneLegacySpacing")
+        _ = coordinator.createScene(title: "Scene 1")
+        _ = coordinator.createScene(title: "scene   2")
+
+        let message = coordinator.createScene()
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Scene 3" }))
     }
 
     func testCreateSceneTrimsSurroundingWhitespaceInTitle() throws {

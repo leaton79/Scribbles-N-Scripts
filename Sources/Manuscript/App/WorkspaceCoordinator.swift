@@ -527,11 +527,7 @@ final class WorkspaceCoordinator: ObservableObject {
         let existing = projectManager.getManifest().hierarchy.chapters.map(\.title)
         let usedNumbers = Set(
             existing.compactMap { title -> Int? in
-                guard title.hasPrefix("Chapter ") else {
-                    return nil
-                }
-                let suffix = title.dropFirst("Chapter ".count)
-                return Int(suffix)
+                parseGeneratedNumber(from: title, prefix: "chapter")
             }
         )
 
@@ -546,11 +542,7 @@ final class WorkspaceCoordinator: ObservableObject {
         let existing = projectManager.getManifest().hierarchy.scenes.map(\.title)
         let usedNumbers = Set(
             existing.compactMap { title -> Int? in
-                guard title.hasPrefix("Scene ") else {
-                    return nil
-                }
-                let suffix = title.dropFirst("Scene ".count)
-                return Int(suffix)
+                parseGeneratedNumber(from: title, prefix: "scene")
             }
         )
 
@@ -559,5 +551,20 @@ final class WorkspaceCoordinator: ObservableObject {
             candidate += 1
         }
         return "Scene \(candidate)"
+    }
+
+    private func parseGeneratedNumber(from title: String, prefix: String) -> Int? {
+        let normalized = title
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercased = normalized.lowercased()
+        guard lowercased.hasPrefix(prefix) else {
+            return nil
+        }
+        let suffix = normalized.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !suffix.isEmpty, suffix.unicodeScalars.allSatisfy(CharacterSet.decimalDigits.contains) else {
+            return nil
+        }
+        return Int(suffix)
     }
 }
