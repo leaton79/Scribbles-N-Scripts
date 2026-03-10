@@ -150,6 +150,34 @@ final class NavigationTests: XCTestCase {
         XCTAssertEqual(after.hierarchy.scenes.map(\.id), before.hierarchy.scenes.map(\.id))
     }
 
+    func testUndoLastOperationRevertsOnlyMostRecentSceneMove() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "UndoLIFO", at: tempDir)
+
+        let baseManifest = manager.getManifest()
+        let ch1Id = try XCTUnwrap(baseManifest.hierarchy.chapters.first?.id)
+        let s1 = try XCTUnwrap(baseManifest.hierarchy.scenes.first?.id)
+        let s2 = try manager.addScene(to: ch1Id, at: nil, title: "S2")
+        let s3 = try manager.addScene(to: ch1Id, at: nil, title: "S3")
+
+        let ch2 = try manager.addChapter(to: nil, at: nil, title: "Ch2")
+        let d1 = try manager.addScene(to: ch2.id, at: nil, title: "D1")
+        _ = d1
+
+        let nav = NavigationState(projectProvider: { manager.currentProject })
+        try nav.performSceneMove(sceneId: s2.id, toChapterId: ch2.id, atIndex: 1, manager: manager)
+        try nav.performSceneMove(sceneId: s3.id, toChapterId: ch2.id, atIndex: 2, manager: manager)
+
+        try nav.undoLastOperation(manager: manager)
+
+        let afterUndo = manager.getManifest()
+        let ch1After = try XCTUnwrap(afterUndo.hierarchy.chapters.first(where: { $0.id == ch1Id }))
+        let ch2After = try XCTUnwrap(afterUndo.hierarchy.chapters.first(where: { $0.id == ch2.id }))
+
+        XCTAssertEqual(ch1After.scenes, [s1, s3.id])
+        XCTAssertEqual(ch2After.scenes, [d1.id, s2.id])
+    }
+
     private func makePartedProjectFixture(name: String) throws -> (project: Project, sceneWordCounts: [String: Int]) {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
