@@ -388,6 +388,9 @@ final class WorkspaceCoordinator: ObservableObject {
         let query = makeSearchQuery()
         searchResults = searchEngine.search(query: query)
         searchErrorMessage = searchEngine.lastErrorMessage
+        if searchShowAllHighlights && !canUseShowAllHighlightsForCurrentContext() {
+            searchShowAllHighlights = false
+        }
         if searchResults.isEmpty {
             currentSearchResultIndex = nil
         } else if let currentSearchResultIndex, currentSearchResultIndex < searchResults.count {
@@ -491,16 +494,46 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     var searchHighlightCap: Int { 100 }
+    var searchHighlightSafetyThreshold: Int { 2_000 }
 
     var hiddenSearchHighlightCount: Int {
         guard !searchShowAllHighlights else { return 0 }
-        guard let activeSceneId = activeSceneIdForHighlights() else { return 0 }
-        let total = searchResults.filter { $0.sceneId == activeSceneId }.count
+        let total = activeSceneMatchCountForHighlights()
         return max(0, total - searchHighlightCap)
     }
 
+    var canEnableShowAllSearchHighlights: Bool {
+        guard isSearchPanelVisible, !searchShowAllHighlights else { return false }
+        let total = activeSceneMatchCountForHighlights()
+        guard total > searchHighlightCap else { return false }
+        return total <= searchHighlightSafetyThreshold
+    }
+
+    var canToggleSearchHighlightMode: Bool {
+        if searchShowAllHighlights {
+            return isSearchPanelVisible && activeSceneMatchCountForHighlights() > searchHighlightCap
+        }
+        return canEnableShowAllSearchHighlights
+    }
+
+    var searchHighlightSafetyMessage: String? {
+        let total = activeSceneMatchCountForHighlights()
+        guard !searchShowAllHighlights,
+              total > searchHighlightSafetyThreshold,
+              total > searchHighlightCap else {
+            return nil
+        }
+        return "Show-all disabled for active scene (\(total) matches; limit \(searchHighlightSafetyThreshold))."
+    }
+
     func toggleShowAllSearchHighlights() {
-        searchShowAllHighlights.toggle()
+        if searchShowAllHighlights {
+            searchShowAllHighlights = false
+            updateEditorSearchHighlights()
+            return
+        }
+        guard canEnableShowAllSearchHighlights else { return }
+        searchShowAllHighlights = true
         updateEditorSearchHighlights()
     }
 
@@ -1042,6 +1075,15 @@ final class WorkspaceCoordinator: ObservableObject {
             return splitEditorState.secondarySceneId
         }
         return splitEditorState.primarySceneId ?? editorState.currentSceneId
+    }
+
+    private func activeSceneMatchCountForHighlights() -> Int {
+        guard let activeSceneId = activeSceneIdForHighlights() else { return 0 }
+        return searchResults.filter { $0.sceneId == activeSceneId }.count
+    }
+
+    private func canUseShowAllHighlightsForCurrentContext() -> Bool {
+        activeSceneMatchCountForHighlights() <= searchHighlightSafetyThreshold
     }
 
     private func activeEditorState() -> EditorState {

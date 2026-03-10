@@ -73,6 +73,14 @@ struct WorkspaceCommandBindings {
         workspace.hasOpenProject
     }
 
+    var canToggleSearchHighlightDisplayMode: Bool {
+        workspace.canToggleSearchHighlightMode
+    }
+
+    var searchHighlightToggleTitle: String {
+        workspace.searchShowAllHighlights ? "Use Capped Highlights" : "Show All Highlights"
+    }
+
     var searchResultPositionText: String {
         workspace.searchResultPositionText
     }
@@ -210,5 +218,9 @@ struct WorkspaceCommandBindings {
 
     func navigateToPreviousSearchResult() {
         workspace.navigateToPreviousSearchResult()
+    }
+
+    func toggleSearchHighlightDisplayMode() {
+        workspace.toggleShowAllSearchHighlights()
     }
 }

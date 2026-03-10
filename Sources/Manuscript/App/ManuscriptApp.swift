@@ -144,6 +144,14 @@ struct ManuscriptApp: App {
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(!commands.canSearchProject)
+
+                Divider()
+
+                Button(commands.searchHighlightToggleTitle) {
+                    commands.toggleSearchHighlightDisplayMode()
+                }
+                .keyboardShortcut("h", modifiers: [.command, .option])
+                .disabled(!commands.canToggleSearchHighlightDisplayMode)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -634,6 +642,7 @@ private struct SearchPanelSheet: View {
                         Button("Show All Highlights") {
                             workspace.toggleShowAllSearchHighlights()
                         }
+                        .disabled(!workspace.canEnableShowAllSearchHighlights)
                         .buttonStyle(.borderless)
                     } else if workspace.searchShowAllHighlights && workspace.searchResults.count > workspace.searchHighlightCap {
                         Button("Use Capped Highlights") {
@@ -641,6 +650,11 @@ private struct SearchPanelSheet: View {
                         }
                         .buttonStyle(.borderless)
                     }
+                }
+                if let safetyMessage = workspace.searchHighlightSafetyMessage {
+                    Text(safetyMessage)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
             }
 

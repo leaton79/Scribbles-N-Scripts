@@ -413,10 +413,38 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.searchResults.count, 120)
         XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, 100)
         XCTAssertEqual(coordinator.hiddenSearchHighlightCount, 20)
+        XCTAssertTrue(coordinator.canEnableShowAllSearchHighlights)
+        XCTAssertTrue(coordinator.canToggleSearchHighlightMode)
 
         coordinator.toggleShowAllSearchHighlights()
         XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, 120)
         XCTAssertEqual(coordinator.hiddenSearchHighlightCount, 0)
+        XCTAssertTrue(coordinator.searchShowAllHighlights)
+        XCTAssertTrue(coordinator.canToggleSearchHighlightMode)
+    }
+
+    func testSearchHighlightShowAllDisabledBeyondSafetyThreshold() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchHighlightSafety")
+        let initialContent = Array(repeating: "hit", count: 120).joined(separator: " ")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: initialContent)
+        coordinator.searchQueryText = "hit"
+        coordinator.showInlineSearchPanel()
+        coordinator.toggleShowAllSearchHighlights()
+        XCTAssertTrue(coordinator.searchShowAllHighlights)
+
+        let largeContent = Array(repeating: "hit", count: coordinator.searchHighlightSafetyThreshold + 1).joined(separator: " ")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: largeContent)
+        coordinator.runSearch()
+
+        XCTAssertFalse(coordinator.searchShowAllHighlights)
+        XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, coordinator.searchHighlightCap)
+        XCTAssertFalse(coordinator.canEnableShowAllSearchHighlights)
+        XCTAssertFalse(coordinator.canToggleSearchHighlightMode)
+        XCTAssertNotNil(coordinator.searchHighlightSafetyMessage)
+
+        coordinator.toggleShowAllSearchHighlights()
+        XCTAssertFalse(coordinator.searchShowAllHighlights)
+        XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, coordinator.searchHighlightCap)
     }
 
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {

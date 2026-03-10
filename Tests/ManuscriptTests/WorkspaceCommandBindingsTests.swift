@@ -206,6 +206,35 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(bindings.searchResultPositionText, "3 of 3")
     }
 
+    func testSearchHighlightToggleAvailabilityAndAction() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsSearchHighlightToggle")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        workspace.editorState.replaceText(
+            in: 0..<workspace.editorState.getCurrentContent().count,
+            with: Array(repeating: "hit", count: 120).joined(separator: " ")
+        )
+        workspace.searchQueryText = "hit"
+
+        bindings.showInlineSearch()
+        XCTAssertTrue(bindings.canToggleSearchHighlightDisplayMode)
+        XCTAssertEqual(bindings.searchHighlightToggleTitle, "Show All Highlights")
+
+        bindings.toggleSearchHighlightDisplayMode()
+        XCTAssertTrue(workspace.searchShowAllHighlights)
+        XCTAssertEqual(bindings.searchHighlightToggleTitle, "Use Capped Highlights")
+        XCTAssertTrue(bindings.canToggleSearchHighlightDisplayMode)
+
+        workspace.editorState.replaceText(
+            in: 0..<workspace.editorState.getCurrentContent().count,
+            with: Array(repeating: "hit", count: workspace.searchHighlightSafetyThreshold + 1).joined(separator: " ")
+        )
+        bindings.runSearch()
+
+        XCTAssertFalse(workspace.searchShowAllHighlights)
+        XCTAssertFalse(bindings.canToggleSearchHighlightDisplayMode)
+        XCTAssertEqual(bindings.searchHighlightToggleTitle, "Show All Highlights")
+    }
+
     func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
         let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
