@@ -562,6 +562,7 @@ private struct SearchPanelSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @State private var showingReplaceConfirmation = false
+    @State private var showingHighlightSettingsHelp = false
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
@@ -658,7 +659,7 @@ private struct SearchPanelSheet: View {
                 }
             }
 
-            GroupBox("Highlight Settings") {
+            GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Highlight cap limits how many matches are drawn at once for performance.")
                         .foregroundStyle(.secondary)
@@ -691,6 +692,30 @@ private struct SearchPanelSheet: View {
                     }
                 }
                 .font(.caption)
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Highlight Settings")
+                    Button {
+                        showingHighlightSettingsHelp = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Learn how cap and safety threshold work")
+                    .popover(isPresented: $showingHighlightSettingsHelp, arrowEdge: .bottom) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Highlight Settings")
+                                .font(.headline)
+                            Text("Highlight cap controls how many matches are drawn at once.")
+                            Text("Safety threshold blocks Show All when a scene has many matches.")
+                            Text("Example: If cap is 100 and threshold is 2,000, scenes over 2,000 matches stay capped.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.caption)
+                        .padding(12)
+                        .frame(maxWidth: 320, alignment: .leading)
+                    }
+                }
             }
 
             List {
