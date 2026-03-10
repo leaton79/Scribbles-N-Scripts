@@ -591,6 +591,10 @@ private struct SearchPanelSheet: View {
             HStack(spacing: 8) {
                 TextField("Replace", text: $workspace.searchReplacementText)
                     .textFieldStyle(.roundedBorder)
+                Button("Replace Next") {
+                    onNotice(commands.replaceNextSearchResult())
+                }
+                .disabled(workspace.searchQueryText.isEmpty || workspace.searchResults.isEmpty)
                 Button("Replace All") {
                     if replacePreview.replacementCount > 0 {
                         showingReplaceConfirmation = true

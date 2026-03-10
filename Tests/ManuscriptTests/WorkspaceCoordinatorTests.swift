@@ -327,6 +327,21 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "colour")
     }
 
+    func testReplaceNextSearchResultUpdatesCurrentMatchOnly() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceNext")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "color color color")
+        coordinator.searchQueryText = "color"
+        coordinator.searchReplacementText = "colour"
+
+        coordinator.showInlineSearchPanel()
+        coordinator.selectSearchResult(at: 0)
+
+        let message = coordinator.replaceNextSearchResult()
+        XCTAssertEqual(message, "Replaced next match.")
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "colour color color")
+        XCTAssertEqual(coordinator.searchResults.count, 2)
+    }
+
     func testSearchResultNavigationWrapsAndUpdatesCursorSelection() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchNavigation")
         coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "cat sat cat")

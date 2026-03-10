@@ -195,6 +195,11 @@ struct WorkspaceCommandBindings {
         workspace.replaceAllSearchResults()
     }
 
+    @discardableResult
+    func replaceNextSearchResult() -> String? {
+        workspace.replaceNextSearchResult()
+    }
+
     func selectSearchResult(at index: Int) {
         workspace.selectSearchResult(at: index)
     }

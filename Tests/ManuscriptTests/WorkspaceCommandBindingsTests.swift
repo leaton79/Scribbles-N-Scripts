@@ -172,6 +172,20 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertFalse(workspace.isSearchPanelVisible)
     }
 
+    func testSearchBindingsReplaceNext() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsReplaceNext")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        workspace.editorState.replaceText(in: 0..<workspace.editorState.getCurrentContent().count, with: "alpha alpha")
+        workspace.searchQueryText = "alpha"
+        workspace.searchReplacementText = "beta"
+
+        bindings.showInlineSearch()
+        let message = bindings.replaceNextSearchResult()
+
+        XCTAssertEqual(message, "Replaced next match.")
+        XCTAssertEqual(workspace.editorState.getCurrentContent(), "beta alpha")
+    }
+
     func testSearchBindingsNavigateResults() throws {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsSearchNavigation")
         let bindings = WorkspaceCommandBindings(workspace: workspace)

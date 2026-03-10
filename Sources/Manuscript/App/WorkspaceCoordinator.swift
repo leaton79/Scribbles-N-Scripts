@@ -415,6 +415,43 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    @discardableResult
+    func replaceNextSearchResult() -> String? {
+        guard hasOpenProject else {
+            return "Could not replace: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
+        guard !searchQueryText.isEmpty else {
+            return "Could not replace: Search text cannot be empty."
+        }
+        runSearch()
+        guard let currentSearchResultIndex, searchResults.indices.contains(currentSearchResultIndex) else {
+            return "No search matches to replace."
+        }
+        let result = searchResults[currentSearchResultIndex]
+        selectSearchResult(at: currentSearchResultIndex)
+
+        let editor = activeEditorState()
+        let before = editor.getCurrentContent()
+        let range = clamp(range: result.matchRange, maxLength: before.count)
+        guard range.lowerBound < range.upperBound else {
+            return "No search matches to replace."
+        }
+        let replacement = replacementTextForNextMatch(in: before, range: range)
+        editor.replaceText(in: range, with: replacement)
+        let after = editor.getCurrentContent()
+        guard before != after else {
+            return "No search matches to replace."
+        }
+
+        if let sceneId = editor.currentSceneId {
+            try? projectManager.saveSceneContent(sceneId: sceneId, content: after)
+            searchEngine.updateIndex(sceneId: sceneId, content: after)
+        }
+
+        runSearch()
+        return "Replaced next match."
+    }
+
     var searchResultPositionText: String {
         guard let currentSearchResultIndex, !searchResults.isEmpty else {
             return "0 of 0"
@@ -985,7 +1022,10 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     private func activeEditorState() -> EditorState {
-        if splitEditorState.isSplit, splitEditorState.activePaneIndex == 1 {
+        guard splitEditorState.isSplit else {
+            return editorState
+        }
+        if splitEditorState.activePaneIndex == 1 {
             return splitEditorState.secondaryEditor
         }
         return splitEditorState.primaryEditor
@@ -995,6 +1035,25 @@ final class WorkspaceCoordinator: ObservableObject {
         let lower = max(0, min(range.lowerBound, maxLength))
         let upper = max(lower, min(range.upperBound, maxLength))
         return lower..<upper
+    }
+
+    private func replacementTextForNextMatch(in content: String, range: Range<Int>) -> String {
+        guard searchIsRegex else { return searchReplacementText }
+        let query = makeSearchQuery()
+        var pattern = query.text
+        if query.isWholeWord {
+            pattern = "\\b(?:\(pattern))\\b"
+        }
+        let options: NSRegularExpression.Options = query.isCaseSensitive ? [] : [.caseInsensitive]
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
+            return searchReplacementText
+        }
+
+        let start = content.index(content.startIndex, offsetBy: range.lowerBound)
+        let end = content.index(content.startIndex, offsetBy: range.upperBound)
+        let target = String(content[start..<end])
+        let nsRange = NSRange(target.startIndex..<target.endIndex, in: target)
+        return regex.stringByReplacingMatches(in: target, range: nsRange, withTemplate: searchReplacementText)
     }
 
     private func reloadOpenEditorScenes() {
