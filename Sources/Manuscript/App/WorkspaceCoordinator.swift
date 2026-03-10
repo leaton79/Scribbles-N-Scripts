@@ -25,6 +25,14 @@ final class WorkspaceCoordinator: ObservableObject {
         lastOpenedProjectURL() != nil
     }
 
+    var canSaveProjectAs: Bool {
+        hasOpenProject
+    }
+
+    var canRenameProject: Bool {
+        hasOpenProject
+    }
+
     var projectDisplayName: String {
         projectManager.currentProject?.name ?? "Scribbles N Scripts"
     }
@@ -258,6 +266,105 @@ final class WorkspaceCoordinator: ObservableObject {
             return "Could not reopen project: No recent project found."
         }
         return openProject(at: projectURL)
+    }
+
+    @discardableResult
+    func saveProjectAs(named rawName: String) -> String? {
+        guard hasOpenProject else {
+            return "Could not save project as: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
+        let name = normalizeTitle(rawName, fallback: "")
+        guard !name.isEmpty else {
+            return "Could not save project as: Project name cannot be empty."
+        }
+
+        let sourceURL = projectManager.projectRootURL!
+        let destinationURL: URL
+        do {
+            destinationURL = try destinationProjectURL(forName: name)
+        } catch {
+            return "Could not save project as: \(error.localizedDescription)"
+        }
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            return "Could not save project as: A project named \"\(name)\" already exists."
+        }
+
+        var copied = false
+        do {
+            autosaveOpenEditors()
+            try projectManager.saveManifest()
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            copied = true
+            let copiedLock = destinationURL.appendingPathComponent(".lock")
+            if FileManager.default.fileExists(atPath: copiedLock.path) {
+                try? FileManager.default.removeItem(at: copiedLock)
+            }
+            _ = try projectManager.openProject(at: destinationURL)
+            try projectManager.updateProjectName(name)
+            try projectManager.saveManifest()
+            didOpenProject()
+            return nil
+        } catch {
+            if copied {
+                try? FileManager.default.removeItem(at: destinationURL)
+                if projectManager.currentProject == nil {
+                    _ = try? projectManager.openProject(at: sourceURL)
+                    didOpenProject()
+                }
+            }
+            return "Could not save project as: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func renameCurrentProject(to rawName: String) -> String? {
+        guard hasOpenProject else {
+            return "Could not rename project: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
+        let name = normalizeTitle(rawName, fallback: "")
+        guard !name.isEmpty else {
+            return "Could not rename project: Project name cannot be empty."
+        }
+
+        let sourceURL = projectManager.projectRootURL!
+        if sourceURL.lastPathComponent == name {
+            return nil
+        }
+
+        let destinationURL: URL
+        do {
+            destinationURL = try destinationProjectURL(forName: name)
+        } catch {
+            return "Could not rename project: \(error.localizedDescription)"
+        }
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            return "Could not rename project: A project named \"\(name)\" already exists."
+        }
+
+        var closed = false
+        var moved = false
+        do {
+            autosaveOpenEditors()
+            try projectManager.saveManifest()
+            try projectManager.closeProject()
+            closed = true
+            try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
+            moved = true
+            _ = try projectManager.openProject(at: destinationURL)
+            try projectManager.updateProjectName(name)
+            try projectManager.saveManifest()
+            didOpenProject()
+            return nil
+        } catch {
+            if moved {
+                _ = try? projectManager.openProject(at: destinationURL)
+                didOpenProject()
+            } else if closed {
+                _ = try? projectManager.openProject(at: sourceURL)
+                didOpenProject()
+            }
+            return "Could not rename project: \(error.localizedDescription)"
+        }
     }
 
     @discardableResult
@@ -533,6 +640,11 @@ final class WorkspaceCoordinator: ObservableObject {
             return currentRoot.deletingLastPathComponent()
         }
         return try Self.defaultProjectContainerURL(fileManager: .default)
+    }
+
+    private func destinationProjectURL(forName name: String) throws -> URL {
+        let root = try projectRootForNewProjects()
+        return root.appendingPathComponent(name, isDirectory: true)
     }
 
     private func persistLastOpenedProject() {

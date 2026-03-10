@@ -247,6 +247,57 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
     }
 
+    func testSaveProjectAsCreatesCopyAndSwitchesContext() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAsSource")
+        let sourceURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.editorState.insertText("save as baseline", at: 0)
+
+        let message = coordinator.saveProjectAs(named: "SaveAsCopy")
+
+        XCTAssertNil(message)
+        let copyURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        XCTAssertNotEqual(copyURL, sourceURL)
+        XCTAssertEqual(copyURL.lastPathComponent, "SaveAsCopy")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sourceURL.path))
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: sceneId), "save as baseline")
+    }
+
+    func testSaveProjectAsReturnsConflictMessageWhenDestinationExists() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAsConflictSource")
+        let conflictURL = tempDir.appendingPathComponent("SaveAsConflictTarget", isDirectory: true)
+        try FileManager.default.createDirectory(at: conflictURL, withIntermediateDirectories: true)
+
+        let message = coordinator.saveProjectAs(named: "SaveAsConflictTarget")
+
+        XCTAssertEqual(message, "Could not save project as: A project named \"SaveAsConflictTarget\" already exists.")
+    }
+
+    func testRenameProjectMovesDirectoryAndKeepsProjectOpen() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RenameSource")
+        let sourceURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.editorState.insertText("rename baseline", at: 0)
+
+        let message = coordinator.renameCurrentProject(to: "RenamedProject")
+
+        XCTAssertNil(message)
+        let renamedURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        XCTAssertEqual(renamedURL.lastPathComponent, "RenamedProject")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sourceURL.path))
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: sceneId), "rename baseline")
+    }
+
+    func testRenameProjectReturnsConflictMessageWhenDestinationExists() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RenameConflictSource")
+        let conflictURL = tempDir.appendingPathComponent("RenameConflictTarget", isDirectory: true)
+        try FileManager.default.createDirectory(at: conflictURL, withIntermediateDirectories: true)
+
+        let message = coordinator.renameCurrentProject(to: "RenameConflictTarget")
+
+        XCTAssertEqual(message, "Could not rename project: A project named \"RenameConflictTarget\" already exists.")
+    }
+
     func testLiveTypingUpdatesSessionWordStatsThroughCoordinatorBinding() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "LiveGoals")
         coordinator.goalsManager.startSession(goal: nil)

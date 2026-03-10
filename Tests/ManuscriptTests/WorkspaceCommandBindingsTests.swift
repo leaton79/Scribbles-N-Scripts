@@ -85,6 +85,25 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(workspace.projectDisplayName, "BindingsTarget")
     }
 
+    func testSaveAsAndRenameDelegationAndAvailability() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsSaveAsRename")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        XCTAssertTrue(bindings.canSaveProjectAs)
+        XCTAssertTrue(bindings.canRenameProject)
+
+        XCTAssertNil(bindings.saveProjectAs(named: "BindingsCopy"))
+        XCTAssertEqual(workspace.projectDisplayName, "BindingsCopy")
+
+        XCTAssertNil(bindings.renameProject(to: "BindingsRenamed"))
+        XCTAssertEqual(workspace.projectDisplayName, "BindingsRenamed")
+
+        try workspace.projectManager.closeProject()
+        XCTAssertFalse(bindings.canSaveProjectAs)
+        XCTAssertFalse(bindings.canRenameProject)
+        XCTAssertEqual(bindings.saveProjectAs(named: "NoProject"), "Could not save project as: No project is currently open.")
+        XCTAssertEqual(bindings.renameProject(to: "NoProject"), "Could not rename project: No project is currently open.")
+    }
+
     func testViewActionsDelegateToWorkspaceCoordinator() throws {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsViewActions")
         let bindings = WorkspaceCommandBindings(workspace: workspace)

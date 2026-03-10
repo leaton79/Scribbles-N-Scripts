@@ -28,6 +28,7 @@ protocol ProjectManager {
 
     func updateSceneMetadata(sceneId: UUID, updates: SceneMetadataUpdate) throws
     func updateChapterMetadata(chapterId: UUID, updates: ChapterMetadataUpdate) throws
+    func updateProjectName(_ name: String) throws
 
     func startAutosave(intervalSeconds: Int)
     func stopAutosave()
@@ -818,6 +819,15 @@ final class FileSystemProjectManager: ProjectManager {
         if let status = updates.status { manifest.hierarchy.chapters[chapterIndex].status = status }
         if let goalWordCount = updates.goalWordCount { manifest.hierarchy.chapters[chapterIndex].goalWordCount = goalWordCount }
 
+        self.manifest = manifest
+        isManifestDirty = true
+        currentProject = try makeProject(from: manifest, loadSceneContent: false, existingTrash: currentProject?.trash ?? [])
+    }
+
+    func updateProjectName(_ name: String) throws {
+        guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
+        manifest.project.name = name
+        manifest.project.modifiedAt = Date()
         self.manifest = manifest
         isManifestDirty = true
         currentProject = try makeProject(from: manifest, loadSceneContent: false, existingTrash: currentProject?.trash ?? [])

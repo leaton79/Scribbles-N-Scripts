@@ -17,6 +17,14 @@ struct WorkspaceCommandBindings {
         workspace.canReopenLastProject
     }
 
+    var canSaveProjectAs: Bool {
+        workspace.canSaveProjectAs
+    }
+
+    var canRenameProject: Bool {
+        workspace.canRenameProject
+    }
+
     var canCreateBackup: Bool {
         workspace.hasOpenProject
     }
@@ -62,6 +70,16 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func reopenLastProject() -> String? {
         workspace.reopenLastProject()
+    }
+
+    @discardableResult
+    func saveProjectAs(named name: String) -> String? {
+        workspace.saveProjectAs(named: name)
+    }
+
+    @discardableResult
+    func renameProject(to name: String) -> String? {
+        workspace.renameCurrentProject(to: name)
     }
 
     @discardableResult

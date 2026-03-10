@@ -21,6 +21,18 @@ struct ManuscriptApp: App {
 
                 Divider()
 
+                Button("Save Project As…") {
+                    NotificationCenter.default.post(name: .showSaveAsSheet, object: nil)
+                }
+                .disabled(!commands.canSaveProjectAs)
+
+                Button("Rename Project…") {
+                    NotificationCenter.default.post(name: .showRenameSheet, object: nil)
+                }
+                .disabled(!commands.canRenameProject)
+
+                Divider()
+
                 Button("Save Project") {
                     _ = commands.saveProject()
                 }
@@ -99,7 +111,11 @@ private struct WorkspaceView: View {
     @State private var actionNotice: String?
     @State private var showingNewProjectSheet = false
     @State private var showingOpenProjectPicker = false
+    @State private var showingSaveAsSheet = false
+    @State private var showingRenameSheet = false
     @State private var newProjectName = ""
+    @State private var saveAsProjectName = ""
+    @State private var renameProjectName = ""
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
@@ -149,6 +165,16 @@ private struct WorkspaceView: View {
                                 actionNotice = commands.reopenLastProject()
                             }
                             .disabled(!commands.canReopenLastProject)
+                            Button("Save As") {
+                                saveAsProjectName = workspace.projectDisplayName
+                                showingSaveAsSheet = true
+                            }
+                            .disabled(!commands.canSaveProjectAs)
+                            Button("Rename") {
+                                renameProjectName = workspace.projectDisplayName
+                                showingRenameSheet = true
+                            }
+                            .disabled(!commands.canRenameProject)
                             Button("Save") {
                                 actionNotice = commands.saveProject() ?? "Project saved."
                             }
@@ -220,6 +246,14 @@ private struct WorkspaceView: View {
                 .onChange(of: workspace.modeController.activeMode) { _, mode in
                     workspace.handleModeChange(mode)
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .showSaveAsSheet)) { _ in
+                    saveAsProjectName = workspace.projectDisplayName
+                    showingSaveAsSheet = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .showRenameSheet)) { _ in
+                    renameProjectName = workspace.projectDisplayName
+                    showingRenameSheet = true
+                }
                 .fileImporter(
                     isPresented: $showingOpenProjectPicker,
                     allowedContentTypes: [.folder],
@@ -235,6 +269,8 @@ private struct WorkspaceView: View {
                 }
                 .sheet(isPresented: $showingNewProjectSheet) {
                     NewProjectSheet(
+                        title: "Create New Project",
+                        actionLabel: "Create",
                         projectName: $newProjectName,
                         onCancel: {
                             showingNewProjectSheet = false
@@ -242,6 +278,34 @@ private struct WorkspaceView: View {
                         onCreate: {
                             actionNotice = commands.createProject(named: newProjectName)
                             showingNewProjectSheet = false
+                        }
+                    )
+                }
+                .sheet(isPresented: $showingSaveAsSheet) {
+                    NewProjectSheet(
+                        title: "Save Project As",
+                        actionLabel: "Save As",
+                        projectName: $saveAsProjectName,
+                        onCancel: {
+                            showingSaveAsSheet = false
+                        },
+                        onCreate: {
+                            actionNotice = commands.saveProjectAs(named: saveAsProjectName) ?? "Project saved as \(saveAsProjectName)."
+                            showingSaveAsSheet = false
+                        }
+                    )
+                }
+                .sheet(isPresented: $showingRenameSheet) {
+                    NewProjectSheet(
+                        title: "Rename Project",
+                        actionLabel: "Rename",
+                        projectName: $renameProjectName,
+                        onCancel: {
+                            showingRenameSheet = false
+                        },
+                        onCreate: {
+                            actionNotice = commands.renameProject(to: renameProjectName) ?? "Project renamed to \(renameProjectName)."
+                            showingRenameSheet = false
                         }
                     )
                 }
@@ -260,24 +324,31 @@ private struct WorkspaceView: View {
 }
 
 private struct NewProjectSheet: View {
+    let title: String
+    let actionLabel: String
     @Binding var projectName: String
     let onCancel: () -> Void
     let onCreate: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Create New Project")
+            Text(title)
                 .font(.headline)
             TextField("Project name", text: $projectName)
                 .textFieldStyle(.roundedBorder)
             HStack {
                 Spacer()
                 Button("Cancel", action: onCancel)
-                Button("Create", action: onCreate)
+                Button(actionLabel, action: onCreate)
                     .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
         .frame(minWidth: 360)
     }
+}
+
+private extension Notification.Name {
+    static let showSaveAsSheet = Notification.Name("workspace.showSaveAsSheet")
+    static let showRenameSheet = Notification.Name("workspace.showRenameSheet")
 }
