@@ -232,12 +232,10 @@ final class WorkspaceCoordinator: ObservableObject {
             if !normalized.isEmpty {
                 resolvedTitle = normalized
             } else {
-                let chapterCount = projectManager.getManifest().hierarchy.chapters.count
-                resolvedTitle = "Chapter \(chapterCount + 1)"
+                resolvedTitle = nextGeneratedChapterTitle()
             }
         } else {
-            let chapterCount = projectManager.getManifest().hierarchy.chapters.count
-            resolvedTitle = "Chapter \(chapterCount + 1)"
+            resolvedTitle = nextGeneratedChapterTitle()
         }
 
         do {
@@ -477,7 +475,7 @@ final class WorkspaceCoordinator: ObservableObject {
             return firstChapter.id
         }
 
-        let newChapter = try projectManager.addChapter(to: nil, at: nil, title: "Chapter 1")
+        let newChapter = try projectManager.addChapter(to: nil, at: nil, title: nextGeneratedChapterTitle())
         return newChapter.id
     }
 
@@ -513,5 +511,24 @@ final class WorkspaceCoordinator: ObservableObject {
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return collapsed.isEmpty ? fallback : collapsed
+    }
+
+    private func nextGeneratedChapterTitle() -> String {
+        let existing = projectManager.getManifest().hierarchy.chapters.map(\.title)
+        let usedNumbers = Set(
+            existing.compactMap { title -> Int? in
+                guard title.hasPrefix("Chapter ") else {
+                    return nil
+                }
+                let suffix = title.dropFirst("Chapter ".count)
+                return Int(suffix)
+            }
+        )
+
+        var candidate = 1
+        while usedNumbers.contains(candidate) {
+            candidate += 1
+        }
+        return "Chapter \(candidate)"
     }
 }

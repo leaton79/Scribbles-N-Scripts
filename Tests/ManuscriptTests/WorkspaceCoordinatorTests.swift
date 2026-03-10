@@ -283,6 +283,17 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter Name" }))
     }
 
+    func testCreateChapterGeneratedTitleFillsNumericGaps() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapterGaps")
+        _ = coordinator.createChapter(title: "Chapter 3")
+
+        let message = coordinator.createChapter()
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter 2" }))
+    }
+
     func testCreateSceneUsesSelectedChapterAndSelectsNewScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneSelectedChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
