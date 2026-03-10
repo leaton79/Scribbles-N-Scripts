@@ -133,6 +133,23 @@ final class NavigationTests: XCTestCase {
         XCTAssertTrue(manager.getManifest().hierarchy.scenes.contains(where: { $0.id == sceneId }))
     }
 
+    func testUndoLastOperationWithEmptyStackIsSafeNoOp() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "UndoNoOp", at: tempDir)
+        let nav = NavigationState(projectProvider: { manager.currentProject })
+        let before = manager.getManifest()
+
+        try nav.undoLastOperation(manager: manager)
+
+        let after = manager.getManifest()
+        XCTAssertEqual(after.hierarchy.parts.count, before.hierarchy.parts.count)
+        XCTAssertEqual(after.hierarchy.chapters.count, before.hierarchy.chapters.count)
+        XCTAssertEqual(after.hierarchy.scenes.count, before.hierarchy.scenes.count)
+        XCTAssertEqual(after.hierarchy.parts.map(\.id), before.hierarchy.parts.map(\.id))
+        XCTAssertEqual(after.hierarchy.chapters.map(\.id), before.hierarchy.chapters.map(\.id))
+        XCTAssertEqual(after.hierarchy.scenes.map(\.id), before.hierarchy.scenes.map(\.id))
+    }
+
     private func makePartedProjectFixture(name: String) throws -> (project: Project, sceneWordCounts: [String: Int]) {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
