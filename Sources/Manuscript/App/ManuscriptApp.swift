@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct ManuscriptApp: App {
@@ -13,6 +14,13 @@ struct ManuscriptApp: App {
         }
         .commands {
             CommandMenu("Project") {
+                Button("Reopen Last Project") {
+                    _ = commands.reopenLastProject()
+                }
+                .disabled(!commands.canReopenLastProject)
+
+                Divider()
+
                 Button("Save Project") {
                     _ = commands.saveProject()
                 }
@@ -89,6 +97,9 @@ private struct WorkspaceView: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     @State private var splitNotice: String?
     @State private var actionNotice: String?
+    @State private var showingNewProjectSheet = false
+    @State private var showingOpenProjectPicker = false
+    @State private var newProjectName = ""
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
@@ -127,6 +138,17 @@ private struct WorkspaceView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
+                            Button("New Project") {
+                                newProjectName = ""
+                                showingNewProjectSheet = true
+                            }
+                            Button("Open Project") {
+                                showingOpenProjectPicker = true
+                            }
+                            Button("Reopen Last") {
+                                actionNotice = commands.reopenLastProject()
+                            }
+                            .disabled(!commands.canReopenLastProject)
                             Button("Save") {
                                 actionNotice = commands.saveProject() ?? "Project saved."
                             }
@@ -198,6 +220,31 @@ private struct WorkspaceView: View {
                 .onChange(of: workspace.modeController.activeMode) { _, mode in
                     workspace.handleModeChange(mode)
                 }
+                .fileImporter(
+                    isPresented: $showingOpenProjectPicker,
+                    allowedContentTypes: [.folder],
+                    allowsMultipleSelection: false
+                ) { result in
+                    switch result {
+                    case let .success(urls):
+                        guard let folder = urls.first else { return }
+                        actionNotice = commands.openProject(at: folder)
+                    case let .failure(error):
+                        actionNotice = "Could not open project: \(error.localizedDescription)"
+                    }
+                }
+                .sheet(isPresented: $showingNewProjectSheet) {
+                    NewProjectSheet(
+                        projectName: $newProjectName,
+                        onCancel: {
+                            showingNewProjectSheet = false
+                        },
+                        onCreate: {
+                            actionNotice = commands.createProject(named: newProjectName)
+                            showingNewProjectSheet = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -209,5 +256,28 @@ private struct WorkspaceView: View {
 
     private func toggleSplit(windowWidth: CGFloat) {
         splitNotice = workspace.toggleSplit(windowWidth: windowWidth)
+    }
+}
+
+private struct NewProjectSheet: View {
+    @Binding var projectName: String
+    let onCancel: () -> Void
+    let onCreate: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Create New Project")
+                .font(.headline)
+            TextField("Project name", text: $projectName)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                Button("Create", action: onCreate)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 360)
     }
 }

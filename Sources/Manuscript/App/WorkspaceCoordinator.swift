@@ -3,6 +3,8 @@ import SwiftUI
 
 @MainActor
 final class WorkspaceCoordinator: ObservableObject {
+    private static let lastOpenedProjectPathKey = "workspace.lastOpenedProjectPath"
+
     let projectManager: FileSystemProjectManager
     let navigationState: NavigationState
     let editorState: EditorState
@@ -11,11 +13,16 @@ final class WorkspaceCoordinator: ObservableObject {
     let modeController: ModeController
     let splitEditorState: SplitEditorState
     let goalsManager: GoalsManager
+    private let recentProjectStore: UserDefaults
 
     @Published var loadError: String?
 
     var hasOpenProject: Bool {
         projectManager.currentProject != nil
+    }
+
+    var canReopenLastProject: Bool {
+        lastOpenedProjectURL() != nil
     }
 
     var projectDisplayName: String {
@@ -84,15 +91,18 @@ final class WorkspaceCoordinator: ObservableObject {
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
         bootstrapProjectName: String = "Sandbox",
-        splitSettingsStore: UserDefaults = .standard
+        splitSettingsStore: UserDefaults = .standard,
+        recentProjectStore: UserDefaults = .standard
     ) {
         self.projectManager = manager
+        self.recentProjectStore = recentProjectStore
 
         do {
             try Self.bootstrapProject(
                 using: manager,
                 rootURL: bootstrapRootURL,
-                projectName: bootstrapProjectName
+                projectName: bootstrapProjectName,
+                recentProjectStore: recentProjectStore
             )
             let dependencies = Self.makeDependencies(
                 manager: manager,
@@ -107,6 +117,7 @@ final class WorkspaceCoordinator: ObservableObject {
             self.splitEditorState = dependencies.splitEditorState
             self.goalsManager = dependencies.goalsManager
             self.goalsManager.bind(to: self.editorState)
+            persistLastOpenedProject()
 
             if dependencies.editorState.currentSceneId == nil, let first = dependencies.linearState.orderedSceneIds.first {
                 dependencies.linearState.goToScene(id: first)
@@ -203,6 +214,50 @@ final class WorkspaceCoordinator: ObservableObject {
         }
         modeController.switchTo(mode)
         handleModeChange(mode)
+    }
+
+    @discardableResult
+    func createAndOpenProject(named rawName: String) -> String? {
+        let name = normalizeTitle(rawName, fallback: "")
+        guard !name.isEmpty else {
+            return "Could not create project: Project name cannot be empty."
+        }
+
+        do {
+            if hasOpenProject {
+                autosaveOpenEditors()
+                try projectManager.saveManifest()
+            }
+            let rootURL = try projectRootForNewProjects()
+            _ = try projectManager.createProject(name: name, at: rootURL)
+            didOpenProject()
+            return nil
+        } catch {
+            return "Could not create project: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func openProject(at projectURL: URL) -> String? {
+        do {
+            if hasOpenProject {
+                autosaveOpenEditors()
+                try projectManager.saveManifest()
+            }
+            _ = try projectManager.openProject(at: projectURL)
+            didOpenProject()
+            return nil
+        } catch {
+            return "Could not open project: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func reopenLastProject() -> String? {
+        guard let projectURL = lastOpenedProjectURL() else {
+            return "Could not reopen project: No recent project found."
+        }
+        return openProject(at: projectURL)
     }
 
     @discardableResult
@@ -357,8 +412,23 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
-    private static func bootstrapProject(using manager: FileSystemProjectManager, rootURL: URL?, projectName: String) throws {
+    private static func bootstrapProject(
+        using manager: FileSystemProjectManager,
+        rootURL: URL?,
+        projectName: String,
+        recentProjectStore: UserDefaults
+    ) throws {
         let fm = FileManager.default
+        if rootURL == nil,
+           let lastPath = recentProjectStore.string(forKey: lastOpenedProjectPathKey) {
+            let lastURL = URL(fileURLWithPath: lastPath, isDirectory: true)
+            if fm.fileExists(atPath: lastURL.appendingPathComponent("manifest.json").path) {
+                _ = try manager.openProject(at: lastURL)
+                return
+            }
+            recentProjectStore.removeObject(forKey: lastOpenedProjectPathKey)
+        }
+
         let root: URL
         if let rootURL {
             root = rootURL
@@ -379,6 +449,16 @@ final class WorkspaceCoordinator: ObservableObject {
         } else {
             _ = try manager.createProject(name: projectName, at: root)
         }
+    }
+
+    private static func defaultProjectContainerURL(fileManager: FileManager = .default) throws -> URL {
+        let appSupport = try fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        return appSupport.appendingPathComponent("Manuscript", isDirectory: true)
     }
 
     private static func makeDependencies(
@@ -427,6 +507,48 @@ final class WorkspaceCoordinator: ObservableObject {
     private func autosaveOpenEditors() {
         try? editorState.autosaveIfNeeded(projectManager: projectManager)
         splitEditorState.autosaveOpenPanes()
+    }
+
+    private func didOpenProject() {
+        refreshDerivedStates()
+        modeController.switchTo(.linear)
+        splitEditorState.closeSplit()
+
+        if let first = linearState.orderedSceneIds.first {
+            editorState.navigateToScene(id: first)
+            navigationState.navigateTo(sceneId: first)
+            splitEditorState.primarySceneId = first
+            splitEditorState.secondarySceneId = nil
+        } else {
+            navigationState.selectedSceneId = nil
+            navigationState.selectedChapterId = nil
+            navigationState.breadcrumb = []
+        }
+
+        persistLastOpenedProject()
+    }
+
+    private func projectRootForNewProjects() throws -> URL {
+        if let currentRoot = projectManager.projectRootURL {
+            return currentRoot.deletingLastPathComponent()
+        }
+        return try Self.defaultProjectContainerURL(fileManager: .default)
+    }
+
+    private func persistLastOpenedProject() {
+        guard let rootURL = projectManager.projectRootURL else { return }
+        recentProjectStore.set(rootURL.path, forKey: Self.lastOpenedProjectPathKey)
+    }
+
+    private func lastOpenedProjectURL() -> URL? {
+        guard let path = recentProjectStore.string(forKey: Self.lastOpenedProjectPathKey) else {
+            return nil
+        }
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else {
+            return nil
+        }
+        return url
     }
 
     private func refreshDerivedStates() {

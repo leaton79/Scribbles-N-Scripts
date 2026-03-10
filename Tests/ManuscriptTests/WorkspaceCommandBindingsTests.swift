@@ -57,6 +57,34 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertTrue(saveAndBackupMessage?.contains("Project saved and backup created") == true)
     }
 
+    func testProjectOpenCreateAndReopenDelegation() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.Recent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsSeed",
+            recentProjectStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        XCTAssertNil(bindings.createProject(named: "BindingsNew"))
+        XCTAssertEqual(workspace.projectDisplayName, "BindingsNew")
+
+        let target = FileSystemProjectManager()
+        _ = try target.createProject(name: "BindingsTarget", at: tempDir)
+        try target.closeProject()
+        let targetURL = tempDir.appendingPathComponent("BindingsTarget", isDirectory: true)
+
+        XCTAssertNil(bindings.openProject(at: targetURL))
+        XCTAssertEqual(workspace.projectDisplayName, "BindingsTarget")
+        XCTAssertTrue(bindings.canReopenLastProject)
+
+        try workspace.projectManager.closeProject()
+        XCTAssertNil(bindings.reopenLastProject())
+        XCTAssertEqual(workspace.projectDisplayName, "BindingsTarget")
+    }
+
     func testViewActionsDelegateToWorkspaceCoordinator() throws {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsViewActions")
         let bindings = WorkspaceCommandBindings(workspace: workspace)

@@ -196,6 +196,57 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(titles.contains("Persisted Scene"))
     }
 
+    func testCreateWriteSaveCloseAndReopenLastProjectWorkflow() throws {
+        let suiteName = "WorkspaceCoordinatorTests.Recent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "WorkflowSeed",
+            recentProjectStore: defaults
+        )
+        XCTAssertNil(coordinator.createAndOpenProject(named: "WorkflowMain"))
+        let workflowRoot = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+
+        coordinator.editorState.insertText("workflow text", at: 0)
+        XCTAssertNil(coordinator.saveProjectNow())
+
+        try coordinator.projectManager.closeProject()
+        XCTAssertFalse(coordinator.hasOpenProject)
+
+        XCTAssertNil(coordinator.reopenLastProject())
+        XCTAssertEqual(coordinator.projectManager.projectRootURL, workflowRoot)
+        let reopenedContent = try coordinator.projectManager.loadSceneContent(sceneId: sceneId)
+        XCTAssertEqual(reopenedContent, "workflow text")
+    }
+
+    func testOpenProjectSwitchesToSelectedProjectAndUpdatesRecentEntry() throws {
+        let suiteName = "WorkspaceCoordinatorTests.OpenRecent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let seed = FileSystemProjectManager()
+        _ = try seed.createProject(name: "TargetOpen", at: tempDir)
+        try seed.closeProject()
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "CurrentProject",
+            recentProjectStore: defaults
+        )
+        let targetURL = tempDir.appendingPathComponent("TargetOpen", isDirectory: true)
+
+        XCTAssertNil(coordinator.openProject(at: targetURL))
+        XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
+        XCTAssertEqual(coordinator.projectDisplayName, "TargetOpen")
+
+        try coordinator.projectManager.closeProject()
+        XCTAssertNil(coordinator.reopenLastProject())
+        XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
+    }
+
     func testLiveTypingUpdatesSessionWordStatsThroughCoordinatorBinding() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "LiveGoals")
         coordinator.goalsManager.startSession(goal: nil)

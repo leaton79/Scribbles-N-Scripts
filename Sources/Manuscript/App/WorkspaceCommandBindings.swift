@@ -13,6 +13,10 @@ struct WorkspaceCommandBindings {
         workspace.hasOpenProject
     }
 
+    var canReopenLastProject: Bool {
+        workspace.canReopenLastProject
+    }
+
     var canCreateBackup: Bool {
         workspace.hasOpenProject
     }
@@ -43,6 +47,21 @@ struct WorkspaceCommandBindings {
 
     var splitToggleTitle: String {
         workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split"
+    }
+
+    @discardableResult
+    func createProject(named name: String) -> String? {
+        workspace.createAndOpenProject(named: name)
+    }
+
+    @discardableResult
+    func openProject(at url: URL) -> String? {
+        workspace.openProject(at: url)
+    }
+
+    @discardableResult
+    func reopenLastProject() -> String? {
+        workspace.reopenLastProject()
     }
 
     @discardableResult
