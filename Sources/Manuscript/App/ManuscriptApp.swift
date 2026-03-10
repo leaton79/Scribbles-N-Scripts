@@ -50,7 +50,7 @@ struct ManuscriptApp: App {
                     _ = workspace.toggleSplitForCommand()
                 }
                 .keyboardShortcut("\\", modifiers: [.command])
-                .disabled(workspace.modeController.activeMode != .linear && !workspace.splitEditorState.isSplit)
+                .disabled(!workspace.canToggleSplitEditor)
 
                 Divider()
 
@@ -135,6 +135,7 @@ private struct WorkspaceView: View {
                                     toggleSplit(windowWidth: geometry.size.width)
                                 }
                                 .keyboardShortcut("\\", modifiers: [.command])
+                                .disabled(!workspace.canToggleSplitEditor)
                             }
                         }
                         .padding(.horizontal, 12)

@@ -159,6 +159,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         XCTAssertNil(notice)
         XCTAssertFalse(coordinator.splitEditorState.isSplit)
+        XCTAssertFalse(coordinator.canToggleSplitEditor)
     }
 
     func testToggleSplitOpensThenClosesSplit() throws {
@@ -181,6 +182,15 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(notice, "Window too narrow for side-by-side split. Using stacked layout.")
         XCTAssertTrue(coordinator.splitEditorState.isSplit)
         XCTAssertEqual(coordinator.splitEditorState.orientation, .horizontal)
+    }
+
+    func testCanToggleSplitEditorAllowsClosingOutsideLinearModeWhenAlreadySplit() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ToggleSplitCloseInModular")
+        let sceneId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.scenes.first?.id)
+        coordinator.splitEditorState.openSplit(sceneId: sceneId)
+        coordinator.modeController.switchTo(.modular)
+
+        XCTAssertTrue(coordinator.canToggleSplitEditor)
     }
 
     func testSplitSettingsAreScopedPerProjectPath() throws {

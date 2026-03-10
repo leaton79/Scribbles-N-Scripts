@@ -50,6 +50,16 @@ final class WorkspaceCoordinator: ObservableObject {
         return index > 0
     }
 
+    var canToggleSplitEditor: Bool {
+        if splitEditorState.isSplit {
+            return true
+        }
+        guard modeController.activeMode == .linear else {
+            return false
+        }
+        return resolveSceneForSplitOpen() != nil
+    }
+
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
