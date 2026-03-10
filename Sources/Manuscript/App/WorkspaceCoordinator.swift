@@ -131,6 +131,7 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     func select(node: SidebarNode) {
+        guard hasOpenProject else { return }
         switch node.level {
         case .scene:
             navigationState.navigateTo(sceneId: node.id)
@@ -150,6 +151,7 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     func select(breadcrumb: BreadcrumbItem) {
+        guard hasOpenProject else { return }
         switch breadcrumb.type {
         case .scene:
             navigationState.navigateTo(sceneId: breadcrumb.id)

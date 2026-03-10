@@ -544,4 +544,42 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.goalsManager.sessionStartTime)
         XCTAssertFalse(coordinator.goalsManager.isTimerRunning)
     }
+
+    func testSelectNodeNoOpWhenNoProjectIsOpen() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectNodeNoProject")
+        coordinator.navigationState.selectedSceneId = UUID()
+        coordinator.editorState.currentSceneId = UUID()
+        let beforeSelectedScene = coordinator.navigationState.selectedSceneId
+        let beforeCurrentScene = coordinator.editorState.currentSceneId
+        try coordinator.projectManager.closeProject()
+
+        let node = SidebarNode(
+            id: UUID(),
+            title: "Scene",
+            level: .scene,
+            wordCount: 0,
+            colorLabel: nil,
+            goalProgressText: nil,
+            children: [],
+            matchingCount: nil
+        )
+        coordinator.select(node: node)
+
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, beforeSelectedScene)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, beforeCurrentScene)
+    }
+
+    func testSelectBreadcrumbNoOpWhenNoProjectIsOpen() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectBreadcrumbNoProject")
+        coordinator.navigationState.selectedSceneId = UUID()
+        coordinator.editorState.currentSceneId = UUID()
+        let beforeSelectedScene = coordinator.navigationState.selectedSceneId
+        let beforeCurrentScene = coordinator.editorState.currentSceneId
+        try coordinator.projectManager.closeProject()
+
+        coordinator.select(breadcrumb: BreadcrumbItem(id: UUID(), title: "Scene", type: .scene))
+
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, beforeSelectedScene)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, beforeCurrentScene)
+    }
 }
