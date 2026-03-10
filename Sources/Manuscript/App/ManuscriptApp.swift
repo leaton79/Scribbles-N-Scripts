@@ -610,10 +610,10 @@ private struct SearchPanelSheet: View {
                 }
                 .disabled(workspace.searchQueryText.isEmpty || workspace.searchResults.isEmpty)
                 Button("Replace All") {
-                    if replacePreview.replacementCount > 0 {
+                    if replacePreview.replacementCount > 0 && replacePreview.selectedScenes > 0 {
                         showingReplaceConfirmation = true
                     } else {
-                        onNotice("No matches to replace.")
+                        onNotice(replacePreview.selectedScenes == 0 ? "No scenes selected for replace." : "No matches to replace.")
                     }
                 }
                 .disabled(workspace.searchQueryText.isEmpty)
@@ -626,14 +626,35 @@ private struct SearchPanelSheet: View {
                         .foregroundStyle(.secondary)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(sceneReplacePreviewItems.prefix(8).enumerated()), id: \.element.id) { _, item in
-                            HStack {
-                                Text("\(item.chapterTitle) • \(item.sceneTitle)")
-                                    .lineLimit(1)
-                                Spacer()
-                                Text("\(item.matchCount)")
-                                    .foregroundStyle(.secondary)
+                        HStack {
+                            Text("\(workspace.selectedReplaceSceneCount) of \(sceneReplacePreviewItems.count) scenes selected")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Include All") {
+                                workspace.includeAllReplaceScenes()
                             }
+                            .buttonStyle(.borderless)
+                            Button("Exclude All") {
+                                workspace.excludeAllReplaceScenes()
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        ForEach(Array(sceneReplacePreviewItems.prefix(8).enumerated()), id: \.element.id) { _, item in
+                            Toggle(
+                                isOn: Binding(
+                                    get: { workspace.isSceneIncludedForReplace(item.id) },
+                                    set: { workspace.setSceneIncludedForReplace(item.id, included: $0) }
+                                )
+                            ) {
+                                HStack {
+                                    Text("\(item.chapterTitle) • \(item.sceneTitle)")
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text("\(item.matchCount)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
                         }
                         if sceneReplacePreviewItems.count > 8 {
                             Text("+ \(sceneReplacePreviewItems.count - 8) more scenes")
@@ -643,6 +664,9 @@ private struct SearchPanelSheet: View {
                     .font(.caption)
                 }
             }
+            Text("Shortcuts: Return Next, Shift+Return Previous, Option+Command+H Toggle Highlights, Option+Command+0 Reset Highlight Settings.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
                 Picker("Scope", selection: $workspace.searchScope) {
@@ -797,13 +821,15 @@ private struct SearchPanelSheet: View {
                 onNotice(commands.replaceAllSearchResults())
             }
         } message: {
-            Text("\(replacePreview.replacementCount) replacements across \(replacePreview.scenesAffected) scenes. Proceed?")
+            Text("\(replacePreview.replacementCount) replacements across \(replacePreview.selectedScenes) selected scenes (\(replacePreview.scenesAffected) scenes matched total). Proceed?")
         }
     }
 
-    private var replacePreview: (replacementCount: Int, scenesAffected: Int) {
+    private var replacePreview: (replacementCount: Int, scenesAffected: Int, selectedScenes: Int) {
         let scenesAffected = Set(workspace.searchResults.map(\.sceneId)).count
-        return (workspace.searchResults.count, scenesAffected)
+        let selectedSceneIDs = Set(sceneReplacePreviewItems.filter { workspace.isSceneIncludedForReplace($0.id) }.map(\.id))
+        let replacementCount = workspace.searchResults.filter { selectedSceneIDs.contains($0.sceneId) }.count
+        return (replacementCount, scenesAffected, workspace.selectedReplaceSceneCount)
     }
 
     private struct SceneReplacePreviewItem: Identifiable {

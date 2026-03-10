@@ -329,6 +329,44 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "colour")
     }
 
+    func testProjectSearchReplaceAllHonorsSceneSelection() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceSelection")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "color color")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "color")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "color"
+        coordinator.searchReplacementText = "colour"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.count, 3)
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 2)
+
+        coordinator.setSceneIncludedForReplace(secondScene.id, included: false)
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 1)
+        let message = coordinator.replaceAllSearchResults()
+
+        XCTAssertEqual(message, "Replaced 2 matches across 1 scenes.")
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: firstSceneId), "colour colour")
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "color")
+    }
+
+    func testProjectSearchReplaceAllWithNoScenesSelectedReturnsMessage() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceNoneSelected")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "color color")
+        coordinator.searchQueryText = "color"
+        coordinator.searchReplacementText = "colour"
+        coordinator.showInlineSearchPanel()
+        coordinator.excludeAllReplaceScenes()
+
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "No scenes selected for replace.")
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "color color")
+    }
+
     func testReplaceNextSearchResultUpdatesCurrentMatchOnly() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceNext")
         coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "color color color")

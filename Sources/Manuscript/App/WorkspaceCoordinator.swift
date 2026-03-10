@@ -53,6 +53,8 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published private(set) var searchResults: [SearchResult] = []
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var currentSearchResultIndex: Int?
+    @Published private(set) var includedReplaceSceneIDs: Set<UUID> = []
+    private var replaceSceneUniverse: Set<UUID> = []
 
     var hasOpenProject: Bool {
         projectManager.currentProject != nil
@@ -400,6 +402,8 @@ final class WorkspaceCoordinator: ObservableObject {
         isSearchPanelVisible = false
         searchShowAllHighlights = false
         isSearchHighlightHelpVisible = false
+        includedReplaceSceneIDs = []
+        replaceSceneUniverse = []
         clearEditorSearchHighlights()
     }
 
@@ -423,6 +427,7 @@ final class WorkspaceCoordinator: ObservableObject {
         } else {
             currentSearchResultIndex = 0
         }
+        synchronizeReplaceSceneSelection()
         updateEditorSearchHighlights()
     }
 
@@ -434,8 +439,16 @@ final class WorkspaceCoordinator: ObservableObject {
         guard !searchQueryText.isEmpty else {
             return "Could not replace: Search text cannot be empty."
         }
+        let selectedSceneIDs = Array(includedReplaceSceneIDs)
+        guard !selectedSceneIDs.isEmpty else {
+            return "No scenes selected for replace."
+        }
         do {
-            let report = try searchEngine.replaceAll(query: makeSearchQuery(), replacement: searchReplacementText)
+            let report = try searchEngine.replaceAll(
+                query: makeSearchQuery(),
+                replacement: searchReplacementText,
+                inSceneIDs: selectedSceneIDs
+            )
             refreshDerivedStates()
             reloadOpenEditorScenes()
             runSearch()
@@ -443,6 +456,31 @@ final class WorkspaceCoordinator: ObservableObject {
         } catch {
             return "Could not replace: \(error.localizedDescription)"
         }
+    }
+
+    var selectedReplaceSceneCount: Int {
+        includedReplaceSceneIDs.count
+    }
+
+    func isSceneIncludedForReplace(_ sceneID: UUID) -> Bool {
+        includedReplaceSceneIDs.contains(sceneID)
+    }
+
+    func setSceneIncludedForReplace(_ sceneID: UUID, included: Bool) {
+        guard replaceSceneUniverse.contains(sceneID) else { return }
+        if included {
+            includedReplaceSceneIDs.insert(sceneID)
+        } else {
+            includedReplaceSceneIDs.remove(sceneID)
+        }
+    }
+
+    func includeAllReplaceScenes() {
+        includedReplaceSceneIDs = replaceSceneUniverse
+    }
+
+    func excludeAllReplaceScenes() {
+        includedReplaceSceneIDs = []
     }
 
     @discardableResult
@@ -1053,6 +1091,21 @@ final class WorkspaceCoordinator: ObservableObject {
 
     private func recentProjectPaths() -> [String] {
         recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
+    }
+
+    private func synchronizeReplaceSceneSelection() {
+        let available = Set(searchResults.map(\.sceneId))
+        if replaceSceneUniverse.isEmpty {
+            includedReplaceSceneIDs = available
+            replaceSceneUniverse = available
+            return
+        }
+
+        let removed = replaceSceneUniverse.subtracting(available)
+        let added = available.subtracting(replaceSceneUniverse)
+        includedReplaceSceneIDs.subtract(removed)
+        includedReplaceSceneIDs.formUnion(added)
+        replaceSceneUniverse = available
     }
 
     private static func normalizeSearchHighlightPreferences(cap: Int, threshold: Int) -> (cap: Int, threshold: Int) {

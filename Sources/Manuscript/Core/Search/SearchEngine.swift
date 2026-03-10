@@ -13,6 +13,7 @@ protocol SearchEngine {
     // Replace
     func replaceNext(in editorState: EditorState, replacement: String)
     func replaceAll(query: SearchQuery, replacement: String) throws -> ReplaceReport
+    func replaceAll(query: SearchQuery, replacement: String, inSceneIDs: [UUID]) throws -> ReplaceReport
 }
 
 struct SearchQuery {
@@ -181,6 +182,14 @@ final class IndexedSearchEngine: SearchEngine {
     }
 
     func replaceAll(query: SearchQuery, replacement: String) throws -> ReplaceReport {
+        try replaceAll(query: query, replacement: replacement, inSceneIDs: nil)
+    }
+
+    func replaceAll(query: SearchQuery, replacement: String, inSceneIDs: [UUID]) throws -> ReplaceReport {
+        try replaceAll(query: query, replacement: replacement, inSceneIDs: Set(inSceneIDs))
+    }
+
+    private func replaceAll(query: SearchQuery, replacement: String, inSceneIDs: Set<UUID>?) throws -> ReplaceReport {
         let manifest = projectManager.getManifest()
         var replacementCount = 0
         var scenesAffected = 0
@@ -188,6 +197,9 @@ final class IndexedSearchEngine: SearchEngine {
         var originalsByScene: [UUID: String] = [:]
 
         for sceneId in scopedSceneIds(for: query.scope, manifest: manifest) {
+            if let inSceneIDs, !inSceneIDs.contains(sceneId) {
+                continue
+            }
             let original = contentForSearch(sceneId: sceneId)
             guard let transform = transformedContent(original, query: query, replacement: replacement) else {
                 if lastErrorMessage != nil { break }
