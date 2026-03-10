@@ -16,23 +16,26 @@ struct ManuscriptApp: App {
                     _ = workspace.saveProjectNow()
                 }
                 .keyboardShortcut("s", modifiers: [.command])
-                .disabled(!workspace.canSaveProject)
+                .disabled(!workspace.hasOpenProject || !workspace.canSaveProject)
 
                 Button("New Chapter") {
                     _ = workspace.createChapter()
                 }
                 .keyboardShortcut("N", modifiers: [.command, .shift])
+                .disabled(!workspace.hasOpenProject)
 
                 Button("New Scene") {
                     _ = workspace.createScene()
                 }
                 .keyboardShortcut("n", modifiers: [.command])
+                .disabled(!workspace.hasOpenProject)
 
                 Divider()
 
                 Button("Create Backup") {
                     _ = workspace.createBackupNow()
                 }
+                .disabled(!workspace.hasOpenProject)
             }
 
             CommandMenu("View") {
@@ -40,11 +43,13 @@ struct ManuscriptApp: App {
                     workspace.setMode(.linear)
                 }
                 .keyboardShortcut("1", modifiers: [.command])
+                .disabled(!workspace.hasOpenProject)
 
                 Button("Modular Mode") {
                     workspace.setMode(.modular)
                 }
                 .keyboardShortcut("2", modifiers: [.command])
+                .disabled(!workspace.hasOpenProject)
 
                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split") {
                     _ = workspace.toggleSplitForCommand()
@@ -118,24 +123,27 @@ private struct WorkspaceView: View {
                                 actionNotice = workspace.saveProjectNow() ?? "Project saved."
                             }
                             .keyboardShortcut("s", modifiers: [.command])
-                            .disabled(!workspace.canSaveProject)
+                            .disabled(!workspace.hasOpenProject || !workspace.canSaveProject)
                             Button("New Chapter") {
                                 actionNotice = workspace.createChapter()
                             }
                             .keyboardShortcut("N", modifiers: [.command, .shift])
+                            .disabled(!workspace.hasOpenProject)
                             Button("New Scene") {
                                 actionNotice = workspace.createScene()
                             }
                             .keyboardShortcut("n", modifiers: [.command])
+                            .disabled(!workspace.hasOpenProject)
                             Button("Backup") {
                                 actionNotice = workspace.createBackupNow()
                             }
+                            .disabled(!workspace.hasOpenProject)
                             if workspace.modeController.activeMode == .linear {
                                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
                                     toggleSplit(windowWidth: geometry.size.width)
                                 }
                                 .keyboardShortcut("\\", modifiers: [.command])
-                                .disabled(!workspace.canToggleSplitEditor)
+                                .disabled(!workspace.hasOpenProject || !workspace.canToggleSplitEditor)
                             }
                         }
                         .padding(.horizontal, 12)

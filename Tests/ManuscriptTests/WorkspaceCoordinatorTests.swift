@@ -482,4 +482,12 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.navigateToNextScene())
         XCTAssertFalse(coordinator.navigateToPreviousScene())
     }
+
+    func testHasOpenProjectReflectsProjectLifecycle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "OpenProjectState")
+        XCTAssertTrue(coordinator.hasOpenProject)
+
+        try coordinator.projectManager.closeProject()
+        XCTAssertFalse(coordinator.hasOpenProject)
+    }
 }

@@ -14,6 +14,10 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @Published var loadError: String?
 
+    var hasOpenProject: Bool {
+        projectManager.currentProject != nil
+    }
+
     var projectDisplayName: String {
         projectManager.currentProject?.name ?? "Scribbles N Scripts"
     }
