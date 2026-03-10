@@ -135,15 +135,7 @@ final class WorkspaceCoordinator: ObservableObject {
         switch node.level {
         case .scene:
             guard sceneExists(node.id) else { return }
-            navigationState.navigateTo(sceneId: node.id)
-            editorState.navigateToScene(id: node.id)
-            if splitEditorState.activePaneIndex == 1, splitEditorState.isSplit {
-                splitEditorState.secondarySceneId = node.id
-                splitEditorState.secondaryEditor.navigateToScene(id: node.id)
-            } else {
-                splitEditorState.primarySceneId = node.id
-                splitEditorState.primaryEditor.navigateToScene(id: node.id)
-            }
+            navigateToSceneInActivePane(node.id)
         case .chapter:
             guard chapterExists(node.id) else { return }
             navigationState.navigateTo(chapterId: node.id)
@@ -157,15 +149,7 @@ final class WorkspaceCoordinator: ObservableObject {
         switch breadcrumb.type {
         case .scene:
             guard sceneExists(breadcrumb.id) else { return }
-            navigationState.navigateTo(sceneId: breadcrumb.id)
-            editorState.navigateToScene(id: breadcrumb.id)
-            if splitEditorState.activePaneIndex == 1, splitEditorState.isSplit {
-                splitEditorState.secondarySceneId = breadcrumb.id
-                splitEditorState.secondaryEditor.navigateToScene(id: breadcrumb.id)
-            } else {
-                splitEditorState.primarySceneId = breadcrumb.id
-                splitEditorState.primaryEditor.navigateToScene(id: breadcrumb.id)
-            }
+            navigateToSceneInActivePane(breadcrumb.id)
         case .chapter:
             guard chapterExists(breadcrumb.id) else { return }
             navigationState.navigateTo(chapterId: breadcrumb.id)
@@ -268,15 +252,7 @@ final class WorkspaceCoordinator: ObservableObject {
             let chapterId = try resolveChapterForSceneCreation()
             let scene = try projectManager.addScene(to: chapterId, at: nil, title: resolvedTitle)
             refreshDerivedStates()
-            navigationState.navigateTo(sceneId: scene.id)
-            editorState.navigateToScene(id: scene.id)
-            if splitEditorState.isSplit, splitEditorState.activePaneIndex == 1 {
-                splitEditorState.secondarySceneId = scene.id
-                splitEditorState.secondaryEditor.navigateToScene(id: scene.id)
-            } else {
-                splitEditorState.primarySceneId = scene.id
-                splitEditorState.primaryEditor.navigateToScene(id: scene.id)
-            }
+            navigateToSceneInActivePane(scene.id)
             return nil
         } catch {
             return "Could not create scene: \(error.localizedDescription)"
@@ -509,6 +485,18 @@ final class WorkspaceCoordinator: ObservableObject {
 
     private func sceneExists(_ id: UUID) -> Bool {
         projectManager.getManifest().hierarchy.scenes.contains(where: { $0.id == id })
+    }
+
+    private func navigateToSceneInActivePane(_ sceneId: UUID) {
+        navigationState.navigateTo(sceneId: sceneId)
+        editorState.navigateToScene(id: sceneId)
+        if splitEditorState.activePaneIndex == 1, splitEditorState.isSplit {
+            splitEditorState.secondarySceneId = sceneId
+            splitEditorState.secondaryEditor.navigateToScene(id: sceneId)
+        } else {
+            splitEditorState.primarySceneId = sceneId
+            splitEditorState.primaryEditor.navigateToScene(id: sceneId)
+        }
     }
 
     private func chapterExists(_ id: UUID) -> Bool {
