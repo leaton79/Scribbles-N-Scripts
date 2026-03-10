@@ -208,6 +208,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     func setMode(_ mode: ViewMode) {
+        guard hasOpenProject else {
+            return
+        }
         modeController.switchTo(mode)
         handleModeChange(mode)
     }

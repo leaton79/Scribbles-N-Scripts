@@ -508,4 +508,13 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.canSwitchToLinearMode)
         XCTAssertFalse(coordinator.canSwitchToModularMode)
     }
+
+    func testSetModeNoOpWhenNoProjectIsOpen() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SetModeNoProject")
+        try coordinator.projectManager.closeProject()
+
+        coordinator.setMode(.modular)
+
+        XCTAssertEqual(coordinator.modeController.activeMode, .linear)
+    }
 }
