@@ -65,6 +65,44 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
     }
 
+    func testBreadcrumbSelectionTargetsSecondaryPaneWhenActive() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitBreadcrumbSelect")
+        let manifest = coordinator.projectManager.getManifest()
+        let chapterId = try XCTUnwrap(manifest.hierarchy.chapters.first?.id)
+        let existingSceneId = try XCTUnwrap(manifest.hierarchy.scenes.first?.id)
+        let otherScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Other")
+
+        coordinator.splitEditorState.openSplit(sceneId: otherScene.id)
+        coordinator.splitEditorState.setActivePane(1)
+        let primaryBefore = coordinator.splitEditorState.primarySceneId
+
+        coordinator.select(breadcrumb: BreadcrumbItem(id: existingSceneId, title: "First", type: .scene))
+
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, existingSceneId)
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
+    }
+
+    func testCreateSceneTargetsSecondaryPaneWhenActive() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitCreateScene")
+        let manifest = coordinator.projectManager.getManifest()
+        let chapterId = try XCTUnwrap(manifest.hierarchy.chapters.first?.id)
+        let otherScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Other")
+
+        coordinator.splitEditorState.openSplit(sceneId: otherScene.id)
+        coordinator.splitEditorState.setActivePane(1)
+        let primaryBefore = coordinator.splitEditorState.primarySceneId
+        let existingSceneIds = Set(coordinator.projectManager.getManifest().hierarchy.scenes.map(\.id))
+
+        let message = coordinator.createScene(title: "Split Created")
+
+        XCTAssertNil(message)
+        let updatedManifest = coordinator.projectManager.getManifest()
+        let createdScene = try XCTUnwrap(updatedManifest.hierarchy.scenes.first(where: { !existingSceneIds.contains($0.id) }))
+        XCTAssertEqual(createdScene.title, "Split Created")
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, createdScene.id)
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
+    }
+
     func testBackgroundPhasePersistsDirtyManifestToDisk() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackgroundSave")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
