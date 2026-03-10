@@ -309,14 +309,40 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.editorState.currentSceneId, added.id)
     }
 
-    func testCreateSceneFallsBackToUntitledWhenInputIsWhitespace() throws {
+    func testCreateSceneFallsBackToGeneratedTitleWhenInputIsWhitespace() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneWhitespaceTitle")
+        let existingSceneIds = Set(coordinator.projectManager.getManifest().hierarchy.scenes.map(\.id))
 
         let message = coordinator.createScene(title: "   \n\t ")
 
         XCTAssertNil(message)
         let manifest = coordinator.projectManager.getManifest()
-        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Untitled Scene" }))
+        let created = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { !existingSceneIds.contains($0.id) }))
+        XCTAssertEqual(created.title, "Scene 1")
+    }
+
+    func testCreateSceneUsesGeneratedTitleWhenNoTitleProvided() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneGeneratedTitle")
+        let existingSceneIds = Set(coordinator.projectManager.getManifest().hierarchy.scenes.map(\.id))
+
+        let message = coordinator.createScene()
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        let created = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { !existingSceneIds.contains($0.id) }))
+        XCTAssertEqual(created.title, "Scene 1")
+    }
+
+    func testCreateSceneGeneratedTitleFillsNumericGaps() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneGaps")
+        _ = coordinator.createScene(title: "Scene 1")
+        _ = coordinator.createScene(title: "Scene 3")
+
+        let message = coordinator.createScene()
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Scene 2" }))
     }
 
     func testCreateSceneTrimsSurroundingWhitespaceInTitle() throws {

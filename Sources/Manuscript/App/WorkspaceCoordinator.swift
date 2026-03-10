@@ -249,11 +249,21 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     @discardableResult
-    func createScene(title: String = "Untitled Scene") -> String? {
+    func createScene(title: String? = nil) -> String? {
         guard projectManager.currentProject != nil else {
             return "Could not create scene: \(ProjectIOError.noOpenProject.localizedDescription)"
         }
-        let resolvedTitle = normalizeTitle(title, fallback: "Untitled Scene")
+        let resolvedTitle: String
+        if let title {
+            let normalized = normalizeTitle(title, fallback: "")
+            if !normalized.isEmpty {
+                resolvedTitle = normalized
+            } else {
+                resolvedTitle = nextGeneratedSceneTitle()
+            }
+        } else {
+            resolvedTitle = nextGeneratedSceneTitle()
+        }
         do {
             let chapterId = try resolveChapterForSceneCreation()
             let scene = try projectManager.addScene(to: chapterId, at: nil, title: resolvedTitle)
@@ -530,5 +540,24 @@ final class WorkspaceCoordinator: ObservableObject {
             candidate += 1
         }
         return "Chapter \(candidate)"
+    }
+
+    private func nextGeneratedSceneTitle() -> String {
+        let existing = projectManager.getManifest().hierarchy.scenes.map(\.title)
+        let usedNumbers = Set(
+            existing.compactMap { title -> Int? in
+                guard title.hasPrefix("Scene ") else {
+                    return nil
+                }
+                let suffix = title.dropFirst("Scene ".count)
+                return Int(suffix)
+            }
+        )
+
+        var candidate = 1
+        while usedNumbers.contains(candidate) {
+            candidate += 1
+        }
+        return "Scene \(candidate)"
     }
 }
