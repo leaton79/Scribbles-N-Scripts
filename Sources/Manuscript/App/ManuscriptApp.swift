@@ -151,7 +151,7 @@ private struct WorkspaceView: View {
                             }
                             .disabled(!commands.canSaveAndBackup)
                             if workspace.modeController.activeMode == .linear {
-                                Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
+                                Button(commands.splitToggleTitle) {
                                     toggleSplit(windowWidth: geometry.size.width)
                                 }
                                 .keyboardShortcut("\\", modifiers: [.command])
