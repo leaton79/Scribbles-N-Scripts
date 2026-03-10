@@ -516,7 +516,7 @@ private struct ProjectSwitcherSheet: View {
     let projects: [RecentProjectEntry]
     let onCancel: () -> Void
     let onSelect: (RecentProjectEntry) -> Void
-    @State private var selectedProjectID: RecentProjectEntry.ID?
+    @State private var selection = ProjectSwitcherSelection()
 
     private var filteredProjects: [RecentProjectEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -528,10 +528,7 @@ private struct ProjectSwitcherSheet: View {
     }
 
     private var selectedProject: RecentProjectEntry? {
-        if let selectedProjectID {
-            return filteredProjects.first(where: { $0.id == selectedProjectID })
-        }
-        return filteredProjects.first
+        selection.selectedProject(in: filteredProjects)
     }
 
     var body: some View {
@@ -541,7 +538,7 @@ private struct ProjectSwitcherSheet: View {
             TextField("Search projects", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(openSelectedProject)
-            List(selection: $selectedProjectID) {
+            List(selection: $selection.selectedProjectID) {
                 ForEach(filteredProjects) { project in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(project.name)
@@ -555,7 +552,7 @@ private struct ProjectSwitcherSheet: View {
                         onSelect(project)
                     }
                     .onTapGesture {
-                        selectedProjectID = project.id
+                        selection.selectedProjectID = project.id
                     }
                 }
             }
@@ -563,9 +560,9 @@ private struct ProjectSwitcherSheet: View {
             .onMoveCommand { direction in
                 switch direction {
                 case .down:
-                    moveSelection(offset: 1)
+                    selection.moveSelection(offset: 1, in: filteredProjects)
                 case .up:
-                    moveSelection(offset: -1)
+                    selection.moveSelection(offset: -1, in: filteredProjects)
                 default:
                     break
                 }
@@ -585,34 +582,11 @@ private struct ProjectSwitcherSheet: View {
         .padding(20)
         .frame(minWidth: 480, minHeight: 360)
         .onAppear {
-            if selectedProjectID == nil {
-                selectedProjectID = filteredProjects.first?.id
-            }
+            selection.synchronizeSelection(with: filteredProjects)
         }
-        .onChange(of: filteredProjects.map(\.id)) { _, ids in
-            guard !ids.isEmpty else {
-                selectedProjectID = nil
-                return
-            }
-            if let selectedProjectID, ids.contains(selectedProjectID) {
-                return
-            }
-            selectedProjectID = ids[0]
+        .onChange(of: filteredProjects.map(\.id)) { _, _ in
+            selection.synchronizeSelection(with: filteredProjects)
         }
-    }
-
-    private func moveSelection(offset: Int) {
-        guard !filteredProjects.isEmpty else {
-            selectedProjectID = nil
-            return
-        }
-        guard let currentSelectionID = selectedProjectID,
-              let index = filteredProjects.firstIndex(where: { $0.id == currentSelectionID }) else {
-            selectedProjectID = filteredProjects[0].id
-            return
-        }
-        let nextIndex = max(0, min(filteredProjects.count - 1, index + offset))
-        selectedProjectID = filteredProjects[nextIndex].id
     }
 
     private func openSelectedProject() {
