@@ -318,6 +318,26 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    @discardableResult
+    func saveAndBackupNow() -> String? {
+        guard projectManager.currentProject != nil else {
+            return "Could not save and back up project: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
+        do {
+            autosaveOpenEditors()
+            try projectManager.saveManifest()
+            let beforeCount = projectManager.listBackups().count
+            try projectManager.createBackup()
+            let backups = projectManager.listBackups()
+            if let latest = backups.first, backups.count >= beforeCount {
+                return "Project saved and backup created: \(latest.filename)"
+            }
+            return "Project saved and backup created."
+        } catch {
+            return "Could not save and back up project: \(error.localizedDescription)"
+        }
+    }
+
     func handleScenePhase(_ phase: ScenePhase) {
         guard hasOpenProject else {
             goalsManager.handleAppFocusChanged(isFocused: false)

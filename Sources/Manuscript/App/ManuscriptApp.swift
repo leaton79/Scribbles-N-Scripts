@@ -36,6 +36,11 @@ struct ManuscriptApp: App {
                     _ = workspace.createBackupNow()
                 }
                 .disabled(!workspace.hasOpenProject)
+
+                Button("Save and Backup") {
+                    _ = workspace.saveAndBackupNow()
+                }
+                .disabled(!workspace.hasOpenProject)
             }
 
             CommandMenu("View") {
@@ -136,6 +141,10 @@ private struct WorkspaceView: View {
                             .disabled(!workspace.hasOpenProject)
                             Button("Backup") {
                                 actionNotice = workspace.createBackupNow()
+                            }
+                            .disabled(!workspace.hasOpenProject)
+                            Button("Save + Backup") {
+                                actionNotice = workspace.saveAndBackupNow()
                             }
                             .disabled(!workspace.hasOpenProject)
                             if workspace.modeController.activeMode == .linear {

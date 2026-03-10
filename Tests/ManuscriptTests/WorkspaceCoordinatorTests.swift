@@ -464,6 +464,22 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(diskContent, "backup flush content")
     }
 
+    func testSaveAndBackupNowPersistsDirtyEditorAndCreatesBackup() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAndBackup")
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        let before = coordinator.projectManager.listBackups().count
+        coordinator.editorState.insertText("save and backup content", at: 0)
+
+        let message = coordinator.saveAndBackupNow()
+
+        XCTAssertNotNil(message)
+        XCTAssertTrue(message?.contains("Project saved and backup created") == true)
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertEqual(coordinator.projectManager.listBackups().count, before + 1)
+        let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: sceneId)
+        XCTAssertEqual(diskContent, "save and backup content")
+    }
+
     func testActionsFailGracefullyWhenNoProjectIsOpen() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NoProjectActions")
         try coordinator.projectManager.closeProject()
@@ -478,6 +494,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.createScene(), "Could not create scene: No project is currently open.")
         XCTAssertEqual(coordinator.saveProjectNow(), "Could not save project: No project is currently open.")
         XCTAssertEqual(coordinator.createBackupNow(), "Could not create backup: No project is currently open.")
+        XCTAssertEqual(coordinator.saveAndBackupNow(), "Could not save and back up project: No project is currently open.")
         XCTAssertEqual(coordinator.toggleSplitForCommand(), "No project is currently open.")
         XCTAssertFalse(coordinator.navigateToNextScene())
         XCTAssertFalse(coordinator.navigateToPreviousScene())
