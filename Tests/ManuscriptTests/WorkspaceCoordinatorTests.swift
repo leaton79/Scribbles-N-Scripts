@@ -604,4 +604,57 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.navigationState.selectedSceneId, beforeSelectedScene)
         XCTAssertEqual(coordinator.editorState.currentSceneId, beforeCurrentScene)
     }
+
+    func testSelectNodeIgnoresStaleSceneAndChapterIds() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectStaleNode")
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.navigationState.navigateTo(sceneId: sceneId)
+        let originalSelectedScene = coordinator.navigationState.selectedSceneId
+        let originalCurrentScene = coordinator.editorState.currentSceneId
+        let originalSelectedChapter = coordinator.navigationState.selectedChapterId
+
+        let staleSceneNode = SidebarNode(
+            id: UUID(),
+            title: "Stale Scene",
+            level: .scene,
+            wordCount: 0,
+            colorLabel: nil,
+            goalProgressText: nil,
+            children: [],
+            matchingCount: nil
+        )
+        coordinator.select(node: staleSceneNode)
+
+        let staleChapterNode = SidebarNode(
+            id: UUID(),
+            title: "Stale Chapter",
+            level: .chapter,
+            wordCount: 0,
+            colorLabel: nil,
+            goalProgressText: nil,
+            children: [],
+            matchingCount: nil
+        )
+        coordinator.select(node: staleChapterNode)
+
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, originalSelectedScene)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, originalCurrentScene)
+        XCTAssertEqual(coordinator.navigationState.selectedChapterId, originalSelectedChapter)
+    }
+
+    func testSelectBreadcrumbIgnoresStaleSceneAndChapterIds() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectStaleBreadcrumb")
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.navigationState.navigateTo(sceneId: sceneId)
+        let originalSelectedScene = coordinator.navigationState.selectedSceneId
+        let originalCurrentScene = coordinator.editorState.currentSceneId
+        let originalSelectedChapter = coordinator.navigationState.selectedChapterId
+
+        coordinator.select(breadcrumb: BreadcrumbItem(id: UUID(), title: "Stale Scene", type: .scene))
+        coordinator.select(breadcrumb: BreadcrumbItem(id: UUID(), title: "Stale Chapter", type: .chapter))
+
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, originalSelectedScene)
+        XCTAssertEqual(coordinator.editorState.currentSceneId, originalCurrentScene)
+        XCTAssertEqual(coordinator.navigationState.selectedChapterId, originalSelectedChapter)
+    }
 }

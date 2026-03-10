@@ -134,6 +134,7 @@ final class WorkspaceCoordinator: ObservableObject {
         guard hasOpenProject else { return }
         switch node.level {
         case .scene:
+            guard sceneExists(node.id) else { return }
             navigationState.navigateTo(sceneId: node.id)
             editorState.navigateToScene(id: node.id)
             if splitEditorState.activePaneIndex == 1, splitEditorState.isSplit {
@@ -144,6 +145,7 @@ final class WorkspaceCoordinator: ObservableObject {
                 splitEditorState.primaryEditor.navigateToScene(id: node.id)
             }
         case .chapter:
+            guard chapterExists(node.id) else { return }
             navigationState.navigateTo(chapterId: node.id)
         case .part, .manuscript:
             break
@@ -154,6 +156,7 @@ final class WorkspaceCoordinator: ObservableObject {
         guard hasOpenProject else { return }
         switch breadcrumb.type {
         case .scene:
+            guard sceneExists(breadcrumb.id) else { return }
             navigationState.navigateTo(sceneId: breadcrumb.id)
             editorState.navigateToScene(id: breadcrumb.id)
             if splitEditorState.activePaneIndex == 1, splitEditorState.isSplit {
@@ -164,6 +167,7 @@ final class WorkspaceCoordinator: ObservableObject {
                 splitEditorState.primaryEditor.navigateToScene(id: breadcrumb.id)
             }
         case .chapter:
+            guard chapterExists(breadcrumb.id) else { return }
             navigationState.navigateTo(chapterId: breadcrumb.id)
         case .part, .manuscript:
             break
@@ -487,5 +491,13 @@ final class WorkspaceCoordinator: ObservableObject {
             }
         }
         return nil
+    }
+
+    private func sceneExists(_ id: UUID) -> Bool {
+        projectManager.getManifest().hierarchy.scenes.contains(where: { $0.id == id })
+    }
+
+    private func chapterExists(_ id: UUID) -> Bool {
+        projectManager.getManifest().hierarchy.chapters.contains(where: { $0.id == id })
     }
 }
