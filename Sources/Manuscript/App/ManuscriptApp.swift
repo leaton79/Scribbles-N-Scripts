@@ -43,13 +43,13 @@ struct ManuscriptApp: App {
                     workspace.setMode(.linear)
                 }
                 .keyboardShortcut("1", modifiers: [.command])
-                .disabled(!workspace.hasOpenProject)
+                .disabled(!workspace.canSwitchToLinearMode)
 
                 Button("Modular Mode") {
                     workspace.setMode(.modular)
                 }
                 .keyboardShortcut("2", modifiers: [.command])
-                .disabled(!workspace.hasOpenProject)
+                .disabled(!workspace.canSwitchToModularMode)
 
                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split") {
                     _ = workspace.toggleSplitForCommand()

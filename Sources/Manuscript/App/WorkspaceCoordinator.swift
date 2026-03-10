@@ -72,6 +72,14 @@ final class WorkspaceCoordinator: ObservableObject {
         return resolveSceneForSplitOpen() != nil
     }
 
+    var canSwitchToLinearMode: Bool {
+        hasOpenProject && modeController.activeMode != .linear
+    }
+
+    var canSwitchToModularMode: Bool {
+        hasOpenProject && modeController.activeMode != .modular
+    }
+
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
