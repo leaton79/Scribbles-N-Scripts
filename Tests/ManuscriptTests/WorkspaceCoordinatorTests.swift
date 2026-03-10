@@ -936,4 +936,19 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.editorState.currentSceneId, originalCurrentScene)
         XCTAssertEqual(coordinator.navigationState.selectedChapterId, originalSelectedChapter)
     }
+
+    func testSelectBreadcrumbIgnoresStaleSceneWithoutChangingSplitPaneTargets() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectStaleBreadcrumbSplit")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondaryScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Secondary")
+        coordinator.splitEditorState.openSplit(sceneId: secondaryScene.id)
+        coordinator.splitEditorState.setActivePane(1)
+        let primaryBefore = coordinator.splitEditorState.primarySceneId
+        let secondaryBefore = coordinator.splitEditorState.secondarySceneId
+
+        coordinator.select(breadcrumb: BreadcrumbItem(id: UUID(), title: "Stale Scene", type: .scene))
+
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, secondaryBefore)
+    }
 }
