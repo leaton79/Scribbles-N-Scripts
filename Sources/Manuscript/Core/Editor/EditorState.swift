@@ -10,6 +10,8 @@ final class EditorState: ObservableObject {
     @Published var characterCount: Int
     @Published var isModified: Bool
     @Published var isFocusMode: Bool
+    @Published private(set) var searchHighlightRanges: [Range<Int>]
+    @Published private(set) var activeSearchHighlightRange: Range<Int>?
     @Published private(set) var placeholderVisible: Bool
     @Published private(set) var renderedBlocks: [MarkdownBlock]
 
@@ -33,6 +35,8 @@ final class EditorState: ObservableObject {
         self.characterCount = initialContent.count
         self.isModified = false
         self.isFocusMode = false
+        self.searchHighlightRanges = []
+        self.activeSearchHighlightRange = nil
         self.placeholderVisible = initialContent.isEmpty
         self.renderedBlocks = parser.parse(initialContent)
     }
@@ -45,6 +49,8 @@ final class EditorState: ObservableObject {
         wordCount = WordCounter.count(content)
         characterCount = content.count
         isModified = false
+        searchHighlightRanges = []
+        activeSearchHighlightRange = nil
         placeholderVisible = content.isEmpty
         renderedBlocks = parser.parse(content)
         undoStack.removeAll()
@@ -98,6 +104,22 @@ final class EditorState: ObservableObject {
         guard isModified, let sceneId = currentSceneId else { return }
         try projectManager.saveSceneContent(sceneId: sceneId, content: content)
         isModified = false
+    }
+
+    func setSearchHighlights(ranges: [Range<Int>], activeRange: Range<Int>?) {
+        let clamped = ranges.map { clampToContent($0) }.filter { $0.lowerBound < $0.upperBound }
+        searchHighlightRanges = clamped
+        if let activeRange {
+            let active = clampToContent(activeRange)
+            activeSearchHighlightRange = active.lowerBound < active.upperBound ? active : nil
+        } else {
+            activeSearchHighlightRange = nil
+        }
+    }
+
+    func clearSearchHighlights() {
+        searchHighlightRanges = []
+        activeSearchHighlightRange = nil
     }
 
     private func replaceText(in range: Range<Int>, with incomingText: String, actionType: ActionType) {
@@ -162,6 +184,10 @@ final class EditorState: ObservableObject {
         let lower = max(0, min(range.lowerBound, content.count))
         let upper = max(lower, min(range.upperBound, content.count))
         return lower..<upper
+    }
+
+    private func clampToContent(_ range: Range<Int>) -> Range<Int> {
+        clampedRange(range)
     }
 
     private static func stripRichText(_ text: String) -> String {

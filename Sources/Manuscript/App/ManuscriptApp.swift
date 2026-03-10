@@ -552,6 +552,7 @@ private struct NewProjectSheet: View {
 private struct SearchPanelSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
+    @State private var showingReplaceConfirmation = false
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
@@ -590,7 +591,11 @@ private struct SearchPanelSheet: View {
                 TextField("Replace", text: $workspace.searchReplacementText)
                     .textFieldStyle(.roundedBorder)
                 Button("Replace All") {
-                    onNotice(commands.replaceAllSearchResults())
+                    if replacePreview.replacementCount > 0 {
+                        showingReplaceConfirmation = true
+                    } else {
+                        onNotice("No matches to replace.")
+                    }
                 }
                 .disabled(workspace.searchQueryText.isEmpty)
             }
@@ -661,6 +666,19 @@ private struct SearchPanelSheet: View {
         .onChange(of: workspace.searchIsWholeWord) { _, _ in
             commands.runSearch()
         }
+        .alert("Replace All?", isPresented: $showingReplaceConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Replace", role: .destructive) {
+                onNotice(commands.replaceAllSearchResults())
+            }
+        } message: {
+            Text("\(replacePreview.replacementCount) replacements across \(replacePreview.scenesAffected) scenes. Proceed?")
+        }
+    }
+
+    private var replacePreview: (replacementCount: Int, scenesAffected: Int) {
+        let scenesAffected = Set(workspace.searchResults.map(\.sceneId)).count
+        return (workspace.searchResults.count, scenesAffected)
     }
 }
 
