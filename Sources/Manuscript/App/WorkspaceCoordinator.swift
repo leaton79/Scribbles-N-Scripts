@@ -319,6 +319,10 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
+        guard hasOpenProject else {
+            goalsManager.handleAppFocusChanged(isFocused: false)
+            return
+        }
         switch phase {
         case .active:
             if goalsManager.sessionStartTime == nil {

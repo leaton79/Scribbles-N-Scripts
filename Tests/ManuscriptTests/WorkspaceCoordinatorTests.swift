@@ -517,4 +517,14 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.modeController.activeMode, .linear)
     }
+
+    func testHandleScenePhaseActiveDoesNotStartSessionWithoutOpenProject() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ScenePhaseNoProject")
+        try coordinator.projectManager.closeProject()
+
+        coordinator.handleScenePhase(.active)
+
+        XCTAssertNil(coordinator.goalsManager.sessionStartTime)
+        XCTAssertFalse(coordinator.goalsManager.isTimerRunning)
+    }
 }
