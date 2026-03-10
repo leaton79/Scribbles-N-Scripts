@@ -6,6 +6,7 @@ struct ManuscriptApp: App {
     @StateObject private var workspace = WorkspaceCoordinator()
 
     var body: some SwiftUI.Scene {
+        let commands = WorkspaceCommandBindings(workspace: workspace)
         WindowGroup {
             WorkspaceView(workspace: workspace)
                 .frame(minWidth: 1000, minHeight: 700)
@@ -13,69 +14,69 @@ struct ManuscriptApp: App {
         .commands {
             CommandMenu("Project") {
                 Button("Save Project") {
-                    _ = workspace.saveProjectNow()
+                    _ = commands.saveProject()
                 }
                 .keyboardShortcut("s", modifiers: [.command])
-                .disabled(!workspace.hasOpenProject || !workspace.canSaveProject)
+                .disabled(!commands.canSaveProject)
 
                 Button("New Chapter") {
-                    _ = workspace.createChapter()
+                    _ = commands.createChapter()
                 }
                 .keyboardShortcut("N", modifiers: [.command, .shift])
-                .disabled(!workspace.hasOpenProject)
+                .disabled(!commands.canCreateProjectContent)
 
                 Button("New Scene") {
-                    _ = workspace.createScene()
+                    _ = commands.createScene()
                 }
                 .keyboardShortcut("n", modifiers: [.command])
-                .disabled(!workspace.hasOpenProject)
+                .disabled(!commands.canCreateProjectContent)
 
                 Divider()
 
                 Button("Create Backup") {
-                    _ = workspace.createBackupNow()
+                    _ = commands.createBackup()
                 }
-                .disabled(!workspace.hasOpenProject)
+                .disabled(!commands.canCreateBackup)
 
                 Button("Save and Backup") {
-                    _ = workspace.saveAndBackupNow()
+                    _ = commands.saveAndBackup()
                 }
                 .keyboardShortcut("S", modifiers: [.command, .option])
-                .disabled(!workspace.hasOpenProject)
+                .disabled(!commands.canSaveAndBackup)
             }
 
             CommandMenu("View") {
                 Button("Linear Mode") {
-                    workspace.setMode(.linear)
+                    commands.setModeLinear()
                 }
                 .keyboardShortcut("1", modifiers: [.command])
-                .disabled(!workspace.canSwitchToLinearMode)
+                .disabled(!commands.canSwitchToLinearMode)
 
                 Button("Modular Mode") {
-                    workspace.setMode(.modular)
+                    commands.setModeModular()
                 }
                 .keyboardShortcut("2", modifiers: [.command])
-                .disabled(!workspace.canSwitchToModularMode)
+                .disabled(!commands.canSwitchToModularMode)
 
-                Button(workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split") {
-                    _ = workspace.toggleSplitForCommand()
+                Button(commands.splitToggleTitle) {
+                    _ = commands.toggleSplit()
                 }
                 .keyboardShortcut("\\", modifiers: [.command])
-                .disabled(!workspace.canToggleSplitEditor)
+                .disabled(!commands.canToggleSplitEditor)
 
                 Divider()
 
                 Button("Previous Scene") {
-                    _ = workspace.navigateToPreviousScene()
+                    _ = commands.navigateToPreviousScene()
                 }
                 .keyboardShortcut("[", modifiers: [.command])
-                .disabled(!workspace.canNavigateToPreviousScene)
+                .disabled(!commands.canNavigateToPreviousScene)
 
                 Button("Next Scene") {
-                    _ = workspace.navigateToNextScene()
+                    _ = commands.navigateToNextScene()
                 }
                 .keyboardShortcut("]", modifiers: [.command])
-                .disabled(!workspace.canNavigateToNextScene)
+                .disabled(!commands.canNavigateToNextScene)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -90,6 +91,7 @@ private struct WorkspaceView: View {
     @State private var actionNotice: String?
 
     var body: some View {
+        let commands = WorkspaceCommandBindings(workspace: workspace)
         GeometryReader { geometry in
             if let loadError = workspace.loadError {
                 ContentUnavailableView("Could not open project", systemImage: "exclamationmark.triangle", description: Text(loadError))
@@ -126,34 +128,34 @@ private struct WorkspaceView: View {
                             }
                             Spacer()
                             Button("Save") {
-                                actionNotice = workspace.saveProjectNow() ?? "Project saved."
+                                actionNotice = commands.saveProject() ?? "Project saved."
                             }
                             .keyboardShortcut("s", modifiers: [.command])
-                            .disabled(!workspace.hasOpenProject || !workspace.canSaveProject)
+                            .disabled(!commands.canSaveProject)
                             Button("New Chapter") {
-                                actionNotice = workspace.createChapter()
+                                actionNotice = commands.createChapter()
                             }
                             .keyboardShortcut("N", modifiers: [.command, .shift])
-                            .disabled(!workspace.hasOpenProject)
+                            .disabled(!commands.canCreateProjectContent)
                             Button("New Scene") {
-                                actionNotice = workspace.createScene()
+                                actionNotice = commands.createScene()
                             }
                             .keyboardShortcut("n", modifiers: [.command])
-                            .disabled(!workspace.hasOpenProject)
+                            .disabled(!commands.canCreateProjectContent)
                             Button("Backup") {
-                                actionNotice = workspace.createBackupNow()
+                                actionNotice = commands.createBackup()
                             }
-                            .disabled(!workspace.hasOpenProject)
+                            .disabled(!commands.canCreateBackup)
                             Button("Save + Backup") {
-                                actionNotice = workspace.saveAndBackupNow()
+                                actionNotice = commands.saveAndBackup()
                             }
-                            .disabled(!workspace.hasOpenProject)
+                            .disabled(!commands.canSaveAndBackup)
                             if workspace.modeController.activeMode == .linear {
                                 Button(workspace.splitEditorState.isSplit ? "Close Split" : "Open Split") {
                                     toggleSplit(windowWidth: geometry.size.width)
                                 }
                                 .keyboardShortcut("\\", modifiers: [.command])
-                                .disabled(!workspace.hasOpenProject || !workspace.canToggleSplitEditor)
+                                .disabled(!commands.canToggleSplitEditor)
                             }
                         }
                         .padding(.horizontal, 12)
