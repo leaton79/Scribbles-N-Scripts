@@ -241,6 +241,28 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.navigationState.selectedChapterId, created.id)
     }
 
+    func testCreateChapterFallsBackToGeneratedTitleWhenInputIsWhitespace() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapterWhitespaceTitle")
+        let beforeCount = coordinator.projectManager.getManifest().hierarchy.chapters.count
+
+        let message = coordinator.createChapter(title: "   \n\t ")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertEqual(manifest.hierarchy.chapters.count, beforeCount + 1)
+        XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter \(beforeCount + 1)" }))
+    }
+
+    func testCreateChapterTrimsSurroundingWhitespaceInTitle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapterTrimmedTitle")
+
+        let message = coordinator.createChapter(title: "  Trimmed Chapter  ")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Trimmed Chapter" }))
+    }
+
     func testCreateSceneUsesSelectedChapterAndSelectsNewScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneSelectedChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
