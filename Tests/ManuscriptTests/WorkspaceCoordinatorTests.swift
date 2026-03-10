@@ -897,6 +897,45 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.canSwitchToModularMode)
     }
 
+    func testModeSwitchAvailabilityMatrixAcrossNoOpAndSplitTransitions() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ModeSwitchMatrix")
+
+        // Baseline linear state.
+        XCTAssertFalse(coordinator.canSwitchToLinearMode)
+        XCTAssertTrue(coordinator.canSwitchToModularMode)
+
+        // Same-mode no-op preserves availability.
+        coordinator.setMode(.linear)
+        XCTAssertFalse(coordinator.canSwitchToLinearMode)
+        XCTAssertTrue(coordinator.canSwitchToModularMode)
+
+        // Split-open linear still allows switching to modular.
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 1200)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertTrue(coordinator.canSwitchToModularMode)
+
+        // Switching to modular flips availability and closes split.
+        coordinator.setMode(.modular)
+        XCTAssertTrue(coordinator.canSwitchToLinearMode)
+        XCTAssertFalse(coordinator.canSwitchToModularMode)
+        XCTAssertFalse(coordinator.splitEditorState.isSplit)
+
+        // Same-mode no-op in modular preserves availability.
+        coordinator.setMode(.modular)
+        XCTAssertTrue(coordinator.canSwitchToLinearMode)
+        XCTAssertFalse(coordinator.canSwitchToModularMode)
+
+        // Switching back to linear flips availability again.
+        coordinator.setMode(.linear)
+        XCTAssertFalse(coordinator.canSwitchToLinearMode)
+        XCTAssertTrue(coordinator.canSwitchToModularMode)
+
+        // No-project state disables both switches.
+        try? coordinator.projectManager.closeProject()
+        XCTAssertFalse(coordinator.canSwitchToLinearMode)
+        XCTAssertFalse(coordinator.canSwitchToModularMode)
+    }
+
     func testModeSwitchAvailabilityDisabledWithoutOpenProject() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ModeSwitchNoProject")
         try coordinator.projectManager.closeProject()
