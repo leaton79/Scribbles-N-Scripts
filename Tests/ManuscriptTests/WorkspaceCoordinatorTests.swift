@@ -65,6 +65,34 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
     }
 
+    func testSidebarSelectionTargetsPrimaryPaneWhenPrimaryIsActive() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitSelectPrimary")
+        let manifest = coordinator.projectManager.getManifest()
+        let chapterId = try XCTUnwrap(manifest.hierarchy.chapters.first?.id)
+        let existingSceneId = try XCTUnwrap(manifest.hierarchy.scenes.first?.id)
+        let otherScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Other")
+
+        coordinator.splitEditorState.openSplit(sceneId: otherScene.id)
+        coordinator.splitEditorState.setActivePane(0)
+        let secondaryBefore = coordinator.splitEditorState.secondarySceneId
+
+        coordinator.select(
+            node: SidebarNode(
+                id: existingSceneId,
+                title: "First",
+                level: .scene,
+                wordCount: 0,
+                colorLabel: nil,
+                goalProgressText: nil,
+                children: [],
+                matchingCount: nil
+            )
+        )
+
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, existingSceneId)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, secondaryBefore)
+    }
+
     func testBreadcrumbSelectionTargetsSecondaryPaneWhenActive() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitBreadcrumbSelect")
         let manifest = coordinator.projectManager.getManifest()
@@ -80,6 +108,23 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, existingSceneId)
         XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
+    }
+
+    func testBreadcrumbSelectionTargetsPrimaryPaneWhenPrimaryIsActive() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitBreadcrumbSelectPrimary")
+        let manifest = coordinator.projectManager.getManifest()
+        let chapterId = try XCTUnwrap(manifest.hierarchy.chapters.first?.id)
+        let existingSceneId = try XCTUnwrap(manifest.hierarchy.scenes.first?.id)
+        let otherScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Other")
+
+        coordinator.splitEditorState.openSplit(sceneId: otherScene.id)
+        coordinator.splitEditorState.setActivePane(0)
+        let secondaryBefore = coordinator.splitEditorState.secondarySceneId
+
+        coordinator.select(breadcrumb: BreadcrumbItem(id: existingSceneId, title: "First", type: .scene))
+
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, existingSceneId)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, secondaryBefore)
     }
 
     func testCreateSceneTargetsSecondaryPaneWhenActive() throws {
