@@ -178,6 +178,29 @@ final class NavigationTests: XCTestCase {
         XCTAssertEqual(ch2After.scenes, [d1.id, s2.id])
     }
 
+    func testUndoLastOperationRevertsOnlyMostRecentChapterMove() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "UndoChapterLIFO", at: tempDir)
+
+        let part1 = try manager.addPart(at: nil, title: "Part1")
+        let part2 = try manager.addPart(at: nil, title: "Part2")
+        let chapterA = try manager.addChapter(to: part1.id, at: nil, title: "A")
+        let chapterB = try manager.addChapter(to: part1.id, at: nil, title: "B")
+
+        let nav = NavigationState(projectProvider: { manager.currentProject })
+        try nav.performChapterMove(chapterId: chapterA.id, toPartId: part2.id, atIndex: 0, manager: manager)
+        try nav.performChapterMove(chapterId: chapterB.id, toPartId: part2.id, atIndex: 1, manager: manager)
+
+        try nav.undoLastOperation(manager: manager)
+
+        let afterUndo = manager.getManifest()
+        let part1After = try XCTUnwrap(afterUndo.hierarchy.parts.first(where: { $0.id == part1.id }))
+        let part2After = try XCTUnwrap(afterUndo.hierarchy.parts.first(where: { $0.id == part2.id }))
+
+        XCTAssertEqual(part1After.chapters, [chapterB.id])
+        XCTAssertEqual(part2After.chapters, [chapterA.id])
+    }
+
     private func makePartedProjectFixture(name: String) throws -> (project: Project, sceneWordCounts: [String: Int]) {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
