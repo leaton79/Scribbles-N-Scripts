@@ -660,6 +660,8 @@ private struct SearchPanelSheet: View {
 
             GroupBox("Highlight Settings") {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text("Highlight cap limits how many matches are drawn at once for performance.")
+                        .foregroundStyle(.secondary)
                     Stepper(
                         "Highlight cap: \(workspace.searchHighlightCap)",
                         value: Binding(
@@ -669,6 +671,8 @@ private struct SearchPanelSheet: View {
                         in: workspace.searchHighlightCapRange,
                         step: 10
                     )
+                    Text("Safety threshold blocks Show All when a scene has too many matches.")
+                        .foregroundStyle(.secondary)
                     Stepper(
                         "Show-all safety threshold: \(workspace.searchHighlightSafetyThreshold)",
                         value: Binding(
