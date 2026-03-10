@@ -623,9 +623,25 @@ private struct SearchPanelSheet: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             } else {
-                Text("\(workspace.searchResults.count) matches")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text("\(workspace.searchResults.count) matches")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if workspace.hiddenSearchHighlightCount > 0 {
+                        Text("Showing first \(workspace.searchHighlightCap) highlights. \(workspace.hiddenSearchHighlightCount) hidden.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Show All Highlights") {
+                            workspace.toggleShowAllSearchHighlights()
+                        }
+                        .buttonStyle(.borderless)
+                    } else if workspace.searchShowAllHighlights && workspace.searchResults.count > workspace.searchHighlightCap {
+                        Button("Use Capped Highlights") {
+                            workspace.toggleShowAllSearchHighlights()
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
             }
 
             List {

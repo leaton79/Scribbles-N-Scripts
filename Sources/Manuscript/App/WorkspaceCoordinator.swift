@@ -37,6 +37,7 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published var searchIsRegex = false
     @Published var searchIsCaseSensitive = false
     @Published var searchIsWholeWord = false
+    @Published var searchShowAllHighlights = false
     @Published private(set) var searchResults: [SearchResult] = []
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var currentSearchResultIndex: Int?
@@ -373,6 +374,7 @@ final class WorkspaceCoordinator: ObservableObject {
 
     func hideSearchPanel() {
         isSearchPanelVisible = false
+        searchShowAllHighlights = false
         clearEditorSearchHighlights()
     }
 
@@ -486,6 +488,20 @@ final class WorkspaceCoordinator: ObservableObject {
             previous = searchResults.count - 1
         }
         selectSearchResult(at: previous)
+    }
+
+    var searchHighlightCap: Int { 100 }
+
+    var hiddenSearchHighlightCount: Int {
+        guard !searchShowAllHighlights else { return 0 }
+        guard let activeSceneId = activeSceneIdForHighlights() else { return 0 }
+        let total = searchResults.filter { $0.sceneId == activeSceneId }.count
+        return max(0, total - searchHighlightCap)
+    }
+
+    func toggleShowAllSearchHighlights() {
+        searchShowAllHighlights.toggle()
+        updateEditorSearchHighlights()
     }
 
     @discardableResult
@@ -1004,7 +1020,7 @@ final class WorkspaceCoordinator: ObservableObject {
         let ranges = searchResults
             .filter { $0.sceneId == sceneId }
             .map(\.matchRange)
-        let limitedRanges = Array(ranges.prefix(100))
+        let visibleRanges = searchShowAllHighlights ? ranges : Array(ranges.prefix(searchHighlightCap))
         let activeRange: Range<Int>?
         if let currentSearchResultIndex, searchResults.indices.contains(currentSearchResultIndex) {
             let result = searchResults[currentSearchResultIndex]
@@ -1012,13 +1028,20 @@ final class WorkspaceCoordinator: ObservableObject {
         } else {
             activeRange = nil
         }
-        editor.setSearchHighlights(ranges: limitedRanges, activeRange: activeRange)
+        editor.setSearchHighlights(ranges: visibleRanges, activeRange: activeRange)
     }
 
     private func clearEditorSearchHighlights() {
         editorState.clearSearchHighlights()
         splitEditorState.primaryEditor.clearSearchHighlights()
         splitEditorState.secondaryEditor.clearSearchHighlights()
+    }
+
+    private func activeSceneIdForHighlights() -> UUID? {
+        if splitEditorState.isSplit, splitEditorState.activePaneIndex == 1 {
+            return splitEditorState.secondarySceneId
+        }
+        return splitEditorState.primarySceneId ?? editorState.currentSceneId
     }
 
     private func activeEditorState() -> EditorState {

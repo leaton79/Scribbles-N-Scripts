@@ -402,6 +402,23 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.editorState.activeSearchHighlightRange)
     }
 
+    func testSearchHighlightCapAndShowAllToggle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchHighlightCap")
+        let content = Array(repeating: "hit", count: 120).joined(separator: " ")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: content)
+        coordinator.searchQueryText = "hit"
+
+        coordinator.showInlineSearchPanel()
+
+        XCTAssertEqual(coordinator.searchResults.count, 120)
+        XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, 100)
+        XCTAssertEqual(coordinator.hiddenSearchHighlightCount, 20)
+
+        coordinator.toggleShowAllSearchHighlights()
+        XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, 120)
+        XCTAssertEqual(coordinator.hiddenSearchHighlightCount, 0)
+    }
+
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
         let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
