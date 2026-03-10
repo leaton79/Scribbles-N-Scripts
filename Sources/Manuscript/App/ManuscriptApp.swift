@@ -632,7 +632,7 @@ private struct SearchPanelSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(result.chapterTitle) • \(result.sceneTitle)")
                                 .font(.subheadline.weight(workspace.currentSearchResultIndex == index ? .semibold : .regular))
-                            Text(result.contextSnippet)
+                            highlightedSnippetText(for: result)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -680,6 +680,21 @@ private struct SearchPanelSheet: View {
     private var replacePreview: (replacementCount: Int, scenesAffected: Int) {
         let scenesAffected = Set(workspace.searchResults.map(\.sceneId)).count
         return (workspace.searchResults.count, scenesAffected)
+    }
+
+    private func highlightedSnippetText(for result: SearchResult) -> Text {
+        guard !result.matchText.isEmpty,
+              let range = result.contextSnippet.range(
+                of: result.matchText,
+                options: workspace.searchIsCaseSensitive ? [] : [.caseInsensitive]
+              ) else {
+            return Text(result.contextSnippet)
+        }
+
+        let prefix = String(result.contextSnippet[..<range.lowerBound])
+        let match = String(result.contextSnippet[range])
+        let suffix = String(result.contextSnippet[range.upperBound...])
+        return Text(prefix) + Text(match).bold() + Text(suffix)
     }
 }
 
