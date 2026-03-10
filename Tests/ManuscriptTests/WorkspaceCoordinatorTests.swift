@@ -269,6 +269,28 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(names.filter { $0 == "RecentA" }.count, 1)
     }
 
+    func testSwitchableProjectsPrioritizeCurrentThenRecentsWithoutDuplication() throws {
+        let suiteName = "WorkspaceCoordinatorTests.SwitchableProjects.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "SwitchSeed",
+            recentProjectStore: defaults
+        )
+        XCTAssertNil(coordinator.createAndOpenProject(named: "SwitchA"))
+        XCTAssertNil(coordinator.createAndOpenProject(named: "SwitchB"))
+        let switchAURL = tempDir.appendingPathComponent("SwitchA", isDirectory: true)
+        XCTAssertNil(coordinator.openProject(at: switchAURL))
+
+        let names = coordinator.switchableProjects.map(\.name)
+        XCTAssertGreaterThanOrEqual(names.count, 2)
+        XCTAssertEqual(names[0], "SwitchA")
+        XCTAssertEqual(names[1], "SwitchB")
+        XCTAssertEqual(names.filter { $0 == "SwitchA" }.count, 1)
+    }
+
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
         let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -317,6 +339,30 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         XCTAssertFalse(coordinator.hasStaleRecentProjects)
         XCTAssertTrue(coordinator.recentProjects.contains(where: { $0.name == "CleanupValid" }))
+    }
+
+    func testRecentProjectsSnapshotRestoreSupportsUndo() throws {
+        let suiteName = "WorkspaceCoordinatorTests.RecentUndo.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "UndoSeed",
+            recentProjectStore: defaults
+        )
+        XCTAssertNil(coordinator.createAndOpenProject(named: "UndoA"))
+        XCTAssertNil(coordinator.createAndOpenProject(named: "UndoB"))
+        let before = coordinator.snapshotRecentProjects()
+        XCTAssertFalse(before.paths.isEmpty)
+
+        coordinator.clearRecentProjects()
+        XCTAssertTrue(coordinator.recentProjects.isEmpty)
+
+        coordinator.restoreRecentProjects(from: before)
+        let restoredNames = coordinator.recentProjects.map(\.name)
+        XCTAssertTrue(restoredNames.contains("UndoA"))
+        XCTAssertTrue(restoredNames.contains("UndoB"))
     }
 
     func testSaveProjectAsCreatesCopyAndSwitchesContext() throws {

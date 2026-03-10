@@ -14,6 +14,13 @@ struct ManuscriptApp: App {
         }
         .commands {
             CommandMenu("Project") {
+                Button("Switch Project…") {
+                    NotificationCenter.default.post(name: .showProjectSwitcher, object: nil)
+                }
+                .keyboardShortcut("k", modifiers: [.command])
+
+                Divider()
+
                 Button("Reopen Last Project") {
                     _ = commands.reopenLastProject()
                 }
@@ -30,7 +37,7 @@ struct ManuscriptApp: App {
                         }
                         Divider()
                         Button("Clear Recent Projects") {
-                            commands.clearRecentProjects()
+                            NotificationCenter.default.post(name: .requestClearRecentProjects, object: nil)
                         }
                     }
                     if commands.hasStaleRecentProjects {
@@ -38,7 +45,7 @@ struct ManuscriptApp: App {
                             Divider()
                         }
                         Button("Clean Missing Entries") {
-                            commands.cleanupMissingRecentProjects()
+                            NotificationCenter.default.post(name: .requestCleanupMissingRecentProjects, object: nil)
                         }
                     }
                 }
@@ -138,7 +145,12 @@ private struct WorkspaceView: View {
     @State private var showingOpenProjectPicker = false
     @State private var showingSaveAsSheet = false
     @State private var showingRenameSheet = false
-    @State private var showingRecentCleanupPrompt = false
+    @State private var showingProjectSwitcher = false
+    @State private var projectSwitcherQuery = ""
+    @State private var pendingRecentAction: RecentProjectsAction?
+    @State private var showingRecentActionConfirmation = false
+    @State private var recentUndoSnapshot: RecentProjectsSnapshot?
+    @State private var recentUndoMessage: String?
     @State private var newProjectName = ""
     @State private var saveAsProjectName = ""
     @State private var renameProjectName = ""
@@ -174,12 +186,30 @@ private struct WorkspaceView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                            if let recentUndoMessage {
+                                Text(recentUndoMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Button("Undo") {
+                                    if let recentUndoSnapshot {
+                                        commands.restoreRecentProjects(from: recentUndoSnapshot)
+                                        actionNotice = "Recent project changes undone."
+                                    }
+                                    recentUndoSnapshot = nil
+                                    self.recentUndoMessage = nil
+                                }
+                                .buttonStyle(.borderless)
+                            }
                             if let splitNotice {
                                 Text(splitNotice)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
+                            Button("Switch Project") {
+                                projectSwitcherQuery = ""
+                                showingProjectSwitcher = true
+                            }
                             Button("New Project") {
                                 newProjectName = ""
                                 showingNewProjectSheet = true
@@ -198,8 +228,8 @@ private struct WorkspaceView: View {
                                     }
                                     Divider()
                                     Button("Clear Recent Projects") {
-                                        commands.clearRecentProjects()
-                                        actionNotice = "Recent projects cleared."
+                                        pendingRecentAction = .clearAll
+                                        showingRecentActionConfirmation = true
                                     }
                                 }
                                 if commands.hasStaleRecentProjects {
@@ -207,8 +237,8 @@ private struct WorkspaceView: View {
                                         Divider()
                                     }
                                     Button("Clean Missing Entries") {
-                                        commands.cleanupMissingRecentProjects()
-                                        actionNotice = "Missing recent projects removed."
+                                        pendingRecentAction = .cleanupMissing
+                                        showingRecentActionConfirmation = true
                                     }
                                 }
                             }
@@ -299,7 +329,22 @@ private struct WorkspaceView: View {
                     workspace.handleModeChange(mode)
                 }
                 .onAppear {
-                    showingRecentCleanupPrompt = commands.hasStaleRecentProjects
+                    if commands.hasStaleRecentProjects {
+                        pendingRecentAction = .cleanupMissing
+                        showingRecentActionConfirmation = true
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .showProjectSwitcher)) { _ in
+                    projectSwitcherQuery = ""
+                    showingProjectSwitcher = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .requestClearRecentProjects)) { _ in
+                    pendingRecentAction = .clearAll
+                    showingRecentActionConfirmation = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .requestCleanupMissingRecentProjects)) { _ in
+                    pendingRecentAction = .cleanupMissing
+                    showingRecentActionConfirmation = true
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .showSaveAsSheet)) { _ in
                     saveAsProjectName = workspace.projectDisplayName
@@ -364,14 +409,24 @@ private struct WorkspaceView: View {
                         }
                     )
                 }
-                .alert("Clean Missing Recent Projects?", isPresented: $showingRecentCleanupPrompt) {
-                    Button("Not Now", role: .cancel) {}
-                    Button("Clean Up") {
-                        commands.cleanupMissingRecentProjects()
-                        actionNotice = "Missing recent projects removed."
+                .sheet(isPresented: $showingProjectSwitcher) {
+                    ProjectSwitcherSheet(
+                        query: $projectSwitcherQuery,
+                        projects: commands.switchableProjects,
+                        onCancel: { showingProjectSwitcher = false },
+                        onSelect: { entry in
+                            actionNotice = commands.openProject(at: entry.url)
+                            showingProjectSwitcher = false
+                        }
+                    )
+                }
+                .alert(recentActionTitle, isPresented: $showingRecentActionConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button(recentActionButtonTitle, role: .destructive) {
+                        performRecentAction(using: commands)
                     }
                 } message: {
-                    Text("Some recent project paths no longer exist. Remove them from recent projects?")
+                    Text(recentActionMessage)
                 }
             }
         }
@@ -384,6 +439,50 @@ private struct WorkspaceView: View {
 
     private func toggleSplit(windowWidth: CGFloat) {
         splitNotice = workspace.toggleSplit(windowWidth: windowWidth)
+    }
+
+    private var recentActionTitle: String {
+        switch pendingRecentAction {
+        case .clearAll: return "Clear Recent Projects?"
+        case .cleanupMissing: return "Clean Missing Recent Entries?"
+        case .none: return "Confirm Recent Action"
+        }
+    }
+
+    private var recentActionButtonTitle: String {
+        switch pendingRecentAction {
+        case .clearAll: return "Clear"
+        case .cleanupMissing: return "Clean"
+        case .none: return "Confirm"
+        }
+    }
+
+    private var recentActionMessage: String {
+        switch pendingRecentAction {
+        case .clearAll:
+            return "Remove all recent project entries? You can undo immediately after this action."
+        case .cleanupMissing:
+            return "Remove recent entries that point to missing projects? You can undo immediately after this action."
+        case .none:
+            return "Proceed?"
+        }
+    }
+
+    private func performRecentAction(using commands: WorkspaceCommandBindings) {
+        guard let pendingRecentAction else { return }
+        let before = commands.snapshotRecentProjects()
+        switch pendingRecentAction {
+        case .clearAll:
+            commands.clearRecentProjects()
+            recentUndoMessage = "Recent projects cleared."
+            actionNotice = "Recent projects cleared."
+        case .cleanupMissing:
+            commands.cleanupMissingRecentProjects()
+            recentUndoMessage = "Missing recent projects removed."
+            actionNotice = "Missing recent projects removed."
+        }
+        recentUndoSnapshot = before
+        self.pendingRecentAction = nil
     }
 }
 
@@ -412,7 +511,60 @@ private struct NewProjectSheet: View {
     }
 }
 
+private struct ProjectSwitcherSheet: View {
+    @Binding var query: String
+    let projects: [RecentProjectEntry]
+    let onCancel: () -> Void
+    let onSelect: (RecentProjectEntry) -> Void
+
+    private var filteredProjects: [RecentProjectEntry] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return projects }
+        return projects.filter { entry in
+            entry.name.localizedCaseInsensitiveContains(trimmed) ||
+            entry.url.path.localizedCaseInsensitiveContains(trimmed)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Switch Project")
+                .font(.headline)
+            TextField("Search projects", text: $query)
+                .textFieldStyle(.roundedBorder)
+            List(filteredProjects) { project in
+                Button {
+                    onSelect(project)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(project.name)
+                        Text(project.url.path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .frame(minHeight: 220)
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 480, minHeight: 360)
+    }
+}
+
+private enum RecentProjectsAction {
+    case clearAll
+    case cleanupMissing
+}
+
 private extension Notification.Name {
+    static let showProjectSwitcher = Notification.Name("workspace.showProjectSwitcher")
+    static let requestClearRecentProjects = Notification.Name("workspace.requestClearRecentProjects")
+    static let requestCleanupMissingRecentProjects = Notification.Name("workspace.requestCleanupMissingRecentProjects")
     static let showSaveAsSheet = Notification.Name("workspace.showSaveAsSheet")
     static let showRenameSheet = Notification.Name("workspace.showRenameSheet")
 }

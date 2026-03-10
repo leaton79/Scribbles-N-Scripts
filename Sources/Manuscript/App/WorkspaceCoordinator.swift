@@ -7,6 +7,11 @@ struct RecentProjectEntry: Identifiable, Equatable {
     let url: URL
 }
 
+struct RecentProjectsSnapshot: Equatable {
+    let paths: [String]
+    let lastOpenedPath: String?
+}
+
 @MainActor
 final class WorkspaceCoordinator: ObservableObject {
     private static let lastOpenedProjectPathKey = "workspace.lastOpenedProjectPath"
@@ -37,6 +42,21 @@ final class WorkspaceCoordinator: ObservableObject {
         recentProjectURLs().map { url in
             RecentProjectEntry(id: url.path, name: url.lastPathComponent, url: url)
         }
+    }
+
+    var switchableProjects: [RecentProjectEntry] {
+        var entries: [RecentProjectEntry] = []
+        var seen = Set<String>()
+
+        if let current = currentProjectEntry {
+            entries.append(current)
+            seen.insert(current.id)
+        }
+        for recent in recentProjects where !seen.contains(recent.id) {
+            entries.append(recent)
+            seen.insert(recent.id)
+        }
+        return entries
     }
 
     var hasStaleRecentProjects: Bool {
@@ -295,6 +315,22 @@ final class WorkspaceCoordinator: ObservableObject {
     func clearRecentProjects() {
         recentProjectStore.removeObject(forKey: Self.recentProjectsKey)
         recentProjectStore.removeObject(forKey: Self.lastOpenedProjectPathKey)
+    }
+
+    func snapshotRecentProjects() -> RecentProjectsSnapshot {
+        RecentProjectsSnapshot(
+            paths: recentProjectPaths(),
+            lastOpenedPath: recentProjectStore.string(forKey: Self.lastOpenedProjectPathKey)
+        )
+    }
+
+    func restoreRecentProjects(from snapshot: RecentProjectsSnapshot) {
+        recentProjectStore.set(snapshot.paths, forKey: Self.recentProjectsKey)
+        if let lastOpenedPath = snapshot.lastOpenedPath {
+            recentProjectStore.set(lastOpenedPath, forKey: Self.lastOpenedProjectPathKey)
+        } else {
+            recentProjectStore.removeObject(forKey: Self.lastOpenedProjectPathKey)
+        }
     }
 
     func cleanupMissingRecentProjects() {
@@ -735,6 +771,11 @@ final class WorkspaceCoordinator: ObservableObject {
             seen.insert(path)
         }
         return urls
+    }
+
+    private var currentProjectEntry: RecentProjectEntry? {
+        guard let root = projectManager.projectRootURL else { return nil }
+        return RecentProjectEntry(id: root.path, name: projectDisplayName, url: root)
     }
 
     private func recentProjectPaths() -> [String] {

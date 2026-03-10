@@ -127,6 +127,28 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(names[1], "BindingsRecentB")
     }
 
+    func testSwitchableProjectsExposeCurrentThenRecents() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.Switchable.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsSwitchSeed",
+            recentProjectStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        XCTAssertNil(bindings.createProject(named: "BindingsSwitchA"))
+        XCTAssertNil(bindings.createProject(named: "BindingsSwitchB"))
+        let switchAURL = tempDir.appendingPathComponent("BindingsSwitchA", isDirectory: true)
+        XCTAssertNil(bindings.openProject(at: switchAURL))
+
+        let names = bindings.switchableProjects.map(\.name)
+        XCTAssertGreaterThanOrEqual(names.count, 2)
+        XCTAssertEqual(names[0], "BindingsSwitchA")
+        XCTAssertEqual(names[1], "BindingsSwitchB")
+    }
+
     func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
         let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -176,6 +198,30 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
 
         XCTAssertFalse(bindings.hasStaleRecentProjects)
         XCTAssertTrue(bindings.recentProjects.contains(where: { $0.name == "BindingsCleanupValid" }))
+    }
+
+    func testSnapshotAndRestoreRecentProjectsSupportUndoFlow() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.RecentUndo.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsUndoSeed",
+            recentProjectStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        XCTAssertNil(bindings.createProject(named: "BindingsUndoA"))
+        XCTAssertNil(bindings.createProject(named: "BindingsUndoB"))
+
+        let snapshot = bindings.snapshotRecentProjects()
+        bindings.clearRecentProjects()
+        XCTAssertTrue(bindings.recentProjects.isEmpty)
+
+        bindings.restoreRecentProjects(from: snapshot)
+        let names = bindings.recentProjects.map(\.name)
+        XCTAssertTrue(names.contains("BindingsUndoA"))
+        XCTAssertTrue(names.contains("BindingsUndoB"))
     }
 
     func testViewActionsDelegateToWorkspaceCoordinator() throws {

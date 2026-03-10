@@ -21,6 +21,10 @@ struct WorkspaceCommandBindings {
         workspace.recentProjects
     }
 
+    var switchableProjects: [RecentProjectEntry] {
+        workspace.switchableProjects
+    }
+
     var canClearRecentProjects: Bool {
         workspace.canClearRecentProjects
     }
@@ -86,6 +90,14 @@ struct WorkspaceCommandBindings {
 
     func clearRecentProjects() {
         workspace.clearRecentProjects()
+    }
+
+    func snapshotRecentProjects() -> RecentProjectsSnapshot {
+        workspace.snapshotRecentProjects()
+    }
+
+    func restoreRecentProjects(from snapshot: RecentProjectsSnapshot) {
+        workspace.restoreRecentProjects(from: snapshot)
     }
 
     func cleanupMissingRecentProjects() {
