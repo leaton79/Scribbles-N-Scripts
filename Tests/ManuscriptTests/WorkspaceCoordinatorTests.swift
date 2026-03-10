@@ -488,6 +488,20 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertGreaterThan(coordinator.searchHighlightSafetyThreshold, coordinator.searchHighlightCap)
     }
 
+    func testResetSearchHighlightPreferencesToDefaults() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchHighlightPrefReset")
+
+        coordinator.updateSearchHighlightCap(180)
+        coordinator.updateSearchHighlightSafetyThreshold(3_500)
+        XCTAssertFalse(coordinator.usesDefaultSearchHighlightPreferences)
+
+        coordinator.resetSearchHighlightPreferencesToDefaults()
+
+        XCTAssertEqual(coordinator.searchHighlightCap, 100)
+        XCTAssertEqual(coordinator.searchHighlightSafetyThreshold, 2_000)
+        XCTAssertTrue(coordinator.usesDefaultSearchHighlightPreferences)
+    }
+
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
         let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

@@ -524,6 +524,11 @@ final class WorkspaceCoordinator: ObservableObject {
         Self.minSearchHighlightSafetyThreshold...Self.maxSearchHighlightSafetyThreshold
     }
 
+    var usesDefaultSearchHighlightPreferences: Bool {
+        searchHighlightCap == Self.defaultSearchHighlightCap
+            && searchHighlightSafetyThreshold == Self.defaultSearchHighlightSafetyThreshold
+    }
+
     var hiddenSearchHighlightCount: Int {
         guard !searchShowAllHighlights else { return 0 }
         let total = activeSceneMatchCountForHighlights()
@@ -578,6 +583,20 @@ final class WorkspaceCoordinator: ObservableObject {
 
     func updateSearchHighlightSafetyThreshold(_ value: Int) {
         let normalized = Self.normalizeSearchHighlightPreferences(cap: searchHighlightCap, threshold: value)
+        searchHighlightCap = normalized.cap
+        searchHighlightSafetyThreshold = normalized.threshold
+        persistSearchHighlightPreferences()
+        if searchShowAllHighlights && !canUseShowAllHighlightsForCurrentContext() {
+            searchShowAllHighlights = false
+        }
+        updateEditorSearchHighlights()
+    }
+
+    func resetSearchHighlightPreferencesToDefaults() {
+        let normalized = Self.normalizeSearchHighlightPreferences(
+            cap: Self.defaultSearchHighlightCap,
+            threshold: Self.defaultSearchHighlightSafetyThreshold
+        )
         searchHighlightCap = normalized.cap
         searchHighlightSafetyThreshold = normalized.threshold
         persistSearchHighlightPreferences()

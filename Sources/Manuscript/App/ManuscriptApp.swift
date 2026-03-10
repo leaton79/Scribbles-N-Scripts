@@ -678,6 +678,13 @@ private struct SearchPanelSheet: View {
                         in: workspace.searchHighlightSafetyThresholdRange,
                         step: 100
                     )
+                    HStack {
+                        Spacer()
+                        Button("Reset to Defaults") {
+                            workspace.resetSearchHighlightPreferencesToDefaults()
+                        }
+                        .disabled(workspace.usesDefaultSearchHighlightPreferences)
+                    }
                 }
                 .font(.caption)
             }
