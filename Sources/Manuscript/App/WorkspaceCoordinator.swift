@@ -512,25 +512,25 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     private func nextGeneratedChapterTitle() -> String {
-        let existing = projectManager.getManifest().hierarchy.chapters.map(\.title)
-        let usedNumbers = Set(
-            existing.compactMap { title -> Int? in
-                parseGeneratedNumber(from: title, prefix: "chapter")
-            }
+        nextGeneratedTitle(
+            existingTitles: projectManager.getManifest().hierarchy.chapters.map(\.title),
+            parsePrefix: "chapter",
+            displayPrefix: "Chapter"
         )
-
-        var candidate = 1
-        while usedNumbers.contains(candidate) {
-            candidate += 1
-        }
-        return "Chapter \(candidate)"
     }
 
     private func nextGeneratedSceneTitle() -> String {
-        let existing = projectManager.getManifest().hierarchy.scenes.map(\.title)
+        nextGeneratedTitle(
+            existingTitles: projectManager.getManifest().hierarchy.scenes.map(\.title),
+            parsePrefix: "scene",
+            displayPrefix: "Scene"
+        )
+    }
+
+    private func nextGeneratedTitle(existingTitles: [String], parsePrefix: String, displayPrefix: String) -> String {
         let usedNumbers = Set(
-            existing.compactMap { title -> Int? in
-                parseGeneratedNumber(from: title, prefix: "scene")
+            existingTitles.compactMap { title -> Int? in
+                parseGeneratedNumber(from: title, prefix: parsePrefix)
             }
         )
 
@@ -538,7 +538,7 @@ final class WorkspaceCoordinator: ObservableObject {
         while usedNumbers.contains(candidate) {
             candidate += 1
         }
-        return "Scene \(candidate)"
+        return "\(displayPrefix) \(candidate)"
     }
 
     private func parseGeneratedNumber(from title: String, prefix: String) -> Int? {
