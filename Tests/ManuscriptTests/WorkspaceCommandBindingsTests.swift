@@ -149,6 +149,29 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(names[1], "BindingsSwitchB")
     }
 
+    func testSearchBindingsShowPanelsAndRunReplaceAll() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsSearch")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertTrue(bindings.canSearchProject)
+        bindings.showInlineSearch()
+        XCTAssertTrue(workspace.isSearchPanelVisible)
+        XCTAssertEqual(workspace.searchScope, .currentScene)
+
+        workspace.searchQueryText = "alpha"
+        workspace.editorState.insertText("alpha alpha", at: 0)
+        bindings.runSearch()
+        XCTAssertEqual(workspace.searchResults.count, 2)
+
+        workspace.searchReplacementText = "beta"
+        let replaceMessage = bindings.replaceAllSearchResults()
+        XCTAssertEqual(replaceMessage, "Replaced 2 matches across 1 scenes.")
+        XCTAssertEqual(workspace.editorState.getCurrentContent(), "beta beta")
+
+        bindings.hideSearch()
+        XCTAssertFalse(workspace.isSearchPanelVisible)
+    }
+
     func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
         let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

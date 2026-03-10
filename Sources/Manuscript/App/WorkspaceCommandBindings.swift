@@ -69,6 +69,10 @@ struct WorkspaceCommandBindings {
         workspace.canNavigateToNextScene
     }
 
+    var canSearchProject: Bool {
+        workspace.hasOpenProject
+    }
+
     var splitToggleTitle: String {
         workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split"
     }
@@ -160,5 +164,26 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func navigateToNextScene() -> Bool {
         workspace.navigateToNextScene()
+    }
+
+    func showInlineSearch() {
+        workspace.showInlineSearchPanel()
+    }
+
+    func showProjectSearch() {
+        workspace.showProjectSearchPanel()
+    }
+
+    func hideSearch() {
+        workspace.hideSearchPanel()
+    }
+
+    func runSearch() {
+        workspace.runSearch()
+    }
+
+    @discardableResult
+    func replaceAllSearchResults() -> String? {
+        workspace.replaceAllSearchResults()
     }
 }

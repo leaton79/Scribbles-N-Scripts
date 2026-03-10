@@ -291,6 +291,42 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(names.filter { $0 == "SwitchA" }.count, 1)
     }
 
+    func testShowInlineSearchUsesCurrentSceneIncludingUnsavedContent() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchInline")
+        coordinator.editorState.insertText("dragon", at: 0)
+        coordinator.searchQueryText = "dragon"
+
+        coordinator.showInlineSearchPanel()
+
+        XCTAssertTrue(coordinator.isSearchPanelVisible)
+        XCTAssertEqual(coordinator.searchScope, .currentScene)
+        XCTAssertEqual(coordinator.searchResults.count, 1)
+        XCTAssertEqual(coordinator.searchResults.first?.matchText.lowercased(), "dragon")
+    }
+
+    func testProjectSearchReplaceAllUpdatesScenes() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceAll")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "color color")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "color")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "color"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.count, 3)
+
+        coordinator.searchReplacementText = "colour"
+        let message = coordinator.replaceAllSearchResults()
+
+        XCTAssertEqual(message, "Replaced 3 matches across 2 scenes.")
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: firstSceneId), "colour colour")
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "colour")
+    }
+
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
         let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

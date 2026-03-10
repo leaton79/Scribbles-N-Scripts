@@ -130,6 +130,20 @@ struct ManuscriptApp: App {
                 .keyboardShortcut("]", modifiers: [.command])
                 .disabled(!commands.canNavigateToNextScene)
             }
+
+            CommandMenu("Find") {
+                Button("Find in Current Scene") {
+                    NotificationCenter.default.post(name: .showInlineSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command])
+                .disabled(!commands.canSearchProject)
+
+                Button("Find in Project") {
+                    NotificationCenter.default.post(name: .showProjectSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!commands.canSearchProject)
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             workspace.handleScenePhase(newPhase)
@@ -210,6 +224,10 @@ private struct WorkspaceView: View {
                                 projectSwitcherQuery = ""
                                 showingProjectSwitcher = true
                             }
+                            Button("Find") {
+                                commands.showProjectSearch()
+                            }
+                            .disabled(!commands.canSearchProject)
                             Button("New Project") {
                                 newProjectName = ""
                                 showingNewProjectSheet = true
@@ -338,6 +356,12 @@ private struct WorkspaceView: View {
                     projectSwitcherQuery = ""
                     showingProjectSwitcher = true
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .showInlineSearch)) { _ in
+                    commands.showInlineSearch()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .showProjectSearch)) { _ in
+                    commands.showProjectSearch()
+                }
                 .onReceive(NotificationCenter.default.publisher(for: .requestClearRecentProjects)) { _ in
                     pendingRecentAction = .clearAll
                     showingRecentActionConfirmation = true
@@ -419,6 +443,20 @@ private struct WorkspaceView: View {
                             showingProjectSwitcher = false
                         }
                     )
+                }
+                .sheet(
+                    isPresented: Binding(
+                        get: { workspace.isSearchPanelVisible },
+                        set: { isVisible in
+                            if !isVisible {
+                                commands.hideSearch()
+                            }
+                        }
+                    )
+                ) {
+                    SearchPanelSheet(workspace: workspace) { message in
+                        actionNotice = message
+                    }
                 }
                 .alert(recentActionTitle, isPresented: $showingRecentActionConfirmation) {
                     Button("Cancel", role: .cancel) {}
@@ -508,6 +546,116 @@ private struct NewProjectSheet: View {
         }
         .padding(20)
         .frame(minWidth: 360)
+    }
+}
+
+private struct SearchPanelSheet: View {
+    @ObservedObject var workspace: WorkspaceCoordinator
+    let onNotice: (String?) -> Void
+
+    var body: some View {
+        let commands = WorkspaceCommandBindings(workspace: workspace)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Find & Replace")
+                .font(.headline)
+
+            HStack(spacing: 8) {
+                TextField("Find", text: $workspace.searchQueryText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        commands.runSearch()
+                    }
+                Button("Search") {
+                    commands.runSearch()
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("Replace", text: $workspace.searchReplacementText)
+                    .textFieldStyle(.roundedBorder)
+                Button("Replace All") {
+                    onNotice(commands.replaceAllSearchResults())
+                }
+                .disabled(workspace.searchQueryText.isEmpty)
+            }
+
+            HStack(spacing: 12) {
+                Picker("Scope", selection: $workspace.searchScope) {
+                    ForEach(WorkspaceSearchScope.allCases) { scope in
+                        Text(scope.title).tag(scope)
+                    }
+                }
+                .pickerStyle(.menu)
+                Toggle("Regex", isOn: $workspace.searchIsRegex)
+                Toggle("Case Sensitive", isOn: $workspace.searchIsCaseSensitive)
+                Toggle("Whole Word", isOn: $workspace.searchIsWholeWord)
+            }
+            .toggleStyle(.checkbox)
+
+            if let error = workspace.searchErrorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else {
+                Text("\(workspace.searchResults.count) matches")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            List {
+                ForEach(Array(workspace.searchResults.enumerated()), id: \.offset) { _, result in
+                    Button {
+                        workspace.select(
+                            node: SidebarNode(
+                                id: result.sceneId,
+                                title: result.sceneTitle,
+                                level: .scene,
+                                wordCount: 0,
+                                colorLabel: nil,
+                                goalProgressText: nil,
+                                children: [],
+                                matchingCount: nil
+                            )
+                        )
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(result.chapterTitle) • \(result.sceneTitle)")
+                                .font(.subheadline)
+                            Text(result.contextSnippet)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(minHeight: 220)
+
+            HStack {
+                Spacer()
+                Button("Close") {
+                    commands.hideSearch()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 640, minHeight: 420)
+        .onChange(of: workspace.searchQueryText) { _, _ in
+            commands.runSearch()
+        }
+        .onChange(of: workspace.searchScope) { _, _ in
+            commands.runSearch()
+        }
+        .onChange(of: workspace.searchIsRegex) { _, _ in
+            commands.runSearch()
+        }
+        .onChange(of: workspace.searchIsCaseSensitive) { _, _ in
+            commands.runSearch()
+        }
+        .onChange(of: workspace.searchIsWholeWord) { _, _ in
+            commands.runSearch()
+        }
     }
 }
 
@@ -602,6 +750,8 @@ private enum RecentProjectsAction {
 
 private extension Notification.Name {
     static let showProjectSwitcher = Notification.Name("workspace.showProjectSwitcher")
+    static let showInlineSearch = Notification.Name("workspace.showInlineSearch")
+    static let showProjectSearch = Notification.Name("workspace.showProjectSearch")
     static let requestClearRecentProjects = Notification.Name("workspace.requestClearRecentProjects")
     static let requestCleanupMissingRecentProjects = Notification.Name("workspace.requestCleanupMissingRecentProjects")
     static let showSaveAsSheet = Notification.Name("workspace.showSaveAsSheet")

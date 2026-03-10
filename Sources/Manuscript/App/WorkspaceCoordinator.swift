@@ -27,8 +27,18 @@ final class WorkspaceCoordinator: ObservableObject {
     let splitEditorState: SplitEditorState
     let goalsManager: GoalsManager
     private let recentProjectStore: UserDefaults
+    private lazy var searchEngine = makeSearchEngine()
 
     @Published var loadError: String?
+    @Published var isSearchPanelVisible = false
+    @Published var searchQueryText = ""
+    @Published var searchReplacementText = ""
+    @Published var searchScope: WorkspaceSearchScope = .currentScene
+    @Published var searchIsRegex = false
+    @Published var searchIsCaseSensitive = false
+    @Published var searchIsWholeWord = false
+    @Published private(set) var searchResults: [SearchResult] = []
+    @Published private(set) var searchErrorMessage: String?
 
     var hasOpenProject: Bool {
         projectManager.currentProject != nil
@@ -175,6 +185,7 @@ final class WorkspaceCoordinator: ObservableObject {
                 dependencies.linearState.goToScene(id: first)
                 dependencies.splitEditorState.primarySceneId = first
             }
+            startSearchIndexing()
         } catch {
             self.loadError = error.localizedDescription
             let dependencies = Self.makeDependencies(
@@ -342,6 +353,54 @@ final class WorkspaceCoordinator: ObservableObject {
 
         if let last = recentProjectStore.string(forKey: Self.lastOpenedProjectPathKey), !cleaned.contains(last) {
             recentProjectStore.removeObject(forKey: Self.lastOpenedProjectPathKey)
+        }
+    }
+
+    func showInlineSearchPanel() {
+        guard hasOpenProject else { return }
+        isSearchPanelVisible = true
+        searchScope = .currentScene
+        runSearch()
+    }
+
+    func showProjectSearchPanel() {
+        guard hasOpenProject else { return }
+        isSearchPanelVisible = true
+        searchScope = .entireProject
+        runSearch()
+    }
+
+    func hideSearchPanel() {
+        isSearchPanelVisible = false
+    }
+
+    func runSearch() {
+        guard hasOpenProject else {
+            searchResults = []
+            searchErrorMessage = nil
+            return
+        }
+        let query = makeSearchQuery()
+        searchResults = searchEngine.search(query: query)
+        searchErrorMessage = searchEngine.lastErrorMessage
+    }
+
+    @discardableResult
+    func replaceAllSearchResults() -> String? {
+        guard hasOpenProject else {
+            return "Could not replace: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
+        guard !searchQueryText.isEmpty else {
+            return "Could not replace: Search text cannot be empty."
+        }
+        do {
+            let report = try searchEngine.replaceAll(query: makeSearchQuery(), replacement: searchReplacementText)
+            refreshDerivedStates()
+            reloadOpenEditorScenes()
+            runSearch()
+            return "Replaced \(report.replacementCount) matches across \(report.scenesAffected) scenes."
+        } catch {
+            return "Could not replace: \(error.localizedDescription)"
         }
     }
 
@@ -720,6 +779,7 @@ final class WorkspaceCoordinator: ObservableObject {
         }
 
         persistLastOpenedProject()
+        startSearchIndexing()
     }
 
     private func projectRootForNewProjects() throws -> URL {
@@ -782,9 +842,53 @@ final class WorkspaceCoordinator: ObservableObject {
         recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
     }
 
+    private func makeSearchEngine() -> IndexedSearchEngine {
+        IndexedSearchEngine(
+            projectManager: projectManager,
+            currentSceneProvider: { [weak self] in
+                self?.editorState.currentSceneId
+            },
+            currentChapterProvider: { [weak self] in
+                self?.navigationState.selectedChapterId
+            },
+            unsavedSceneProvider: { [weak self] in
+                guard let self, let sceneId = self.editorState.currentSceneId else { return nil }
+                return (sceneId, self.editorState.getCurrentContent())
+            }
+        )
+    }
+
+    private func makeSearchQuery() -> SearchQuery {
+        SearchQuery(
+            text: searchQueryText,
+            isRegex: searchIsRegex,
+            isCaseSensitive: searchIsCaseSensitive,
+            isWholeWord: searchIsWholeWord,
+            scope: searchScope.searchScope
+        )
+    }
+
+    private func startSearchIndexing() {
+        Task { @MainActor [weak self] in
+            guard let self, let project = self.projectManager.currentProject else { return }
+            await self.searchEngine.buildIndex(for: project)
+        }
+    }
+
     private func refreshDerivedStates() {
         linearState.reloadSequence()
         modularState.reload()
+    }
+
+    private func reloadOpenEditorScenes() {
+        if let primary = splitEditorState.primarySceneId {
+            splitEditorState.primaryEditor.navigateToScene(id: primary)
+            editorState.navigateToScene(id: primary)
+            navigationState.navigateTo(sceneId: primary)
+        }
+        if splitEditorState.isSplit, let secondary = splitEditorState.secondarySceneId {
+            splitEditorState.secondaryEditor.navigateToScene(id: secondary)
+        }
     }
 
     private func resolveChapterForSceneCreation() throws -> UUID {
