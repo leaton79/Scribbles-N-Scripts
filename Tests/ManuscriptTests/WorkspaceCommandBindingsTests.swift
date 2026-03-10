@@ -8,6 +8,8 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
     override func setUpWithError() throws {
         tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightCap")
+        UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightSafetyThreshold")
     }
 
     override func tearDownWithError() throws {

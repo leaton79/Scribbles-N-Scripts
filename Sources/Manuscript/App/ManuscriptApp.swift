@@ -658,6 +658,30 @@ private struct SearchPanelSheet: View {
                 }
             }
 
+            GroupBox("Highlight Settings") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Stepper(
+                        "Highlight cap: \(workspace.searchHighlightCap)",
+                        value: Binding(
+                            get: { workspace.searchHighlightCap },
+                            set: { workspace.updateSearchHighlightCap($0) }
+                        ),
+                        in: workspace.searchHighlightCapRange,
+                        step: 10
+                    )
+                    Stepper(
+                        "Show-all safety threshold: \(workspace.searchHighlightSafetyThreshold)",
+                        value: Binding(
+                            get: { workspace.searchHighlightSafetyThreshold },
+                            set: { workspace.updateSearchHighlightSafetyThreshold($0) }
+                        ),
+                        in: workspace.searchHighlightSafetyThresholdRange,
+                        step: 100
+                    )
+                }
+                .font(.caption)
+            }
+
             List {
                 ForEach(Array(workspace.searchResults.enumerated()), id: \.offset) { index, result in
                     Button {

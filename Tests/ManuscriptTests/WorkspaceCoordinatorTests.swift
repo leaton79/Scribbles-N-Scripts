@@ -9,6 +9,8 @@ final class WorkspaceCoordinatorTests: XCTestCase {
     override func setUpWithError() throws {
         tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightCap")
+        UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightSafetyThreshold")
     }
 
     override func tearDownWithError() throws {
@@ -445,6 +447,45 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         coordinator.toggleShowAllSearchHighlights()
         XCTAssertFalse(coordinator.searchShowAllHighlights)
         XCTAssertEqual(coordinator.editorState.searchHighlightRanges.count, coordinator.searchHighlightCap)
+    }
+
+    func testSearchHighlightPreferencesPersistAcrossCoordinatorInstances() throws {
+        let suiteName = "WorkspaceCoordinatorTests.HighlightPrefs.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "SearchHighlightPrefs",
+            splitSettingsStore: defaults,
+            recentProjectStore: defaults,
+            searchPreferenceStore: defaults
+        )
+        first.updateSearchHighlightCap(180)
+        first.updateSearchHighlightSafetyThreshold(3_500)
+        try first.projectManager.closeProject()
+
+        let second = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "SearchHighlightPrefs",
+            splitSettingsStore: defaults,
+            recentProjectStore: defaults,
+            searchPreferenceStore: defaults
+        )
+
+        XCTAssertEqual(second.searchHighlightCap, 180)
+        XCTAssertEqual(second.searchHighlightSafetyThreshold, 3_500)
+    }
+
+    func testSearchHighlightPreferenceNormalizationKeepsThresholdAboveCap() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchHighlightPrefNormalization")
+
+        coordinator.updateSearchHighlightCap(5_000)
+        XCTAssertEqual(coordinator.searchHighlightCap, 1_000)
+        XCTAssertGreaterThan(coordinator.searchHighlightSafetyThreshold, coordinator.searchHighlightCap)
+
+        coordinator.updateSearchHighlightSafetyThreshold(100)
+        XCTAssertGreaterThan(coordinator.searchHighlightSafetyThreshold, coordinator.searchHighlightCap)
     }
 
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {

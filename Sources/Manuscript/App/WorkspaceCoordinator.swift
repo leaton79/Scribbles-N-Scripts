@@ -16,7 +16,15 @@ struct RecentProjectsSnapshot: Equatable {
 final class WorkspaceCoordinator: ObservableObject {
     private static let lastOpenedProjectPathKey = "workspace.lastOpenedProjectPath"
     private static let recentProjectsKey = "workspace.recentProjects"
+    private static let searchHighlightCapKey = "workspace.searchHighlightCap"
+    private static let searchHighlightSafetyThresholdKey = "workspace.searchHighlightSafetyThreshold"
     private static let maxRecentProjects = 10
+    private static let defaultSearchHighlightCap = 100
+    private static let defaultSearchHighlightSafetyThreshold = 2_000
+    private static let minSearchHighlightCap = 10
+    private static let maxSearchHighlightCap = 1_000
+    private static let minSearchHighlightSafetyThreshold = 100
+    private static let maxSearchHighlightSafetyThreshold = 20_000
 
     let projectManager: FileSystemProjectManager
     let navigationState: NavigationState
@@ -27,6 +35,7 @@ final class WorkspaceCoordinator: ObservableObject {
     let splitEditorState: SplitEditorState
     let goalsManager: GoalsManager
     private let recentProjectStore: UserDefaults
+    private let searchPreferenceStore: UserDefaults
     private lazy var searchEngine = makeSearchEngine()
 
     @Published var loadError: String?
@@ -38,6 +47,8 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published var searchIsCaseSensitive = false
     @Published var searchIsWholeWord = false
     @Published var searchShowAllHighlights = false
+    @Published private(set) var searchHighlightCap: Int
+    @Published private(set) var searchHighlightSafetyThreshold: Int
     @Published private(set) var searchResults: [SearchResult] = []
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var currentSearchResultIndex: Int?
@@ -156,10 +167,21 @@ final class WorkspaceCoordinator: ObservableObject {
         bootstrapRootURL: URL? = nil,
         bootstrapProjectName: String = "Sandbox",
         splitSettingsStore: UserDefaults = .standard,
-        recentProjectStore: UserDefaults = .standard
+        recentProjectStore: UserDefaults = .standard,
+        searchPreferenceStore: UserDefaults = .standard
     ) {
         self.projectManager = manager
         self.recentProjectStore = recentProjectStore
+        self.searchPreferenceStore = searchPreferenceStore
+        let storedCap = searchPreferenceStore.object(forKey: Self.searchHighlightCapKey) != nil
+            ? searchPreferenceStore.integer(forKey: Self.searchHighlightCapKey)
+            : Self.defaultSearchHighlightCap
+        let storedThreshold = searchPreferenceStore.object(forKey: Self.searchHighlightSafetyThresholdKey) != nil
+            ? searchPreferenceStore.integer(forKey: Self.searchHighlightSafetyThresholdKey)
+            : Self.defaultSearchHighlightSafetyThreshold
+        let normalized = Self.normalizeSearchHighlightPreferences(cap: storedCap, threshold: storedThreshold)
+        self.searchHighlightCap = normalized.cap
+        self.searchHighlightSafetyThreshold = normalized.threshold
 
         do {
             try Self.bootstrapProject(
@@ -203,6 +225,7 @@ final class WorkspaceCoordinator: ObservableObject {
             self.splitEditorState = dependencies.splitEditorState
             self.goalsManager = dependencies.goalsManager
             self.goalsManager.bind(to: self.editorState)
+            persistSearchHighlightPreferences()
         }
     }
 
@@ -493,8 +516,13 @@ final class WorkspaceCoordinator: ObservableObject {
         selectSearchResult(at: previous)
     }
 
-    var searchHighlightCap: Int { 100 }
-    var searchHighlightSafetyThreshold: Int { 2_000 }
+    var searchHighlightCapRange: ClosedRange<Int> {
+        Self.minSearchHighlightCap...Self.maxSearchHighlightCap
+    }
+
+    var searchHighlightSafetyThresholdRange: ClosedRange<Int> {
+        Self.minSearchHighlightSafetyThreshold...Self.maxSearchHighlightSafetyThreshold
+    }
 
     var hiddenSearchHighlightCount: Int {
         guard !searchShowAllHighlights else { return 0 }
@@ -534,6 +562,28 @@ final class WorkspaceCoordinator: ObservableObject {
         }
         guard canEnableShowAllSearchHighlights else { return }
         searchShowAllHighlights = true
+        updateEditorSearchHighlights()
+    }
+
+    func updateSearchHighlightCap(_ value: Int) {
+        let normalized = Self.normalizeSearchHighlightPreferences(cap: value, threshold: searchHighlightSafetyThreshold)
+        searchHighlightCap = normalized.cap
+        searchHighlightSafetyThreshold = normalized.threshold
+        persistSearchHighlightPreferences()
+        if searchShowAllHighlights && !canUseShowAllHighlightsForCurrentContext() {
+            searchShowAllHighlights = false
+        }
+        updateEditorSearchHighlights()
+    }
+
+    func updateSearchHighlightSafetyThreshold(_ value: Int) {
+        let normalized = Self.normalizeSearchHighlightPreferences(cap: searchHighlightCap, threshold: value)
+        searchHighlightCap = normalized.cap
+        searchHighlightSafetyThreshold = normalized.threshold
+        persistSearchHighlightPreferences()
+        if searchShowAllHighlights && !canUseShowAllHighlightsForCurrentContext() {
+            searchShowAllHighlights = false
+        }
         updateEditorSearchHighlights()
     }
 
@@ -973,6 +1023,18 @@ final class WorkspaceCoordinator: ObservableObject {
 
     private func recentProjectPaths() -> [String] {
         recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
+    }
+
+    private static func normalizeSearchHighlightPreferences(cap: Int, threshold: Int) -> (cap: Int, threshold: Int) {
+        let normalizedCap = min(max(cap, minSearchHighlightCap), maxSearchHighlightCap)
+        let minimumThreshold = max(normalizedCap + 1, minSearchHighlightSafetyThreshold)
+        let normalizedThreshold = min(max(threshold, minimumThreshold), maxSearchHighlightSafetyThreshold)
+        return (normalizedCap, normalizedThreshold)
+    }
+
+    private func persistSearchHighlightPreferences() {
+        searchPreferenceStore.set(searchHighlightCap, forKey: Self.searchHighlightCapKey)
+        searchPreferenceStore.set(searchHighlightSafetyThreshold, forKey: Self.searchHighlightSafetyThresholdKey)
     }
 
     private func makeSearchEngine() -> IndexedSearchEngine {
