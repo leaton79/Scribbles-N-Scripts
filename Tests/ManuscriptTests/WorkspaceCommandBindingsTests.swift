@@ -253,6 +253,22 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertFalse(bindings.canResetSearchHighlightSettings)
     }
 
+    func testReplacePreviewBulkSelectionCommands() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsReplacePreviewBulk")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertFalse(bindings.canBulkSelectReplaceScenes)
+        workspace.editorState.replaceText(in: 0..<workspace.editorState.getCurrentContent().count, with: "one one")
+        workspace.searchQueryText = "one"
+        bindings.showInlineSearch()
+        XCTAssertTrue(bindings.canBulkSelectReplaceScenes)
+
+        bindings.excludeAllReplaceScenes()
+        XCTAssertEqual(workspace.selectedReplaceSceneCount, 0)
+        bindings.includeAllReplaceScenes()
+        XCTAssertGreaterThan(workspace.selectedReplaceSceneCount, 0)
+    }
+
     func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
         let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

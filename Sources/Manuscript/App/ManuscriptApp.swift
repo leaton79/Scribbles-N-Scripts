@@ -158,6 +158,20 @@ struct ManuscriptApp: App {
                 }
                 .keyboardShortcut("0", modifiers: [.command, .option])
                 .disabled(!commands.canResetSearchHighlightSettings)
+
+                Divider()
+
+                Button("Include All Preview Scenes") {
+                    commands.includeAllReplaceScenes()
+                }
+                .keyboardShortcut("i", modifiers: [.command, .option])
+                .disabled(!commands.canBulkSelectReplaceScenes)
+
+                Button("Exclude All Preview Scenes") {
+                    commands.excludeAllReplaceScenes()
+                }
+                .keyboardShortcut("u", modifiers: [.command, .option])
+                .disabled(!commands.canBulkSelectReplaceScenes)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -568,6 +582,7 @@ private struct SearchPanelSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @State private var showingReplaceConfirmation = false
+    @State private var quickSelectThreshold = 1
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
@@ -626,6 +641,13 @@ private struct SearchPanelSheet: View {
                         .foregroundStyle(.secondary)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
+                        Picker("Selection Mode", selection: $workspace.replaceSceneSelectionMode) {
+                            ForEach(ReplaceSceneSelectionMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
                         HStack {
                             Text("\(workspace.selectedReplaceSceneCount) of \(sceneReplacePreviewItems.count) scenes selected")
                                 .foregroundStyle(.secondary)
@@ -636,6 +658,13 @@ private struct SearchPanelSheet: View {
                             .buttonStyle(.borderless)
                             Button("Exclude All") {
                                 workspace.excludeAllReplaceScenes()
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        HStack {
+                            Stepper("Match threshold: >\(quickSelectThreshold)", value: $quickSelectThreshold, in: 0...500, step: 1)
+                            Button("Select >N Matches") {
+                                workspace.includeReplaceScenes(withMatchCountGreaterThan: quickSelectThreshold)
                             }
                             .buttonStyle(.borderless)
                         }
@@ -664,7 +693,7 @@ private struct SearchPanelSheet: View {
                     .font(.caption)
                 }
             }
-            Text("Shortcuts: Return Next, Shift+Return Previous, Option+Command+H Toggle Highlights, Option+Command+0 Reset Highlight Settings.")
+            Text("Shortcuts: Return Next, Shift+Return Previous, Option+Command+H Toggle Highlights, Option+Command+0 Reset Highlight Settings, Option+Command+I Include All Scenes, Option+Command+U Exclude All Scenes.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 

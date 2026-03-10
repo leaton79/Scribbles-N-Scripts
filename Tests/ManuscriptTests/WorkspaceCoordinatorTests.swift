@@ -367,6 +367,67 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.editorState.getCurrentContent(), "color color")
     }
 
+    func testReplaceSceneSelectionModeKeepManualSelectionPersistsAcrossSearchRuns() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchSelectionModeKeep")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "token")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "token")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "token"
+        coordinator.runSearch()
+        coordinator.replaceSceneSelectionMode = .keepManualSelection
+        coordinator.setSceneIncludedForReplace(secondScene.id, included: false)
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 1)
+
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 1)
+        XCTAssertFalse(coordinator.isSceneIncludedForReplace(secondScene.id))
+    }
+
+    func testReplaceSceneSelectionModeResetOnSearchResetsSelection() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchSelectionModeReset")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "token")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "token")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "token"
+        coordinator.runSearch()
+        coordinator.replaceSceneSelectionMode = .resetOnSearch
+        coordinator.setSceneIncludedForReplace(secondScene.id, included: false)
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 1)
+
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 2)
+        XCTAssertTrue(coordinator.isSceneIncludedForReplace(secondScene.id))
+    }
+
+    func testIncludeReplaceScenesWithMatchCountGreaterThanThreshold() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchSelectionThreshold")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "x x x")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "x")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "x"
+        coordinator.runSearch()
+        coordinator.includeReplaceScenes(withMatchCountGreaterThan: 1)
+
+        XCTAssertTrue(coordinator.isSceneIncludedForReplace(firstSceneId))
+        XCTAssertFalse(coordinator.isSceneIncludedForReplace(secondScene.id))
+        XCTAssertEqual(coordinator.selectedReplaceSceneCount, 1)
+    }
+
     func testReplaceNextSearchResultUpdatesCurrentMatchOnly() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceNext")
         coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "color color color")

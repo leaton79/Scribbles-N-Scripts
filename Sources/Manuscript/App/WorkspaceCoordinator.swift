@@ -12,6 +12,22 @@ struct RecentProjectsSnapshot: Equatable {
     let lastOpenedPath: String?
 }
 
+enum ReplaceSceneSelectionMode: String, CaseIterable, Identifiable {
+    case resetOnSearch
+    case keepManualSelection
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .resetOnSearch:
+            return "Reset on Search"
+        case .keepManualSelection:
+            return "Keep Manual Selection"
+        }
+    }
+}
+
 @MainActor
 final class WorkspaceCoordinator: ObservableObject {
     private static let lastOpenedProjectPathKey = "workspace.lastOpenedProjectPath"
@@ -54,6 +70,7 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var currentSearchResultIndex: Int?
     @Published private(set) var includedReplaceSceneIDs: Set<UUID> = []
+    @Published var replaceSceneSelectionMode: ReplaceSceneSelectionMode = .resetOnSearch
     private var replaceSceneUniverse: Set<UUID> = []
 
     var hasOpenProject: Bool {
@@ -481,6 +498,22 @@ final class WorkspaceCoordinator: ObservableObject {
 
     func excludeAllReplaceScenes() {
         includedReplaceSceneIDs = []
+    }
+
+    var canBulkSelectReplaceScenes: Bool {
+        !replaceSceneUniverse.isEmpty
+    }
+
+    func includeReplaceScenes(withMatchCountGreaterThan threshold: Int) {
+        guard canBulkSelectReplaceScenes else { return }
+        let minimum = max(0, threshold)
+        var counts: [UUID: Int] = [:]
+        for result in searchResults {
+            counts[result.sceneId, default: 0] += 1
+        }
+        includedReplaceSceneIDs = Set(counts.compactMap { sceneID, count in
+            count > minimum ? sceneID : nil
+        })
     }
 
     @discardableResult
@@ -1095,7 +1128,7 @@ final class WorkspaceCoordinator: ObservableObject {
 
     private func synchronizeReplaceSceneSelection() {
         let available = Set(searchResults.map(\.sceneId))
-        if replaceSceneUniverse.isEmpty {
+        if replaceSceneUniverse.isEmpty || replaceSceneSelectionMode == .resetOnSearch {
             includedReplaceSceneIDs = available
             replaceSceneUniverse = available
             return

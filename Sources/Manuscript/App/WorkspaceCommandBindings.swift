@@ -85,6 +85,10 @@ struct WorkspaceCommandBindings {
         !workspace.usesDefaultSearchHighlightPreferences
     }
 
+    var canBulkSelectReplaceScenes: Bool {
+        workspace.canBulkSelectReplaceScenes
+    }
+
     var searchResultPositionText: String {
         workspace.searchResultPositionText
     }
@@ -230,5 +234,13 @@ struct WorkspaceCommandBindings {
 
     func resetSearchHighlightSettings() {
         workspace.resetSearchHighlightPreferencesToDefaults()
+    }
+
+    func includeAllReplaceScenes() {
+        workspace.includeAllReplaceScenes()
+    }
+
+    func excludeAllReplaceScenes() {
+        workspace.excludeAllReplaceScenes()
     }
 }
