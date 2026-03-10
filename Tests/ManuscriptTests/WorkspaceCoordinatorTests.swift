@@ -602,6 +602,55 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.canNavigateToNextScene)
     }
 
+    func testCommandAvailabilityMatrixAcrossBoundaryStates() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandAvailabilityMatrix")
+
+        // Baseline: one-scene linear project.
+        XCTAssertTrue(coordinator.canToggleSplitEditor)
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+
+        // Two-scene linear project at first scene.
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        coordinator.linearState.reloadSequence()
+        let firstScene = try XCTUnwrap(coordinator.linearState.orderedSceneIds.first)
+        coordinator.editorState.navigateToScene(id: firstScene)
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertTrue(coordinator.canNavigateToNextScene)
+
+        // Two-scene linear project at second scene.
+        coordinator.editorState.navigateToScene(id: secondScene.id)
+        XCTAssertTrue(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+
+        // Modular mode with no split open disables toggle and navigation.
+        coordinator.setMode(.modular)
+        XCTAssertFalse(coordinator.canToggleSplitEditor)
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+
+        // Split open remains closable outside linear mode.
+        coordinator.modeController.switchTo(.linear)
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 1200)
+        coordinator.modeController.switchTo(.modular)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertTrue(coordinator.canToggleSplitEditor)
+
+        // Stale selected/current scene IDs still allow split via valid sequence fallback.
+        coordinator.splitEditorState.closeSplit()
+        coordinator.modeController.switchTo(.linear)
+        coordinator.navigationState.selectedSceneId = UUID()
+        coordinator.editorState.currentSceneId = UUID()
+        XCTAssertTrue(coordinator.canToggleSplitEditor)
+
+        // No project means all command availability is disabled.
+        try coordinator.projectManager.closeProject()
+        XCTAssertFalse(coordinator.canToggleSplitEditor)
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+    }
+
     func testSelectBreadcrumbChapterNavigatesChapterAndFirstScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BreadcrumbChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
