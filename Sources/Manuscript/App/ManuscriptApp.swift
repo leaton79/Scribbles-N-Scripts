@@ -516,6 +516,7 @@ private struct ProjectSwitcherSheet: View {
     let projects: [RecentProjectEntry]
     let onCancel: () -> Void
     let onSelect: (RecentProjectEntry) -> Void
+    @State private var selectedProjectID: RecentProjectEntry.ID?
 
     private var filteredProjects: [RecentProjectEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -526,33 +527,97 @@ private struct ProjectSwitcherSheet: View {
         }
     }
 
+    private var selectedProject: RecentProjectEntry? {
+        if let selectedProjectID {
+            return filteredProjects.first(where: { $0.id == selectedProjectID })
+        }
+        return filteredProjects.first
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Switch Project")
                 .font(.headline)
             TextField("Search projects", text: $query)
                 .textFieldStyle(.roundedBorder)
-            List(filteredProjects) { project in
-                Button {
-                    onSelect(project)
-                } label: {
+                .onSubmit(openSelectedProject)
+            List(selection: $selectedProjectID) {
+                ForEach(filteredProjects) { project in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(project.name)
                         Text(project.url.path)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .tag(project.id)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        onSelect(project)
+                    }
+                    .onTapGesture {
+                        selectedProjectID = project.id
+                    }
                 }
-                .buttonStyle(.plain)
             }
             .frame(minHeight: 220)
+            .onMoveCommand { direction in
+                switch direction {
+                case .down:
+                    moveSelection(offset: 1)
+                case .up:
+                    moveSelection(offset: -1)
+                default:
+                    break
+                }
+            }
+            .onExitCommand(perform: onCancel)
             HStack {
                 Spacer()
                 Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("Open") {
+                    openSelectedProject()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(selectedProject == nil)
             }
         }
         .padding(20)
         .frame(minWidth: 480, minHeight: 360)
+        .onAppear {
+            if selectedProjectID == nil {
+                selectedProjectID = filteredProjects.first?.id
+            }
+        }
+        .onChange(of: filteredProjects.map(\.id)) { _, ids in
+            guard !ids.isEmpty else {
+                selectedProjectID = nil
+                return
+            }
+            if let selectedProjectID, ids.contains(selectedProjectID) {
+                return
+            }
+            selectedProjectID = ids[0]
+        }
+    }
+
+    private func moveSelection(offset: Int) {
+        guard !filteredProjects.isEmpty else {
+            selectedProjectID = nil
+            return
+        }
+        guard let currentSelectionID = selectedProjectID,
+              let index = filteredProjects.firstIndex(where: { $0.id == currentSelectionID }) else {
+            selectedProjectID = filteredProjects[0].id
+            return
+        }
+        let nextIndex = max(0, min(filteredProjects.count - 1, index + offset))
+        selectedProjectID = filteredProjects[nextIndex].id
+    }
+
+    private func openSelectedProject() {
+        guard let selectedProject else { return }
+        onSelect(selectedProject)
     }
 }
 
