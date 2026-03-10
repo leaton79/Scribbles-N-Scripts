@@ -111,4 +111,19 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertFalse(bindings.navigateToPreviousScene())
         XCTAssertFalse(bindings.navigateToNextScene())
     }
+
+    func testNoProjectModeSwitchCommandsAreSafeNoOps() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsNoProjectModeSwitch")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        try workspace.projectManager.closeProject()
+
+        XCTAssertEqual(workspace.modeController.activeMode, .linear)
+        XCTAssertFalse(bindings.canSwitchToLinearMode)
+        XCTAssertFalse(bindings.canSwitchToModularMode)
+
+        bindings.setModeModular()
+        XCTAssertEqual(workspace.modeController.activeMode, .linear)
+        bindings.setModeLinear()
+        XCTAssertEqual(workspace.modeController.activeMode, .linear)
+    }
 }
