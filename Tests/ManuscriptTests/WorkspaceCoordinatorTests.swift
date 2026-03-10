@@ -753,6 +753,41 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.canSaveProject)
     }
 
+    func testSaveAvailabilityMatrixAcrossEditorSplitAndNoProjectTransitions() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAvailabilityMatrix")
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertFalse(coordinator.canSaveProject)
+
+        // Primary editor dirty state enables save.
+        coordinator.editorState.insertText("dirty primary", at: 0)
+        XCTAssertTrue(coordinator.hasUnsavedChanges)
+        XCTAssertTrue(coordinator.canSaveProject)
+
+        _ = coordinator.saveProjectNow()
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertFalse(coordinator.canSaveProject)
+
+        // Split secondary dirty state enables save.
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        coordinator.linearState.reloadSequence()
+        coordinator.editorState.navigateToScene(id: secondScene.id)
+        coordinator.navigationState.navigateTo(sceneId: secondScene.id)
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 1200)
+        coordinator.splitEditorState.secondaryEditor.insertText("dirty secondary", at: 0)
+        XCTAssertTrue(coordinator.hasUnsavedChanges)
+        XCTAssertTrue(coordinator.canSaveProject)
+
+        _ = coordinator.saveProjectNow()
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertFalse(coordinator.canSaveProject)
+
+        // No project disables save availability regardless of prior state.
+        try coordinator.projectManager.closeProject()
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertFalse(coordinator.canSaveProject)
+    }
+
     func testHasUnsavedChangesReflectsSplitPaneDirtyState() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DirtySplitIndicator")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
