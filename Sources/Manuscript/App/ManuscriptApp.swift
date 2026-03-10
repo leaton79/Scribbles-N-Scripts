@@ -58,13 +58,13 @@ struct ManuscriptApp: App {
                     _ = workspace.navigateToPreviousScene()
                 }
                 .keyboardShortcut("[", modifiers: [.command])
-                .disabled(workspace.modeController.activeMode != .linear)
+                .disabled(!workspace.canNavigateToPreviousScene)
 
                 Button("Next Scene") {
                     _ = workspace.navigateToNextScene()
                 }
                 .keyboardShortcut("]", modifiers: [.command])
-                .disabled(workspace.modeController.activeMode != .linear)
+                .disabled(!workspace.canNavigateToNextScene)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

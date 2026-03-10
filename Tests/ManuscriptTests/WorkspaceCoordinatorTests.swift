@@ -299,6 +299,30 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.editorState.currentSceneId, before)
     }
 
+    func testNavigationAvailabilityReflectsLinearBoundaries() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NavigationAvailability")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+        coordinator.linearState.reloadSequence()
+        let firstScene = try XCTUnwrap(coordinator.linearState.orderedSceneIds.first)
+
+        coordinator.editorState.navigateToScene(id: firstScene)
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertTrue(coordinator.canNavigateToNextScene)
+
+        coordinator.editorState.navigateToScene(id: secondScene.id)
+        XCTAssertTrue(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+    }
+
+    func testNavigationAvailabilityDisabledOutsideLinearMode() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NavigationAvailabilityMode")
+        coordinator.setMode(.modular)
+
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+    }
+
     func testSelectBreadcrumbChapterNavigatesChapterAndFirstScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BreadcrumbChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)

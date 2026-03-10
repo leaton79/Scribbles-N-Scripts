@@ -32,6 +32,24 @@ final class WorkspaceCoordinator: ObservableObject {
         hasUnsavedChanges
     }
 
+    var canNavigateToNextScene: Bool {
+        guard modeController.activeMode == .linear,
+              let current = editorState.currentSceneId,
+              let index = linearState.orderedSceneIds.firstIndex(of: current) else {
+            return false
+        }
+        return index + 1 < linearState.orderedSceneIds.count
+    }
+
+    var canNavigateToPreviousScene: Bool {
+        guard modeController.activeMode == .linear,
+              let current = editorState.currentSceneId,
+              let index = linearState.orderedSceneIds.firstIndex(of: current) else {
+            return false
+        }
+        return index > 0
+    }
+
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
