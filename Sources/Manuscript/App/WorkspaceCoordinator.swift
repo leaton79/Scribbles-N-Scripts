@@ -47,6 +47,7 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published var searchIsCaseSensitive = false
     @Published var searchIsWholeWord = false
     @Published var searchShowAllHighlights = false
+    @Published var isSearchHighlightHelpVisible = false
     @Published private(set) var searchHighlightCap: Int
     @Published private(set) var searchHighlightSafetyThreshold: Int
     @Published private(set) var searchResults: [SearchResult] = []
@@ -398,6 +399,7 @@ final class WorkspaceCoordinator: ObservableObject {
     func hideSearchPanel() {
         isSearchPanelVisible = false
         searchShowAllHighlights = false
+        isSearchHighlightHelpVisible = false
         clearEditorSearchHighlights()
     }
 
@@ -604,6 +606,15 @@ final class WorkspaceCoordinator: ObservableObject {
             searchShowAllHighlights = false
         }
         updateEditorSearchHighlights()
+    }
+
+    func showSearchHighlightHelp() {
+        guard isSearchPanelVisible else { return }
+        isSearchHighlightHelpVisible = true
+    }
+
+    func hideSearchHighlightHelp() {
+        isSearchHighlightHelpVisible = false
     }
 
     @discardableResult

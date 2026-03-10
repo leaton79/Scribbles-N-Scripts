@@ -502,6 +502,24 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.usesDefaultSearchHighlightPreferences)
     }
 
+    func testSearchHighlightHelpVisibilityShowAndDismiss() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchHighlightHelp")
+
+        coordinator.showSearchHighlightHelp()
+        XCTAssertFalse(coordinator.isSearchHighlightHelpVisible)
+
+        coordinator.showInlineSearchPanel()
+        coordinator.showSearchHighlightHelp()
+        XCTAssertTrue(coordinator.isSearchHighlightHelpVisible)
+
+        coordinator.hideSearchHighlightHelp()
+        XCTAssertFalse(coordinator.isSearchHighlightHelpVisible)
+
+        coordinator.showSearchHighlightHelp()
+        coordinator.hideSearchPanel()
+        XCTAssertFalse(coordinator.isSearchHighlightHelpVisible)
+    }
+
     func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
         let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

@@ -152,6 +152,12 @@ struct ManuscriptApp: App {
                 }
                 .keyboardShortcut("h", modifiers: [.command, .option])
                 .disabled(!commands.canToggleSearchHighlightDisplayMode)
+
+                Button("Reset Highlight Settings") {
+                    commands.resetSearchHighlightSettings()
+                }
+                .keyboardShortcut("0", modifiers: [.command, .option])
+                .disabled(!commands.canResetSearchHighlightSettings)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -562,7 +568,6 @@ private struct SearchPanelSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @State private var showingReplaceConfirmation = false
-    @State private var showingHighlightSettingsHelp = false
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
@@ -612,6 +617,31 @@ private struct SearchPanelSheet: View {
                     }
                 }
                 .disabled(workspace.searchQueryText.isEmpty)
+            }
+
+            GroupBox("Replace Preview") {
+                if sceneReplacePreviewItems.isEmpty {
+                    Text("No scene matches to preview.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(sceneReplacePreviewItems.prefix(8).enumerated()), id: \.element.id) { _, item in
+                            HStack {
+                                Text("\(item.chapterTitle) • \(item.sceneTitle)")
+                                    .lineLimit(1)
+                                Spacer()
+                                Text("\(item.matchCount)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if sceneReplacePreviewItems.count > 8 {
+                            Text("+ \(sceneReplacePreviewItems.count - 8) more scenes")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.caption)
+                }
             }
 
             HStack(spacing: 12) {
@@ -696,13 +726,13 @@ private struct SearchPanelSheet: View {
                 HStack(spacing: 6) {
                     Text("Highlight Settings")
                     Button {
-                        showingHighlightSettingsHelp = true
+                        workspace.showSearchHighlightHelp()
                     } label: {
                         Image(systemName: "info.circle")
                     }
                     .buttonStyle(.plain)
                     .help("Learn how cap and safety threshold work")
-                    .popover(isPresented: $showingHighlightSettingsHelp, arrowEdge: .bottom) {
+                    .popover(isPresented: $workspace.isSearchHighlightHelpVisible, arrowEdge: .bottom) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Highlight Settings")
                                 .font(.headline)
@@ -774,6 +804,37 @@ private struct SearchPanelSheet: View {
     private var replacePreview: (replacementCount: Int, scenesAffected: Int) {
         let scenesAffected = Set(workspace.searchResults.map(\.sceneId)).count
         return (workspace.searchResults.count, scenesAffected)
+    }
+
+    private struct SceneReplacePreviewItem: Identifiable {
+        let id: UUID
+        let chapterTitle: String
+        let sceneTitle: String
+        let matchCount: Int
+    }
+
+    private var sceneReplacePreviewItems: [SceneReplacePreviewItem] {
+        var orderedIds: [UUID] = []
+        var counts: [UUID: Int] = [:]
+        var metadata: [UUID: (chapterTitle: String, sceneTitle: String)] = [:]
+
+        for result in workspace.searchResults {
+            if counts[result.sceneId] == nil {
+                orderedIds.append(result.sceneId)
+                metadata[result.sceneId] = (result.chapterTitle, result.sceneTitle)
+            }
+            counts[result.sceneId, default: 0] += 1
+        }
+
+        return orderedIds.compactMap { sceneId in
+            guard let matchCount = counts[sceneId], let details = metadata[sceneId] else { return nil }
+            return SceneReplacePreviewItem(
+                id: sceneId,
+                chapterTitle: details.chapterTitle,
+                sceneTitle: details.sceneTitle,
+                matchCount: matchCount
+            )
+        }
     }
 
     private func highlightedSnippetText(for result: SearchResult) -> Text {

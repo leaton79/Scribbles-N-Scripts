@@ -81,6 +81,10 @@ struct WorkspaceCommandBindings {
         workspace.searchShowAllHighlights ? "Use Capped Highlights" : "Show All Highlights"
     }
 
+    var canResetSearchHighlightSettings: Bool {
+        !workspace.usesDefaultSearchHighlightPreferences
+    }
+
     var searchResultPositionText: String {
         workspace.searchResultPositionText
     }
@@ -222,5 +226,9 @@ struct WorkspaceCommandBindings {
 
     func toggleSearchHighlightDisplayMode() {
         workspace.toggleShowAllSearchHighlights()
+    }
+
+    func resetSearchHighlightSettings() {
+        workspace.resetSearchHighlightPreferencesToDefaults()
     }
 }

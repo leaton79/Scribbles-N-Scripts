@@ -237,6 +237,22 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(bindings.searchHighlightToggleTitle, "Show All Highlights")
     }
 
+    func testResetSearchHighlightSettingsCommand() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsSearchHighlightReset")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertFalse(bindings.canResetSearchHighlightSettings)
+        workspace.updateSearchHighlightCap(180)
+        workspace.updateSearchHighlightSafetyThreshold(3_500)
+        XCTAssertTrue(bindings.canResetSearchHighlightSettings)
+
+        bindings.resetSearchHighlightSettings()
+
+        XCTAssertEqual(workspace.searchHighlightCap, 100)
+        XCTAssertEqual(workspace.searchHighlightSafetyThreshold, 2_000)
+        XCTAssertFalse(bindings.canResetSearchHighlightSettings)
+    }
+
     func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
         let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
