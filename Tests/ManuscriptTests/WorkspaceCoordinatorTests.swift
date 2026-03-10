@@ -463,4 +463,23 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: sceneId)
         XCTAssertEqual(diskContent, "backup flush content")
     }
+
+    func testActionsFailGracefullyWhenNoProjectIsOpen() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NoProjectActions")
+        try coordinator.projectManager.closeProject()
+
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertFalse(coordinator.canSaveProject)
+        XCTAssertFalse(coordinator.canToggleSplitEditor)
+        XCTAssertFalse(coordinator.canNavigateToPreviousScene)
+        XCTAssertFalse(coordinator.canNavigateToNextScene)
+
+        XCTAssertEqual(coordinator.createChapter(), "Could not create chapter: No project is currently open.")
+        XCTAssertEqual(coordinator.createScene(), "Could not create scene: No project is currently open.")
+        XCTAssertEqual(coordinator.saveProjectNow(), "Could not save project: No project is currently open.")
+        XCTAssertEqual(coordinator.createBackupNow(), "Could not create backup: No project is currently open.")
+        XCTAssertEqual(coordinator.toggleSplitForCommand(), "No project is currently open.")
+        XCTAssertFalse(coordinator.navigateToNextScene())
+        XCTAssertFalse(coordinator.navigateToPreviousScene())
+    }
 }

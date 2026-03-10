@@ -19,6 +19,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     var hasUnsavedChanges: Bool {
+        guard projectManager.currentProject != nil else {
+            return false
+        }
         if projectManager.isDirty || editorState.isModified {
             return true
         }
@@ -33,7 +36,8 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     var canNavigateToNextScene: Bool {
-        guard modeController.activeMode == .linear,
+        guard projectManager.currentProject != nil,
+              modeController.activeMode == .linear,
               let current = editorState.currentSceneId,
               let index = linearState.orderedSceneIds.firstIndex(of: current) else {
             return false
@@ -42,7 +46,8 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     var canNavigateToPreviousScene: Bool {
-        guard modeController.activeMode == .linear,
+        guard projectManager.currentProject != nil,
+              modeController.activeMode == .linear,
               let current = editorState.currentSceneId,
               let index = linearState.orderedSceneIds.firstIndex(of: current) else {
             return false
@@ -51,6 +56,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     var canToggleSplitEditor: Bool {
+        guard projectManager.currentProject != nil else {
+            return false
+        }
         if splitEditorState.isSplit {
             return true
         }
@@ -149,6 +157,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     func openSplitFromCurrentContext(windowWidth: CGFloat, preferredOrientation: SplitOrientation = .vertical) -> String? {
+        guard projectManager.currentProject != nil else {
+            return nil
+        }
         guard modeController.activeMode == .linear else { return nil }
         guard let targetSceneId = resolveSceneForSplitOpen() else {
             return nil
@@ -168,6 +179,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     func toggleSplit(windowWidth: CGFloat, preferredOrientation: SplitOrientation = .vertical) -> String? {
+        guard projectManager.currentProject != nil else {
+            return ProjectIOError.noOpenProject.localizedDescription
+        }
         if splitEditorState.isSplit {
             splitEditorState.closeSplit()
             return nil
@@ -188,6 +202,9 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @discardableResult
     func createChapter(title: String? = nil) -> String? {
+        guard projectManager.currentProject != nil else {
+            return "Could not create chapter: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
         let base = title?.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle: String
         if let base, !base.isEmpty {
@@ -209,6 +226,9 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @discardableResult
     func createScene(title: String = "Untitled Scene") -> String? {
+        guard projectManager.currentProject != nil else {
+            return "Could not create scene: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
         do {
             let chapterId = try resolveChapterForSceneCreation()
             let scene = try projectManager.addScene(to: chapterId, at: nil, title: title)
@@ -235,7 +255,7 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @discardableResult
     func navigateToNextScene() -> Bool {
-        guard modeController.activeMode == .linear else { return false }
+        guard projectManager.currentProject != nil, modeController.activeMode == .linear else { return false }
         let before = editorState.currentSceneId
         linearState.goToNextScene()
         return editorState.currentSceneId != before
@@ -243,7 +263,7 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @discardableResult
     func navigateToPreviousScene() -> Bool {
-        guard modeController.activeMode == .linear else { return false }
+        guard projectManager.currentProject != nil, modeController.activeMode == .linear else { return false }
         let before = editorState.currentSceneId
         linearState.goToPreviousScene()
         return editorState.currentSceneId != before
@@ -251,6 +271,9 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @discardableResult
     func saveProjectNow() -> String? {
+        guard projectManager.currentProject != nil else {
+            return "Could not save project: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
         do {
             autosaveOpenEditors()
             try projectManager.saveManifest()
@@ -262,6 +285,9 @@ final class WorkspaceCoordinator: ObservableObject {
 
     @discardableResult
     func createBackupNow() -> String? {
+        guard projectManager.currentProject != nil else {
+            return "Could not create backup: \(ProjectIOError.noOpenProject.localizedDescription)"
+        }
         let beforeCount = projectManager.listBackups().count
         do {
             autosaveOpenEditors()
@@ -374,6 +400,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     private func resolveChapterForSceneCreation() throws -> UUID {
+        guard projectManager.currentProject != nil else {
+            throw ProjectIOError.noOpenProject
+        }
         let manifest = projectManager.getManifest()
         let validChapterIds = Set(manifest.hierarchy.chapters.map(\.id))
         if let selected = navigationState.selectedChapterId,
@@ -402,6 +431,9 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     private func resolveSceneForSplitOpen() -> UUID? {
+        guard projectManager.currentProject != nil else {
+            return nil
+        }
         let validSceneIds = Set(projectManager.getManifest().hierarchy.scenes.map(\.id))
         let candidates: [UUID?] = [
             navigationState.selectedSceneId,
