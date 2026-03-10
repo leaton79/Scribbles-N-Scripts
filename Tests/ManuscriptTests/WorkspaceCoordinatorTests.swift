@@ -896,6 +896,31 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.navigationState.selectedChapterId, originalSelectedChapter)
     }
 
+    func testSelectNodeIgnoresStaleSceneWithoutChangingSplitPaneTargets() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectStaleNodeSplit")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondaryScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Secondary")
+        coordinator.splitEditorState.openSplit(sceneId: secondaryScene.id)
+        coordinator.splitEditorState.setActivePane(1)
+        let primaryBefore = coordinator.splitEditorState.primarySceneId
+        let secondaryBefore = coordinator.splitEditorState.secondarySceneId
+
+        let staleSceneNode = SidebarNode(
+            id: UUID(),
+            title: "Stale Scene",
+            level: .scene,
+            wordCount: 0,
+            colorLabel: nil,
+            goalProgressText: nil,
+            children: [],
+            matchingCount: nil
+        )
+        coordinator.select(node: staleSceneNode)
+
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primaryBefore)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, secondaryBefore)
+    }
+
     func testSelectBreadcrumbIgnoresStaleSceneAndChapterIds() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectStaleBreadcrumb")
         let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
