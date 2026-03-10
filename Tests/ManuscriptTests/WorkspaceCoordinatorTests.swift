@@ -713,6 +713,18 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.canSwitchToModularMode)
     }
 
+    func testSetModeToModularClosesOpenSplit() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SetModeClosesSplit")
+        let openMessage = coordinator.toggleSplit(windowWidth: 1200)
+        XCTAssertNil(openMessage)
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+
+        coordinator.setMode(.modular)
+
+        XCTAssertEqual(coordinator.modeController.activeMode, .modular)
+        XCTAssertFalse(coordinator.splitEditorState.isSplit)
+    }
+
     func testSetModeNoOpWhenNoProjectIsOpen() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SetModeNoProject")
         try coordinator.projectManager.closeProject()
