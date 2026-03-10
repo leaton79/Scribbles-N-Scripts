@@ -449,4 +449,18 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(after.count, before + 1)
         XCTAssertTrue(message?.contains("Backup created") == true)
     }
+
+    func testCreateBackupNowPersistsDirtyEditorBeforeArchiving() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackupFlush")
+        let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.editorState.insertText("backup flush content", at: 0)
+        XCTAssertTrue(coordinator.hasUnsavedChanges)
+
+        let message = coordinator.createBackupNow()
+
+        XCTAssertNotNil(message)
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: sceneId)
+        XCTAssertEqual(diskContent, "backup flush content")
+    }
 }

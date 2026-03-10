@@ -264,6 +264,8 @@ final class WorkspaceCoordinator: ObservableObject {
     func createBackupNow() -> String? {
         let beforeCount = projectManager.listBackups().count
         do {
+            autosaveOpenEditors()
+            try projectManager.saveManifest()
             try projectManager.createBackup()
             let backups = projectManager.listBackups()
             if let latest = backups.first, backups.count >= beforeCount {
