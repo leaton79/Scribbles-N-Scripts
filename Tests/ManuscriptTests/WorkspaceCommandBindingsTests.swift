@@ -96,4 +96,19 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(bindings.splitToggleTitle, "Toggle Split")
         XCTAssertTrue(bindings.canToggleSplitEditor)
     }
+
+    func testNoProjectDelegatedActionsReturnExpectedMessages() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsNoProject")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        try workspace.projectManager.closeProject()
+
+        XCTAssertEqual(bindings.saveProject(), "Could not save project: No project is currently open.")
+        XCTAssertEqual(bindings.createChapter(), "Could not create chapter: No project is currently open.")
+        XCTAssertEqual(bindings.createScene(), "Could not create scene: No project is currently open.")
+        XCTAssertEqual(bindings.createBackup(), "Could not create backup: No project is currently open.")
+        XCTAssertEqual(bindings.saveAndBackup(), "Could not save and back up project: No project is currently open.")
+        XCTAssertEqual(bindings.toggleSplit(), "No project is currently open.")
+        XCTAssertFalse(bindings.navigateToPreviousScene())
+        XCTAssertFalse(bindings.navigateToNextScene())
+    }
 }
