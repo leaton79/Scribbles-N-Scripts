@@ -201,6 +201,34 @@ final class NavigationTests: XCTestCase {
         XCTAssertEqual(part2After.chapters, [chapterA.id])
     }
 
+    func testUndoLastOperationRevertsOnlyMostRecentChapterMoveAcrossPartBoundary() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "UndoChapterBoundary", at: tempDir)
+
+        let defaultTopLevelChapterId = try XCTUnwrap(manager.getManifest().hierarchy.chapters.first?.id)
+        let part = try manager.addPart(at: nil, title: "PartA")
+        let chapterA = try manager.addChapter(to: part.id, at: nil, title: "A")
+        let chapterB = try manager.addChapter(to: part.id, at: nil, title: "B")
+
+        let nav = NavigationState(projectProvider: { manager.currentProject })
+        try nav.performChapterMove(chapterId: chapterA.id, toPartId: nil, atIndex: 1, manager: manager)
+        try nav.performChapterMove(chapterId: chapterB.id, toPartId: nil, atIndex: 2, manager: manager)
+
+        try nav.undoLastOperation(manager: manager)
+
+        let afterUndo = manager.getManifest()
+        let chapterAAfter = try XCTUnwrap(afterUndo.hierarchy.chapters.first(where: { $0.id == chapterA.id }))
+        let chapterBAfter = try XCTUnwrap(afterUndo.hierarchy.chapters.first(where: { $0.id == chapterB.id }))
+        XCTAssertNil(chapterAAfter.parentPartId)
+        XCTAssertEqual(chapterBAfter.parentPartId, part.id)
+
+        let partAfter = try XCTUnwrap(afterUndo.hierarchy.parts.first(where: { $0.id == part.id }))
+        XCTAssertEqual(partAfter.chapters, [chapterB.id])
+
+        let topLevelIds = Set(afterUndo.hierarchy.chapters.filter { $0.parentPartId == nil }.map(\.id))
+        XCTAssertEqual(topLevelIds, Set([defaultTopLevelChapterId, chapterA.id]))
+    }
+
     private func makePartedProjectFixture(name: String) throws -> (project: Project, sceneWordCounts: [String: Int]) {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: name, at: tempDir)
