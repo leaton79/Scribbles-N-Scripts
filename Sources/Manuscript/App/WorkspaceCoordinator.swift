@@ -39,6 +39,10 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    var canClearRecentProjects: Bool {
+        !recentProjects.isEmpty
+    }
+
     var canSaveProjectAs: Bool {
         hasOpenProject
     }
@@ -280,6 +284,11 @@ final class WorkspaceCoordinator: ObservableObject {
             return "Could not reopen project: No recent project found."
         }
         return openProject(at: projectURL)
+    }
+
+    func clearRecentProjects() {
+        recentProjectStore.removeObject(forKey: Self.recentProjectsKey)
+        recentProjectStore.removeObject(forKey: Self.lastOpenedProjectPathKey)
     }
 
     @discardableResult

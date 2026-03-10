@@ -21,6 +21,10 @@ struct WorkspaceCommandBindings {
         workspace.recentProjects
     }
 
+    var canClearRecentProjects: Bool {
+        workspace.canClearRecentProjects
+    }
+
     var canSaveProjectAs: Bool {
         workspace.canSaveProjectAs
     }
@@ -74,6 +78,10 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func reopenLastProject() -> String? {
         workspace.reopenLastProject()
+    }
+
+    func clearRecentProjects() {
+        workspace.clearRecentProjects()
     }
 
     @discardableResult

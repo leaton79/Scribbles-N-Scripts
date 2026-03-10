@@ -269,6 +269,28 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(names.filter { $0 == "RecentA" }.count, 1)
     }
 
+    func testClearRecentProjectsRemovesRecentAndLastEntries() throws {
+        let suiteName = "WorkspaceCoordinatorTests.ClearRecent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "RecentClearSeed",
+            recentProjectStore: defaults
+        )
+        XCTAssertNil(coordinator.createAndOpenProject(named: "RecentClearA"))
+        XCTAssertTrue(coordinator.canReopenLastProject)
+        XCTAssertTrue(coordinator.canClearRecentProjects)
+        XCTAssertFalse(coordinator.recentProjects.isEmpty)
+
+        coordinator.clearRecentProjects()
+
+        XCTAssertFalse(coordinator.canReopenLastProject)
+        XCTAssertFalse(coordinator.canClearRecentProjects)
+        XCTAssertTrue(coordinator.recentProjects.isEmpty)
+    }
+
     func testSaveProjectAsCreatesCopyAndSwitchesContext() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAsSource")
         let sourceURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)

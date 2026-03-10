@@ -28,6 +28,10 @@ struct ManuscriptApp: App {
                                 _ = commands.openProject(at: project.url)
                             }
                         }
+                        Divider()
+                        Button("Clear Recent Projects") {
+                            commands.clearRecentProjects()
+                        }
                     }
                 }
                 .disabled(commands.recentProjects.isEmpty)
@@ -174,6 +178,23 @@ private struct WorkspaceView: View {
                             Button("Open Project") {
                                 showingOpenProjectPicker = true
                             }
+                            Menu("Recent") {
+                                if commands.recentProjects.isEmpty {
+                                    Text("No Recent Projects")
+                                } else {
+                                    ForEach(commands.recentProjects) { project in
+                                        Button(project.name) {
+                                            actionNotice = commands.openProject(at: project.url)
+                                        }
+                                    }
+                                    Divider()
+                                    Button("Clear Recent Projects") {
+                                        commands.clearRecentProjects()
+                                        actionNotice = "Recent projects cleared."
+                                    }
+                                }
+                            }
+                            .disabled(commands.recentProjects.isEmpty)
                             Button("Reopen Last") {
                                 actionNotice = commands.reopenLastProject()
                             }

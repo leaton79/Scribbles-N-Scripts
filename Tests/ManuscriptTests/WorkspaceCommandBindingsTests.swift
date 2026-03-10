@@ -127,6 +127,28 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(names[1], "BindingsRecentB")
     }
 
+    func testClearRecentProjectsDelegatesAndUpdatesAvailability() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.ClearRecent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsRecentClearSeed",
+            recentProjectStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        XCTAssertNil(bindings.createProject(named: "BindingsRecentClearA"))
+        XCTAssertTrue(bindings.canClearRecentProjects)
+        XCTAssertTrue(bindings.canReopenLastProject)
+
+        bindings.clearRecentProjects()
+
+        XCTAssertFalse(bindings.canClearRecentProjects)
+        XCTAssertFalse(bindings.canReopenLastProject)
+        XCTAssertTrue(bindings.recentProjects.isEmpty)
+    }
+
     func testViewActionsDelegateToWorkspaceCoordinator() throws {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsViewActions")
         let bindings = WorkspaceCommandBindings(workspace: workspace)
