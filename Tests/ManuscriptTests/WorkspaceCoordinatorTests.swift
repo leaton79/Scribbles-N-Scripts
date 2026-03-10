@@ -291,6 +291,34 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.recentProjects.isEmpty)
     }
 
+    func testCleanupMissingRecentProjectsRemovesStaleEntries() throws {
+        let suiteName = "WorkspaceCoordinatorTests.CleanupMissingRecent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let validManager = FileSystemProjectManager()
+        _ = try validManager.createProject(name: "CleanupValid", at: tempDir)
+        let validURL = try XCTUnwrap(validManager.projectRootURL)
+        try validManager.closeProject()
+
+        let missingURL = tempDir.appendingPathComponent("CleanupMissing", isDirectory: true)
+        defaults.set([missingURL.path, validURL.path], forKey: "workspace.recentProjects")
+        defaults.set(missingURL.path, forKey: "workspace.lastOpenedProjectPath")
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "CleanupSeed",
+            recentProjectStore: defaults
+        )
+        XCTAssertTrue(coordinator.hasStaleRecentProjects)
+        XCTAssertTrue(coordinator.recentProjects.contains(where: { $0.name == "CleanupValid" }))
+
+        coordinator.cleanupMissingRecentProjects()
+
+        XCTAssertFalse(coordinator.hasStaleRecentProjects)
+        XCTAssertTrue(coordinator.recentProjects.contains(where: { $0.name == "CleanupValid" }))
+    }
+
     func testSaveProjectAsCreatesCopyAndSwitchesContext() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAsSource")
         let sourceURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)

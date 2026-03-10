@@ -39,6 +39,12 @@ final class WorkspaceCoordinator: ObservableObject {
         }
     }
 
+    var hasStaleRecentProjects: Bool {
+        let stored = recentProjectPaths()
+        let valid = Set(recentProjectURLs().map(\.path))
+        return stored.contains { !valid.contains($0) }
+    }
+
     var canClearRecentProjects: Bool {
         !recentProjects.isEmpty
     }
@@ -289,6 +295,18 @@ final class WorkspaceCoordinator: ObservableObject {
     func clearRecentProjects() {
         recentProjectStore.removeObject(forKey: Self.recentProjectsKey)
         recentProjectStore.removeObject(forKey: Self.lastOpenedProjectPathKey)
+    }
+
+    func cleanupMissingRecentProjects() {
+        let cleaned = recentProjectPaths().filter { path in
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            return FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path)
+        }
+        recentProjectStore.set(cleaned, forKey: Self.recentProjectsKey)
+
+        if let last = recentProjectStore.string(forKey: Self.lastOpenedProjectPathKey), !cleaned.contains(last) {
+            recentProjectStore.removeObject(forKey: Self.lastOpenedProjectPathKey)
+        }
     }
 
     @discardableResult
@@ -704,7 +722,7 @@ final class WorkspaceCoordinator: ObservableObject {
     }
 
     private func recentProjectURLs() -> [URL] {
-        let stored = recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
+        let stored = recentProjectPaths()
         var seen = Set<String>()
         var urls: [URL] = []
         for path in stored {
@@ -717,6 +735,10 @@ final class WorkspaceCoordinator: ObservableObject {
             seen.insert(path)
         }
         return urls
+    }
+
+    private func recentProjectPaths() -> [String] {
+        recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
     }
 
     private func refreshDerivedStates() {

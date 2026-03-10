@@ -149,6 +149,35 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertTrue(bindings.recentProjects.isEmpty)
     }
 
+    func testCleanupMissingRecentProjectsDelegatesToCoordinator() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.CleanupMissingRecent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let validManager = FileSystemProjectManager()
+        _ = try validManager.createProject(name: "BindingsCleanupValid", at: tempDir)
+        let validURL = try XCTUnwrap(validManager.projectRootURL)
+        try validManager.closeProject()
+
+        let missingURL = tempDir.appendingPathComponent("BindingsCleanupMissing", isDirectory: true)
+        defaults.set([missingURL.path, validURL.path], forKey: "workspace.recentProjects")
+        defaults.set(missingURL.path, forKey: "workspace.lastOpenedProjectPath")
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsCleanupSeed",
+            recentProjectStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+        XCTAssertTrue(bindings.hasStaleRecentProjects)
+        XCTAssertTrue(bindings.recentProjects.contains(where: { $0.name == "BindingsCleanupValid" }))
+
+        bindings.cleanupMissingRecentProjects()
+
+        XCTAssertFalse(bindings.hasStaleRecentProjects)
+        XCTAssertTrue(bindings.recentProjects.contains(where: { $0.name == "BindingsCleanupValid" }))
+    }
+
     func testViewActionsDelegateToWorkspaceCoordinator() throws {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsViewActions")
         let bindings = WorkspaceCommandBindings(workspace: workspace)

@@ -33,8 +33,16 @@ struct ManuscriptApp: App {
                             commands.clearRecentProjects()
                         }
                     }
+                    if commands.hasStaleRecentProjects {
+                        if !commands.recentProjects.isEmpty {
+                            Divider()
+                        }
+                        Button("Clean Missing Entries") {
+                            commands.cleanupMissingRecentProjects()
+                        }
+                    }
                 }
-                .disabled(commands.recentProjects.isEmpty)
+                .disabled(commands.recentProjects.isEmpty && !commands.hasStaleRecentProjects)
 
                 Divider()
 
@@ -130,6 +138,7 @@ private struct WorkspaceView: View {
     @State private var showingOpenProjectPicker = false
     @State private var showingSaveAsSheet = false
     @State private var showingRenameSheet = false
+    @State private var showingRecentCleanupPrompt = false
     @State private var newProjectName = ""
     @State private var saveAsProjectName = ""
     @State private var renameProjectName = ""
@@ -193,8 +202,17 @@ private struct WorkspaceView: View {
                                         actionNotice = "Recent projects cleared."
                                     }
                                 }
+                                if commands.hasStaleRecentProjects {
+                                    if !commands.recentProjects.isEmpty {
+                                        Divider()
+                                    }
+                                    Button("Clean Missing Entries") {
+                                        commands.cleanupMissingRecentProjects()
+                                        actionNotice = "Missing recent projects removed."
+                                    }
+                                }
                             }
-                            .disabled(commands.recentProjects.isEmpty)
+                            .disabled(commands.recentProjects.isEmpty && !commands.hasStaleRecentProjects)
                             Button("Reopen Last") {
                                 actionNotice = commands.reopenLastProject()
                             }
@@ -280,6 +298,9 @@ private struct WorkspaceView: View {
                 .onChange(of: workspace.modeController.activeMode) { _, mode in
                     workspace.handleModeChange(mode)
                 }
+                .onAppear {
+                    showingRecentCleanupPrompt = commands.hasStaleRecentProjects
+                }
                 .onReceive(NotificationCenter.default.publisher(for: .showSaveAsSheet)) { _ in
                     saveAsProjectName = workspace.projectDisplayName
                     showingSaveAsSheet = true
@@ -342,6 +363,15 @@ private struct WorkspaceView: View {
                             showingRenameSheet = false
                         }
                     )
+                }
+                .alert("Clean Missing Recent Projects?", isPresented: $showingRecentCleanupPrompt) {
+                    Button("Not Now", role: .cancel) {}
+                    Button("Clean Up") {
+                        commands.cleanupMissingRecentProjects()
+                        actionNotice = "Missing recent projects removed."
+                    }
+                } message: {
+                    Text("Some recent project paths no longer exist. Remove them from recent projects?")
                 }
             }
         }
