@@ -509,6 +509,7 @@ final class WorkspaceCoordinator: ObservableObject {
 
     private func normalizeTitle(_ value: String, fallback: String) -> String {
         let collapsed = value
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return collapsed.isEmpty ? fallback : collapsed

@@ -273,6 +273,16 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter Name Final" }))
     }
 
+    func testCreateChapterNormalizesNonBreakingSpacesInTitle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapterNBSPTitle")
+
+        let message = coordinator.createChapter(title: "Chapter\u{00A0}\u{00A0}Name")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter Name" }))
+    }
+
     func testCreateSceneUsesSelectedChapterAndSelectsNewScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneSelectedChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
@@ -316,6 +326,16 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNil(message)
         let manifest = coordinator.projectManager.getManifest()
         XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Scene Title Final" }))
+    }
+
+    func testCreateSceneNormalizesNonBreakingSpacesInTitle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneNBSPTitle")
+
+        let message = coordinator.createScene(title: "Scene\u{00A0}\u{00A0}Title")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Scene Title" }))
     }
 
     func testCreateSceneCreatesFallbackChapterWhenHierarchyIsEmpty() throws {
