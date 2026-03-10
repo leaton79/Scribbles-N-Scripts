@@ -78,4 +78,22 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         bindings.setModeLinear()
         XCTAssertEqual(workspace.modeController.activeMode, .linear)
     }
+
+    func testSplitToggleTitleAndAvailabilityCycle() throws {
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsSplitCycle")
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertEqual(bindings.splitToggleTitle, "Toggle Split")
+        XCTAssertTrue(bindings.canToggleSplitEditor)
+
+        XCTAssertNil(bindings.toggleSplit())
+        XCTAssertTrue(workspace.splitEditorState.isSplit)
+        XCTAssertEqual(bindings.splitToggleTitle, "Close Split")
+        XCTAssertTrue(bindings.canToggleSplitEditor)
+
+        XCTAssertNil(bindings.toggleSplit())
+        XCTAssertFalse(workspace.splitEditorState.isSplit)
+        XCTAssertEqual(bindings.splitToggleTitle, "Toggle Split")
+        XCTAssertTrue(bindings.canToggleSplitEditor)
+    }
 }
