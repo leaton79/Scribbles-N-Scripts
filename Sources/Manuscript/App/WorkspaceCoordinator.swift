@@ -250,9 +250,11 @@ final class WorkspaceCoordinator: ObservableObject {
         guard projectManager.currentProject != nil else {
             return "Could not create scene: \(ProjectIOError.noOpenProject.localizedDescription)"
         }
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle = normalizedTitle.isEmpty ? "Untitled Scene" : normalizedTitle
         do {
             let chapterId = try resolveChapterForSceneCreation()
-            let scene = try projectManager.addScene(to: chapterId, at: nil, title: title)
+            let scene = try projectManager.addScene(to: chapterId, at: nil, title: resolvedTitle)
             refreshDerivedStates()
             navigationState.navigateTo(sceneId: scene.id)
             editorState.navigateToScene(id: scene.id)

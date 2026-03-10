@@ -256,6 +256,26 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.editorState.currentSceneId, added.id)
     }
 
+    func testCreateSceneFallsBackToUntitledWhenInputIsWhitespace() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneWhitespaceTitle")
+
+        let message = coordinator.createScene(title: "   \n\t ")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Untitled Scene" }))
+    }
+
+    func testCreateSceneTrimsSurroundingWhitespaceInTitle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneTrimmedTitle")
+
+        let message = coordinator.createScene(title: "  Trimmed Title  ")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Trimmed Title" }))
+    }
+
     func testCreateSceneCreatesFallbackChapterWhenHierarchyIsEmpty() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneFallbackChapter")
         let initialChapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
