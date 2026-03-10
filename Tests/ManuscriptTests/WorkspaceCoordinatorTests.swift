@@ -263,6 +263,16 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Trimmed Chapter" }))
     }
 
+    func testCreateChapterCollapsesInternalWhitespaceInTitle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateChapterCollapsedWhitespace")
+
+        let message = coordinator.createChapter(title: "  Chapter\t\tName \n  Final  ")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.chapters.contains(where: { $0.title == "Chapter Name Final" }))
+    }
+
     func testCreateSceneUsesSelectedChapterAndSelectsNewScene() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneSelectedChapter")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
@@ -296,6 +306,16 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNil(message)
         let manifest = coordinator.projectManager.getManifest()
         XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Trimmed Title" }))
+    }
+
+    func testCreateSceneCollapsesInternalWhitespaceInTitle() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CreateSceneCollapsedWhitespace")
+
+        let message = coordinator.createScene(title: "  Scene\t\tTitle \n  Final  ")
+
+        XCTAssertNil(message)
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Scene Title Final" }))
     }
 
     func testCreateSceneCreatesFallbackChapterWhenHierarchyIsEmpty() throws {

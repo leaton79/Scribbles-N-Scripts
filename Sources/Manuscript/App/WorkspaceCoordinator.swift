@@ -226,10 +226,15 @@ final class WorkspaceCoordinator: ObservableObject {
         guard projectManager.currentProject != nil else {
             return "Could not create chapter: \(ProjectIOError.noOpenProject.localizedDescription)"
         }
-        let base = title?.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle: String
-        if let base, !base.isEmpty {
-            resolvedTitle = base
+        if let title {
+            let normalized = normalizeTitle(title, fallback: "")
+            if !normalized.isEmpty {
+                resolvedTitle = normalized
+            } else {
+                let chapterCount = projectManager.getManifest().hierarchy.chapters.count
+                resolvedTitle = "Chapter \(chapterCount + 1)"
+            }
         } else {
             let chapterCount = projectManager.getManifest().hierarchy.chapters.count
             resolvedTitle = "Chapter \(chapterCount + 1)"
@@ -250,8 +255,7 @@ final class WorkspaceCoordinator: ObservableObject {
         guard projectManager.currentProject != nil else {
             return "Could not create scene: \(ProjectIOError.noOpenProject.localizedDescription)"
         }
-        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedTitle = normalizedTitle.isEmpty ? "Untitled Scene" : normalizedTitle
+        let resolvedTitle = normalizeTitle(title, fallback: "Untitled Scene")
         do {
             let chapterId = try resolveChapterForSceneCreation()
             let scene = try projectManager.addScene(to: chapterId, at: nil, title: resolvedTitle)
@@ -501,5 +505,12 @@ final class WorkspaceCoordinator: ObservableObject {
 
     private func chapterExists(_ id: UUID) -> Bool {
         projectManager.getManifest().hierarchy.chapters.contains(where: { $0.id == id })
+    }
+
+    private func normalizeTitle(_ value: String, fallback: String) -> String {
+        let collapsed = value
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return collapsed.isEmpty ? fallback : collapsed
     }
 }
