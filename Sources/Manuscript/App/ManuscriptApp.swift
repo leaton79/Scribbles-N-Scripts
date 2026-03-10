@@ -19,6 +19,19 @@ struct ManuscriptApp: App {
                 }
                 .disabled(!commands.canReopenLastProject)
 
+                Menu("Open Recent") {
+                    if commands.recentProjects.isEmpty {
+                        Text("No Recent Projects")
+                    } else {
+                        ForEach(commands.recentProjects) { project in
+                            Button(project.name) {
+                                _ = commands.openProject(at: project.url)
+                            }
+                        }
+                    }
+                }
+                .disabled(commands.recentProjects.isEmpty)
+
                 Divider()
 
                 Button("Save Project As…") {

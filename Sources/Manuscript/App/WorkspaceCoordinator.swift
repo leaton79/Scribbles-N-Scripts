@@ -1,9 +1,17 @@
 import Foundation
 import SwiftUI
 
+struct RecentProjectEntry: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let url: URL
+}
+
 @MainActor
 final class WorkspaceCoordinator: ObservableObject {
     private static let lastOpenedProjectPathKey = "workspace.lastOpenedProjectPath"
+    private static let recentProjectsKey = "workspace.recentProjects"
+    private static let maxRecentProjects = 10
 
     let projectManager: FileSystemProjectManager
     let navigationState: NavigationState
@@ -23,6 +31,12 @@ final class WorkspaceCoordinator: ObservableObject {
 
     var canReopenLastProject: Bool {
         lastOpenedProjectURL() != nil
+    }
+
+    var recentProjects: [RecentProjectEntry] {
+        recentProjectURLs().map { url in
+            RecentProjectEntry(id: url.path, name: url.lastPathComponent, url: url)
+        }
     }
 
     var canSaveProjectAs: Bool {
@@ -526,14 +540,24 @@ final class WorkspaceCoordinator: ObservableObject {
         recentProjectStore: UserDefaults
     ) throws {
         let fm = FileManager.default
-        if rootURL == nil,
-           let lastPath = recentProjectStore.string(forKey: lastOpenedProjectPathKey) {
-            let lastURL = URL(fileURLWithPath: lastPath, isDirectory: true)
-            if fm.fileExists(atPath: lastURL.appendingPathComponent("manifest.json").path) {
-                _ = try manager.openProject(at: lastURL)
-                return
+        if rootURL == nil {
+            let storedRecent = recentProjectStore.array(forKey: recentProjectsKey) as? [String] ?? []
+            for path in storedRecent {
+                let url = URL(fileURLWithPath: path, isDirectory: true)
+                if fm.fileExists(atPath: url.appendingPathComponent("manifest.json").path) {
+                    _ = try manager.openProject(at: url)
+                    return
+                }
             }
-            recentProjectStore.removeObject(forKey: lastOpenedProjectPathKey)
+
+            if let lastPath = recentProjectStore.string(forKey: lastOpenedProjectPathKey) {
+                let lastURL = URL(fileURLWithPath: lastPath, isDirectory: true)
+                if fm.fileExists(atPath: lastURL.appendingPathComponent("manifest.json").path) {
+                    _ = try manager.openProject(at: lastURL)
+                    return
+                }
+                recentProjectStore.removeObject(forKey: lastOpenedProjectPathKey)
+            }
         }
 
         let root: URL
@@ -650,6 +674,13 @@ final class WorkspaceCoordinator: ObservableObject {
     private func persistLastOpenedProject() {
         guard let rootURL = projectManager.projectRootURL else { return }
         recentProjectStore.set(rootURL.path, forKey: Self.lastOpenedProjectPathKey)
+        var stored = recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
+        stored.removeAll { $0 == rootURL.path }
+        stored.insert(rootURL.path, at: 0)
+        if stored.count > Self.maxRecentProjects {
+            stored.removeLast(stored.count - Self.maxRecentProjects)
+        }
+        recentProjectStore.set(stored, forKey: Self.recentProjectsKey)
     }
 
     private func lastOpenedProjectURL() -> URL? {
@@ -661,6 +692,22 @@ final class WorkspaceCoordinator: ObservableObject {
             return nil
         }
         return url
+    }
+
+    private func recentProjectURLs() -> [URL] {
+        let stored = recentProjectStore.array(forKey: Self.recentProjectsKey) as? [String] ?? []
+        var seen = Set<String>()
+        var urls: [URL] = []
+        for path in stored {
+            guard !seen.contains(path) else { continue }
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else {
+                continue
+            }
+            urls.append(url)
+            seen.insert(path)
+        }
+        return urls
     }
 
     private func refreshDerivedStates() {

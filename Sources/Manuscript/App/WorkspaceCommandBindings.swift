@@ -17,6 +17,10 @@ struct WorkspaceCommandBindings {
         workspace.canReopenLastProject
     }
 
+    var recentProjects: [RecentProjectEntry] {
+        workspace.recentProjects
+    }
+
     var canSaveProjectAs: Bool {
         workspace.canSaveProjectAs
     }

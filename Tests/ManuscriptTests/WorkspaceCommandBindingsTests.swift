@@ -104,6 +104,29 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertEqual(bindings.renameProject(to: "NoProject"), "Could not rename project: No project is currently open.")
     }
 
+    func testRecentProjectsExposeMostRecentAndAllowOpen() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.RecentList.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsRecentSeed",
+            recentProjectStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertNil(bindings.createProject(named: "BindingsRecentA"))
+        let recentA = tempDir.appendingPathComponent("BindingsRecentA", isDirectory: true)
+        XCTAssertNil(bindings.createProject(named: "BindingsRecentB"))
+        XCTAssertNil(bindings.openProject(at: recentA))
+
+        let names = bindings.recentProjects.map(\.name)
+        XCTAssertGreaterThanOrEqual(names.count, 2)
+        XCTAssertEqual(names[0], "BindingsRecentA")
+        XCTAssertEqual(names[1], "BindingsRecentB")
+    }
+
     func testViewActionsDelegateToWorkspaceCoordinator() throws {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CommandBindingsViewActions")
         let bindings = WorkspaceCommandBindings(workspace: workspace)

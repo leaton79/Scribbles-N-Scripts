@@ -247,6 +247,28 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
     }
 
+    func testRecentProjectsTrackMostRecentFirstAndDeduplicate() throws {
+        let suiteName = "WorkspaceCoordinatorTests.RecentList.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "RecentSeed",
+            recentProjectStore: defaults
+        )
+        XCTAssertNil(coordinator.createAndOpenProject(named: "RecentA"))
+        let recentA = tempDir.appendingPathComponent("RecentA", isDirectory: true)
+        XCTAssertNil(coordinator.createAndOpenProject(named: "RecentB"))
+        XCTAssertNil(coordinator.openProject(at: recentA))
+
+        let names = coordinator.recentProjects.map(\.name)
+        XCTAssertGreaterThanOrEqual(names.count, 2)
+        XCTAssertEqual(names[0], "RecentA")
+        XCTAssertEqual(names[1], "RecentB")
+        XCTAssertEqual(names.filter { $0 == "RecentA" }.count, 1)
+    }
+
     func testSaveProjectAsCreatesCopyAndSwitchesContext() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAsSource")
         let sourceURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
