@@ -914,6 +914,19 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.navigateToPreviousScene())
     }
 
+    func testSplitToggleAvailabilityStaysDisabledAfterCloseEvenIfSplitRemainsOpen() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SplitAvailabilityAfterClose")
+        XCTAssertNil(coordinator.toggleSplit(windowWidth: 1200))
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+
+        try coordinator.projectManager.closeProject()
+
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertFalse(coordinator.canToggleSplitEditor)
+        XCTAssertEqual(coordinator.toggleSplitForCommand(), "No project is currently open.")
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+    }
+
     func testHasOpenProjectReflectsProjectLifecycle() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "OpenProjectState")
         XCTAssertTrue(coordinator.hasOpenProject)
