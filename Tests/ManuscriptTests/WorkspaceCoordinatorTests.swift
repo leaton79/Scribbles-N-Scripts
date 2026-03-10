@@ -480,6 +480,28 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(diskContent, "save and backup content")
     }
 
+    func testSaveAndBackupNowPersistsSplitPaneDirtyContentAndCreatesBackup() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAndBackupSplit")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let scene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Split Backup Scene")
+        coordinator.linearState.reloadSequence()
+        coordinator.editorState.navigateToScene(id: scene.id)
+        coordinator.navigationState.navigateTo(sceneId: scene.id)
+        _ = coordinator.openSplitFromCurrentContext(windowWidth: 1200)
+        let secondarySceneId = try XCTUnwrap(coordinator.splitEditorState.secondarySceneId)
+        coordinator.splitEditorState.secondaryEditor.insertText("split save+backup", at: 0)
+        let before = coordinator.projectManager.listBackups().count
+
+        let message = coordinator.saveAndBackupNow()
+
+        XCTAssertNotNil(message)
+        XCTAssertTrue(message?.contains("Project saved and backup created") == true)
+        XCTAssertFalse(coordinator.hasUnsavedChanges)
+        XCTAssertEqual(coordinator.projectManager.listBackups().count, before + 1)
+        let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: secondarySceneId)
+        XCTAssertEqual(diskContent, "split save+backup")
+    }
+
     func testActionsFailGracefullyWhenNoProjectIsOpen() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NoProjectActions")
         try coordinator.projectManager.closeProject()

@@ -40,6 +40,7 @@ struct ManuscriptApp: App {
                 Button("Save and Backup") {
                     _ = workspace.saveAndBackupNow()
                 }
+                .keyboardShortcut("S", modifiers: [.command, .option])
                 .disabled(!workspace.hasOpenProject)
             }
 
