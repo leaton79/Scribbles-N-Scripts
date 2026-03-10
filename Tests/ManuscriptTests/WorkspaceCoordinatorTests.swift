@@ -565,6 +565,19 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(diskContent, "split pane save")
     }
 
+    func testSaveProjectNowReturnsErrorMessageWhenManifestWriteFails() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveFailureMessage")
+        coordinator.projectManager.manifestWriteInterceptor = { _, _ in
+            throw NSError(domain: "WorkspaceCoordinatorTests", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Simulated manifest write failure"
+            ])
+        }
+
+        let message = coordinator.saveProjectNow()
+
+        XCTAssertEqual(message, "Could not save project: Simulated manifest write failure")
+    }
+
     func testHasUnsavedChangesReflectsEditorDirtyAndSave() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DirtyIndicator")
         XCTAssertFalse(coordinator.hasUnsavedChanges)
@@ -629,6 +642,19 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(diskContent, "backup flush content")
     }
 
+    func testCreateBackupNowReturnsErrorMessageWhenManifestWriteFails() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BackupFailureMessage")
+        coordinator.projectManager.manifestWriteInterceptor = { _, _ in
+            throw NSError(domain: "WorkspaceCoordinatorTests", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Simulated manifest write failure"
+            ])
+        }
+
+        let message = coordinator.createBackupNow()
+
+        XCTAssertEqual(message, "Could not create backup: Simulated manifest write failure")
+    }
+
     func testSaveAndBackupNowPersistsDirtyEditorAndCreatesBackup() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAndBackup")
         let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
@@ -665,6 +691,19 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.projectManager.listBackups().count, before + 1)
         let diskContent = try coordinator.projectManager.loadSceneContent(sceneId: secondarySceneId)
         XCTAssertEqual(diskContent, "split save+backup")
+    }
+
+    func testSaveAndBackupNowReturnsErrorMessageWhenManifestWriteFails() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SaveAndBackupFailureMessage")
+        coordinator.projectManager.manifestWriteInterceptor = { _, _ in
+            throw NSError(domain: "WorkspaceCoordinatorTests", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "Simulated manifest write failure"
+            ])
+        }
+
+        let message = coordinator.saveAndBackupNow()
+
+        XCTAssertEqual(message, "Could not save and back up project: Simulated manifest write failure")
     }
 
     func testActionsFailGracefullyWhenNoProjectIsOpen() throws {
