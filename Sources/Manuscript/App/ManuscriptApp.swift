@@ -16,6 +16,7 @@ struct ManuscriptApp: App {
                     _ = workspace.saveProjectNow()
                 }
                 .keyboardShortcut("s", modifiers: [.command])
+                .disabled(!workspace.canSaveProject)
 
                 Button("New Chapter") {
                     _ = workspace.createChapter()
@@ -117,6 +118,7 @@ private struct WorkspaceView: View {
                                 actionNotice = workspace.saveProjectNow() ?? "Project saved."
                             }
                             .keyboardShortcut("s", modifiers: [.command])
+                            .disabled(!workspace.canSaveProject)
                             Button("New Chapter") {
                                 actionNotice = workspace.createChapter()
                             }

@@ -377,6 +377,17 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.hasUnsavedChanges)
     }
 
+    func testCanSaveProjectTracksUnsavedState() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CanSaveState")
+        XCTAssertFalse(coordinator.canSaveProject)
+
+        coordinator.editorState.insertText("dirty", at: 0)
+        XCTAssertTrue(coordinator.canSaveProject)
+
+        _ = coordinator.saveProjectNow()
+        XCTAssertFalse(coordinator.canSaveProject)
+    }
+
     func testHasUnsavedChangesReflectsSplitPaneDirtyState() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DirtySplitIndicator")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)

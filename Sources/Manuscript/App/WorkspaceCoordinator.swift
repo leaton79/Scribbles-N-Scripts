@@ -28,6 +28,10 @@ final class WorkspaceCoordinator: ObservableObject {
         return false
     }
 
+    var canSaveProject: Bool {
+        hasUnsavedChanges
+    }
+
     init(
         projectManager manager: FileSystemProjectManager = FileSystemProjectManager(),
         bootstrapRootURL: URL? = nil,
