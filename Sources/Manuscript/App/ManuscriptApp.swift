@@ -42,7 +42,14 @@ struct ScribblesNScriptsApp: App {
 
                 Menu("Open Recent") {
                     if commands.recentProjects.isEmpty {
-                        Text("No Recent Projects")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("No Recent Projects")
+                            Button("Help") {
+                                NotificationCenter.default.post(name: .showHelpReference, object: "recent-projects-empty")
+                            }
+                            .buttonStyle(.borderless)
+                            .font(.caption)
+                        }
                     } else {
                         ForEach(commands.recentProjects) { project in
                             Button(project.name) {
@@ -1574,17 +1581,24 @@ private struct InspectorPanelView: View {
                     Text("Note").tag(InspectorMode.note)
                 }
                 .pickerStyle(.segmented)
+                InlineHelpTopics(topicIDs: ["inspector", "inspector-modes"])
 
                 switch inspectorMode {
                 case .context:
                     if let scene {
                         sceneSection(scene)
                     } else {
-                        ContentUnavailableView(
-                            "No Scene Selected",
-                            systemImage: "sidebar.right",
-                            description: Text("Select a scene to edit tags, status, color labels, and metadata.")
-                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            ContentUnavailableView(
+                                "No Scene Selected",
+                                systemImage: "sidebar.right",
+                                description: Text("Select a scene to edit tags, status, color labels, and metadata.")
+                            )
+                            Button("Help with Inspector") {
+                                NotificationCenter.default.post(name: .showHelpReference, object: "inspector")
+                            }
+                            .buttonStyle(.borderless)
+                        }
                     }
                     if let chapter {
                         chapterSection(chapter)
@@ -1616,6 +1630,7 @@ private struct InspectorPanelView: View {
     private var entityInspectorSection: some View {
         GroupBox("Entity Detail") {
             VStack(alignment: .leading, spacing: 12) {
+                InlineHelpTopics(topicIDs: ["inspector-modes", "entity-relationships", "entities"])
                 if sceneMentionedEntities.isEmpty {
                     Text("No tracked entities are linked to the current scene.")
                         .font(.caption)
@@ -1692,6 +1707,7 @@ private struct InspectorPanelView: View {
     private var noteInspectorSection: some View {
         GroupBox("Note Detail") {
             VStack(alignment: .leading, spacing: 12) {
+                InlineHelpTopics(topicIDs: ["inspector-modes", "note-linking", "notes"])
                 if sceneLinkedNotes.isEmpty {
                     Text("No notes are linked to the current scene.")
                         .font(.caption)
@@ -2786,6 +2802,11 @@ private struct StagingTrayView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button("Help") {
+                    NotificationCenter.default.post(name: .showHelpReference, object: "staging-tray")
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
             }
 
             if workspace.stagingScenes.isEmpty {
@@ -2874,6 +2895,11 @@ private struct EditorEntityAssistantBar: View {
                 Text("Entity Assistant")
                     .font(.caption.weight(.semibold))
                 Spacer()
+                Button("Help") {
+                    NotificationCenter.default.post(name: .showHelpReference, object: "entity-assistant")
+                }
+                .buttonStyle(.borderless)
+                .font(.caption2)
                 if mentionedEntities.isEmpty {
                     Text("No tracked mentions in this scene yet.")
                         .font(.caption2)

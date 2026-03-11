@@ -51,8 +51,8 @@ enum HelpReferenceLibrary {
             "welcome-screen",
             "Welcome Screen",
             category: "Start",
-            summary: "The start screen is the home screen you see when no project is open.",
-            what: "It gives you the fastest way to begin: create a project, open a project, reopen a recent project, or jump into the Command Palette.",
+            summary: "The welcome screen is the app's home when no project is open.",
+            what: "It gives you the fastest starting actions: create a project, open one, reopen a recent project, or jump into the Command Palette.",
             how: [
                 "Open the app with no project loaded.",
                 "Use `New Project` to create a fresh manuscript folder.",
@@ -131,8 +131,8 @@ enum HelpReferenceLibrary {
             "open-recent",
             "Open Recent, Clear Recent Projects, and Clean Missing Entries",
             category: "Start",
-            summary: "The recent-project list stores projects you opened before and helps you keep that list tidy.",
-            what: "Open Recent shows saved project paths. `Clear Recent Projects` removes the list, and `Clean Missing Entries` removes projects that no longer exist on disk.",
+            summary: "Open Recent stores previously opened projects and gives you cleanup tools for the list.",
+            what: "It shows saved project paths. `Clear Recent Projects` removes the list, and `Clean Missing Entries` removes entries that no longer exist on disk.",
             how: [
                 "Open `Project > Open Recent`.",
                 "Choose a project name to reopen it.",
@@ -143,6 +143,19 @@ enum HelpReferenceLibrary {
             menuPath: "Project > Open Recent",
             related: ["reopen-last-project", "switch-project", "welcome-screen"],
             keywords: ["recent", "cleanup", "missing"]
+        ),
+        entry(
+            "recent-projects-empty",
+            "No Recent Projects",
+            category: "Start",
+            summary: "This state means the app does not have any recent projects recorded yet.",
+            what: "It usually appears the first time you use the app, or after the recent-project list was cleared.",
+            how: [
+                "Create a project from the welcome screen, or open an existing one.",
+                "After a project opens once, it will appear in the recent-project list."
+            ],
+            why: "Use this explanation when an empty recent-project menu makes you wonder whether something is broken. Usually nothing is wrong.",
+            related: ["welcome-screen", "open-recent", "reopen-last-project"]
         ),
         entry(
             "save-project",
@@ -476,6 +489,20 @@ enum HelpReferenceLibrary {
             menuPath: "View > Show Inspector / Hide Inspector",
             shortcut: "Option-Command-I",
             related: ["entities", "notes", "metadata-schema"]
+        ),
+        entry(
+            "inspector-modes",
+            "Inspector Modes",
+            category: "View",
+            summary: "The inspector can switch between Context, Entity, and Note modes.",
+            what: "Context mode focuses on scene and chapter metadata. Entity mode focuses on linked entities. Note mode focuses on notes linked to the current scene.",
+            how: [
+                "Show the inspector.",
+                "Use the segmented control near the top of the panel.",
+                "Choose `Context`, `Entity`, or `Note` depending on what you need to review or edit."
+            ],
+            why: "Use mode switching when you want the right panel to stay open but change jobs from metadata editing to continuity or notes.",
+            related: ["inspector", "entities", "notes"]
         ),
         entry(
             "modular-corkboard",
@@ -856,6 +883,20 @@ enum HelpReferenceLibrary {
             ],
             why: "Use it when you want help keeping names and references consistent while writing.",
             related: ["entities", "inspector", "notes"]
+        ),
+        entry(
+            "entity-assistant",
+            "Entity Assistant",
+            category: "Workspace",
+            summary: "The entity assistant is the compact editor helper for tracked mentions in the current scene.",
+            what: "It shows which tracked entities are already recognized in the active scene and gives you quick actions to insert or jump to them.",
+            how: [
+                "Select a scene and work in the editor.",
+                "Look for the `Entity Assistant` bar above the writing area.",
+                "Use `Insert` to place a tracked entity name into the editor, or `Jump` to move to that entity's primary scene."
+            ],
+            why: "Use it when you want continuity support while drafting without leaving the editor for the full Entities sheet.",
+            related: ["entities", "entity-highlights", "editor-writing"]
         ),
         entry(
             "entity-relationships",
