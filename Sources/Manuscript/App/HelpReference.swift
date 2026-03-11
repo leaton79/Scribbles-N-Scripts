@@ -1287,6 +1287,11 @@ struct HelpReferenceSheet: View {
         return filteredEntries.first
     }
 
+    private var guidedSelectionIndex: Int? {
+        guard let selectedEntryID else { return nil }
+        return guidedPathIDs.firstIndex(of: selectedEntryID)
+    }
+
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 12) {
@@ -1366,6 +1371,29 @@ struct HelpReferenceSheet: View {
                         detailSection(title: "What It Does", body: selectedEntry.whatItDoes)
                         detailStepsSection(title: "How To Use It", steps: selectedEntry.howToUse)
                         detailSection(title: "Why Use It", body: selectedEntry.whyUseIt)
+
+                        if let guidedSelectionIndex {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Guided Path")
+                                    .font(.headline)
+                                HStack(spacing: 10) {
+                                    if guidedSelectionIndex > 0,
+                                       let previousEntry = HelpReferenceLibrary.entry(for: guidedPathIDs[guidedSelectionIndex - 1]) {
+                                        Button("Previous: \(previousEntry.title)") {
+                                            selectedEntryID = previousEntry.id
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                    if guidedSelectionIndex < guidedPathIDs.count - 1,
+                                       let nextEntry = HelpReferenceLibrary.entry(for: guidedPathIDs[guidedSelectionIndex + 1]) {
+                                        Button("Next: \(nextEntry.title)") {
+                                            selectedEntryID = nextEntry.id
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                    }
+                                }
+                            }
+                        }
 
                         if !selectedEntry.relatedIDs.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {

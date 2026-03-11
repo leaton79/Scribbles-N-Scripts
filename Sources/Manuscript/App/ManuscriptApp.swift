@@ -512,11 +512,17 @@ private struct WorkspaceView: View {
             }
 
             if commands.recentProjects.isEmpty {
-                ContentUnavailableView(
-                    "No Recent Projects",
-                    systemImage: "books.vertical",
-                    description: Text("Create a project or open an existing manuscript folder to begin building your workspace.")
-                )
+                VStack(alignment: .center, spacing: 8) {
+                    ContentUnavailableView(
+                        "No Recent Projects",
+                        systemImage: "books.vertical",
+                        description: Text("Create a project or open an existing manuscript folder to begin building your workspace.")
+                    )
+                    Button("Help") {
+                        NotificationCenter.default.post(name: .showHelpReference, object: "recent-projects-empty")
+                    }
+                    .buttonStyle(.borderless)
+                }
                 .frame(maxWidth: .infinity, minHeight: 240)
                 .background(workspace.themePalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(
@@ -2432,11 +2438,17 @@ private struct ProjectSettingsSheet: View {
                             }
                         }
                         if workspace.appearancePresets.isEmpty {
-                            ContentUnavailableView(
-                                "No Appearance Presets",
-                                systemImage: "paintbrush.pointed",
-                                description: Text("Save a preferred writing look here to quickly restore the same theme, font, spacing, and editor width later.")
-                            )
+                            VStack(alignment: .leading, spacing: 8) {
+                                ContentUnavailableView(
+                                    "No Appearance Presets",
+                                    systemImage: "paintbrush.pointed",
+                                    description: Text("Save a preferred writing look here to quickly restore the same theme, font, spacing, and editor width later.")
+                                )
+                                Button("Help") {
+                                    NotificationCenter.default.post(name: .showHelpReference, object: "appearance-presets")
+                                }
+                                .buttonStyle(.borderless)
+                            }
                         } else {
                             VStack(alignment: .leading, spacing: 10) {
                                 ForEach(workspace.appearancePresets) { preset in
@@ -2523,11 +2535,17 @@ private struct ProjectSettingsSheet: View {
                             .disabled(newFieldName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                         if workspace.inspectorCustomFields.isEmpty {
-                            ContentUnavailableView(
-                                "No Metadata Fields",
-                                systemImage: "tray",
-                                description: Text("Create reusable scene metadata fields here, then fill in scene values from the inspector.")
-                            )
+                            VStack(alignment: .leading, spacing: 8) {
+                                ContentUnavailableView(
+                                    "No Metadata Fields",
+                                    systemImage: "tray",
+                                    description: Text("Create reusable scene metadata fields here, then fill in scene values from the inspector.")
+                                )
+                                Button("Help") {
+                                    NotificationCenter.default.post(name: .showHelpReference, object: "metadata-schema")
+                                }
+                                .buttonStyle(.borderless)
+                            }
                         } else {
                             VStack(alignment: .leading, spacing: 12) {
                                 ForEach(Array(workspace.inspectorCustomFields.enumerated()), id: \.element.id) { index, field in
@@ -2784,11 +2802,17 @@ private struct MoveSceneToChapterSheet: View {
             Text("Move Scene to Chapter")
                 .font(.headline)
             if workspace.moveSceneTargetChapters.isEmpty {
-                ContentUnavailableView(
-                    "No Available Chapters",
-                    systemImage: "tray",
-                    description: Text("Create another chapter before moving this scene.")
-                )
+                VStack(alignment: .leading, spacing: 8) {
+                    ContentUnavailableView(
+                        "No Available Chapters",
+                        systemImage: "tray",
+                        description: Text("Create another chapter before moving this scene.")
+                    )
+                    Button("Help") {
+                        NotificationCenter.default.post(name: .showHelpReference, object: "move-to-chapter")
+                    }
+                    .buttonStyle(.borderless)
+                }
             } else {
                 Picker("Chapter", selection: $selectedChapterID) {
                     ForEach(workspace.moveSceneTargetChapters, id: \.id) { chapter in
@@ -3696,11 +3720,17 @@ private struct TimelineSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     InlineHelpTopics(topicIDs: ["timeline-events", "scene-actions"])
                     if workspace.timelineEvents.isEmpty {
-                        ContentUnavailableView(
-                            "No Timeline Events Yet",
-                            systemImage: "timeline.selection",
-                            description: Text("Add events here to map plot beats, chronology, and scene-linked story tracks.")
-                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            ContentUnavailableView(
+                                "No Timeline Events Yet",
+                                systemImage: "timeline.selection",
+                                description: Text("Add events here to map plot beats, chronology, and scene-linked story tracks.")
+                            )
+                            Button("Help") {
+                                NotificationCenter.default.post(name: .showHelpReference, object: "timeline-events")
+                            }
+                            .buttonStyle(.borderless)
+                        }
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 10) {
@@ -3969,9 +3999,17 @@ private struct SourceLibrarySheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 InlineHelpTopics(topicIDs: ["sources", "source-links", "citation-insertion"])
                 if filteredSources.isEmpty {
-                    Text(libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No sources yet. Add a reference, URL, or research file to start your library." : "No sources match the current filter. Clear or change the filter to see more references.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No sources yet. Add a reference, URL, or research file to start your library." : "No sources match the current filter. Clear or change the filter to see more references.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Button("Help") {
+                                NotificationCenter.default.post(name: .showHelpReference, object: "sources")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
@@ -4489,11 +4527,17 @@ private struct ScratchpadSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     InlineHelpTopics(topicIDs: ["scratchpad", "scratchpad-capture"])
                     if workspace.scratchpadItems.isEmpty {
-                        ContentUnavailableView(
-                            "No Scratchpad Items Yet",
-                            systemImage: "square.and.pencil.on.square",
-                            description: Text("Capture a selection or add a reusable snippet here for fast reinsertion while drafting.")
-                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            ContentUnavailableView(
+                                "No Scratchpad Items Yet",
+                                systemImage: "square.and.pencil.on.square",
+                                description: Text("Capture a selection or add a reusable snippet here for fast reinsertion while drafting.")
+                            )
+                            Button("Help") {
+                                NotificationCenter.default.post(name: .showHelpReference, object: "scratchpad")
+                            }
+                            .buttonStyle(.borderless)
+                        }
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 10) {
@@ -4714,11 +4758,17 @@ private struct EntityTrackerSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     InlineHelpTopics(topicIDs: ["entities", "entity-relationships"])
                     if workspace.entities.isEmpty {
-                        ContentUnavailableView(
-                            "No Entities Yet",
-                            systemImage: "person.2.crop.square.stack",
-                            description: Text("Track characters, places, objects, and aliases here so scene context and mention scanning have something to build on.")
-                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            ContentUnavailableView(
+                                "No Entities Yet",
+                                systemImage: "person.2.crop.square.stack",
+                                description: Text("Track characters, places, objects, and aliases here so scene context and mention scanning have something to build on.")
+                            )
+                            Button("Help") {
+                                NotificationCenter.default.post(name: .showHelpReference, object: "entities")
+                            }
+                            .buttonStyle(.borderless)
+                        }
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 10) {
@@ -5018,11 +5068,17 @@ private struct NotesSheet: View {
 
             GroupBox("Saved Notes") {
                 if filteredNotes.isEmpty {
-                    ContentUnavailableView(
-                        "No Notes Yet",
-                        systemImage: "note.text",
-                        description: Text("Create a note to capture loose ideas, scene context, entity details, or research takeaways.")
-                    )
+                    VStack(alignment: .leading, spacing: 8) {
+                        ContentUnavailableView(
+                            "No Notes Yet",
+                            systemImage: "note.text",
+                            description: Text("Create a note to capture loose ideas, scene context, entity details, or research takeaways.")
+                        )
+                        Button("Help") {
+                            NotificationCenter.default.post(name: .showHelpReference, object: "notes")
+                        }
+                        .buttonStyle(.borderless)
+                    }
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
