@@ -405,7 +405,7 @@ private struct WorkspaceView: View {
                             Text("Notebook-first drafting for long-form writing.")
                                 .font(.title3)
                                 .foregroundStyle(.secondary)
-                            Text("Create a manuscript, reopen a recent project, or jump back into your last working draft.")
+                            Text("Start a new manuscript, reopen a recent draft, or use Commands to jump straight into the workflow.")
                                 .font(.body)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -478,7 +478,7 @@ private struct WorkspaceView: View {
                 ContentUnavailableView(
                     "No Recent Projects",
                     systemImage: "books.vertical",
-                    description: Text("Start a new project or open an existing manuscript folder to build your workspace.")
+                    description: Text("Create a project or open an existing manuscript folder to begin building your workspace.")
                 )
                 .frame(maxWidth: .infinity, minHeight: 240)
                 .background(workspace.themePalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -2318,7 +2318,7 @@ private struct ProjectSettingsSheet: View {
                             ContentUnavailableView(
                                 "No Appearance Presets",
                                 systemImage: "paintbrush.pointed",
-                                description: Text("Save your current appearance setup to reuse it across this project.")
+                                description: Text("Save a preferred writing look here to quickly restore the same theme, font, spacing, and editor width later.")
                             )
                         } else {
                             VStack(alignment: .leading, spacing: 10) {
@@ -2439,7 +2439,7 @@ private struct ProjectSettingsSheet: View {
                             ContentUnavailableView(
                                 "No Metadata Fields",
                                 systemImage: "tray",
-                                description: Text("Create project metadata fields here, then edit values from the inspector.")
+                                description: Text("Create reusable scene metadata fields here, then fill in scene values from the inspector.")
                             )
                         } else {
                             VStack(alignment: .leading, spacing: 12) {
@@ -2672,7 +2672,7 @@ private struct StagingTrayView: View {
             }
 
             if workspace.stagingScenes.isEmpty {
-                Text("No staged scenes.")
+                Text("No staged scenes right now. Send scenes here when you want them parked outside the manuscript flow.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -2866,7 +2866,7 @@ private struct ImportExportSheet: View {
 
             GroupBox("Export") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(workspace.isRecoveryMode ? "Recovery exports are written outside the damaged project into a sibling recovery-exports folder." : "Exports are written into the project’s `exports/` folder.")
+                    Text(workspace.isRecoveryMode ? "Recovery exports are written outside the damaged project into a sibling recovery-exports folder." : "Exports are written into the project’s `exports/` folder. Save a preset when you want to reuse this exact compile setup later.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -3777,7 +3777,7 @@ private struct SourceLibrarySheet: View {
     private var librarySection: some View {
         GroupBox("Library") {
             if filteredSources.isEmpty {
-                Text(libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No sources yet." : "No sources match the current filter.")
+                Text(libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No sources yet. Add a reference, URL, or research file to start your library." : "No sources match the current filter. Clear or change the filter to see more references.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -4799,9 +4799,11 @@ private struct NotesSheet: View {
 
             GroupBox("Saved Notes") {
                 if filteredNotes.isEmpty {
-                    Text("No notes yet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView(
+                        "No Notes Yet",
+                        systemImage: "note.text",
+                        description: Text("Create a note to capture loose ideas, scene context, entity details, or research takeaways.")
+                    )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
