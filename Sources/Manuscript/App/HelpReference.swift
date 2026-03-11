@@ -802,20 +802,6 @@ enum HelpReferenceLibrary {
             related: ["project-settings", "inspector", "entities"]
         ),
         entry(
-            "inspector-modes",
-            "Inspector Modes",
-            category: "Workspace",
-            summary: "The inspector can change between contextual manuscript details, entity detail, and note detail.",
-            what: "Instead of being only a scene metadata panel, the inspector can also focus on note detail or entity detail when those items are active.",
-            how: [
-                "Show the inspector.",
-                "Select a scene, chapter, note, or entity from the relevant UI surface.",
-                "Use the inspector to edit the currently focused kind of detail."
-            ],
-            why: "Use it when you want to stay in the main workspace instead of bouncing in and out of modal sheets.",
-            related: ["inspector", "entities", "notes"]
-        ),
-        entry(
             "goals-dashboard-details",
             "Goals Dashboard Details",
             category: "Workspace",

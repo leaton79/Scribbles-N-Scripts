@@ -579,6 +579,17 @@ private struct WorkspaceView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("First Steps")
+                    .font(.headline)
+                guidedHelpButton(title: "Start with the Welcome Screen", topicID: "welcome-screen")
+                guidedHelpButton(title: "Learn the Command Palette", topicID: "command-palette")
+                guidedHelpButton(title: "Understand the Inspector", topicID: "inspector")
+                guidedHelpButton(title: "Search the Whole Project", topicID: "find-project")
+            }
         }
         .padding(20)
         .background(workspace.themePalette.panel, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -603,6 +614,14 @@ private struct WorkspaceView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private func guidedHelpButton(title: String, topicID: String) -> some View {
+        Button(title) {
+            NotificationCenter.default.post(name: .showHelpReference, object: topicID)
+        }
+        .buttonStyle(.borderless)
+        .font(.caption)
     }
 
     private func loadedWorkspaceView(commands: WorkspaceCommandBindings, geometry: GeometryProxy) -> AnyView {
@@ -1264,6 +1283,12 @@ private struct WorkspaceView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
+            Spacer(minLength: 0)
+            Button("Help") {
+                NotificationCenter.default.post(name: .showHelpReference, object: "help-reference")
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
