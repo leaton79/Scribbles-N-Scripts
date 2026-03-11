@@ -6,6 +6,11 @@ Scribbles-N-Scripts is a macOS writing application built with Swift and SwiftUI.
 
 Feature-complete across the major manuscript-writing surfaces in the project Bible, with current work focused on release polish, workflow depth, and export/research refinement.
 
+## Milestones
+
+- [v1.0.0 Release Notes](docs/releases/v1.0.0.md)
+- [Post-v1 Roadmap](docs/POST-V1-ROADMAP.md)
+
 ## Current Surfaces
 
 - Project I/O, backups, and recovery mode
