@@ -13,6 +13,7 @@ enum CommandPaletteAction: Equatable {
     case exportRecoveryMarkdown
     case showProjectSettings
     case setTheme(AppTheme)
+    case applyAppearancePreset(UUID)
     case showImportExport
     case showTimeline
     case showEntities
@@ -197,6 +198,23 @@ enum WorkspaceCommandPalette {
                 keywords: ["theme", "appearance", "color", theme.displayName.lowercased()],
                 isEnabled: workspace.hasOpenProject,
                 action: .setTheme(theme)
+            )
+        }
+        for preset in commands.appearancePresets {
+            append(
+                "Appearance Preset: \(preset.name)",
+                subtitle: "\(preset.theme.displayName) • \(preset.fontName) \(preset.fontSize) pt • \(Int(preset.editorContentWidth)) pt width",
+                category: "Appearance",
+                keywords: [
+                    "appearance",
+                    "preset",
+                    "theme",
+                    preset.name.lowercased(),
+                    preset.theme.displayName.lowercased(),
+                    preset.fontName.lowercased()
+                ],
+                isEnabled: workspace.hasOpenProject,
+                action: .applyAppearancePreset(preset.id)
             )
         }
         append(

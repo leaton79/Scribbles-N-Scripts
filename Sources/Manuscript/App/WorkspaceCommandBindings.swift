@@ -21,6 +21,10 @@ struct WorkspaceCommandBindings {
         workspace.projectSettings?.theme ?? .system
     }
 
+    var appearancePresets: [AppearancePreset] {
+        workspace.appearancePresets
+    }
+
     var canReopenLastProject: Bool {
         workspace.canReopenLastProject
     }
@@ -226,6 +230,11 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func setTheme(_ theme: AppTheme) -> String? {
         workspace.setTheme(theme)
+    }
+
+    @discardableResult
+    func applyAppearancePreset(_ presetID: UUID) -> String? {
+        workspace.applyAppearancePreset(presetID)
     }
 
     @discardableResult

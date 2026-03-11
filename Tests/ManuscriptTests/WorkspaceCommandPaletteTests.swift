@@ -19,6 +19,7 @@ final class WorkspaceCommandPaletteTests: XCTestCase {
         let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "PaletteCore")
         let secondChapter = try workspace.projectManager.addChapter(to: nil, at: nil, title: "Second Chapter")
         let secondScene = try workspace.projectManager.addScene(to: secondChapter.id, at: nil, title: "Second Scene")
+        XCTAssertEqual(workspace.saveAppearancePreset(name: "Draft Focus"), "Saved appearance preset “Draft Focus”.")
         let commands = WorkspaceCommandBindings(workspace: workspace)
 
         let items = WorkspaceCommandPalette.items(workspace: workspace, commands: commands)
@@ -27,6 +28,7 @@ final class WorkspaceCommandPaletteTests: XCTestCase {
         XCTAssertTrue(items.contains(where: { $0.title == "Switch Project" && $0.shortcut == "⇧⌘K" }))
         XCTAssertTrue(items.contains(where: { $0.title == "Project Settings" && $0.action == .showProjectSettings }))
         XCTAssertTrue(items.contains(where: { $0.title == "Import / Export" && $0.action == .showImportExport }))
+        XCTAssertTrue(items.contains(where: { $0.title == "Appearance Preset: Draft Focus" }))
         XCTAssertTrue(items.contains(where: { $0.title == "Timeline" && $0.action == .showTimeline }))
         XCTAssertTrue(items.contains(where: { $0.title == "Entities" && $0.action == .showEntities }))
         XCTAssertTrue(items.contains(where: { $0.title == "Sources" && $0.action == .showSources }))

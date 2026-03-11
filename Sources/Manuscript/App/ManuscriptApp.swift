@@ -1085,6 +1085,17 @@ private struct WorkspaceView: View {
                                 }
                             }
                         }
+                        if !commands.appearancePresets.isEmpty {
+                            Menu("Appearance Presets") {
+                                ForEach(commands.appearancePresets) { preset in
+                                    Button {
+                                        actionNotice = commands.applyAppearancePreset(preset.id)
+                                    } label: {
+                                        Text(preset.name)
+                                    }
+                                }
+                            }
+                        }
                         Button(workspace.isInspectorVisible ? "Hide Inspector" : "Show Inspector") {
                             commands.toggleInspector()
                         }
@@ -3510,9 +3521,11 @@ private struct TimelineSheet: View {
 
             GroupBox("Events") {
                 if workspace.timelineEvents.isEmpty {
-                    Text("No timeline events yet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView(
+                        "No Timeline Events Yet",
+                        systemImage: "timeline.selection",
+                        description: Text("Add events here to map plot beats, chronology, and scene-linked story tracks.")
+                    )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
@@ -4285,9 +4298,11 @@ private struct ScratchpadSheet: View {
 
             GroupBox("Items") {
                 if workspace.scratchpadItems.isEmpty {
-                    Text("No scratchpad items yet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView(
+                        "No Scratchpad Items Yet",
+                        systemImage: "square.and.pencil.on.square",
+                        description: Text("Capture a selection or add a reusable snippet here for fast reinsertion while drafting.")
+                    )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
@@ -4503,9 +4518,11 @@ private struct EntityTrackerSheet: View {
 
             GroupBox("Tracked") {
                 if workspace.entities.isEmpty {
-                    Text("No entities yet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView(
+                        "No Entities Yet",
+                        systemImage: "person.2.crop.square.stack",
+                        description: Text("Track characters, places, objects, and aliases here so scene context and mention scanning have something to build on.")
+                    )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
@@ -6247,6 +6264,8 @@ private struct CommandPaletteSheet: View {
             DispatchQueue.main.async(execute: onShowProjectSettings)
         case let .setTheme(theme):
             onNotice(commands.setTheme(theme))
+        case let .applyAppearancePreset(presetID):
+            onNotice(commands.applyAppearancePreset(presetID))
         case .showImportExport:
             DispatchQueue.main.async(execute: onShowImportExport)
         case .showTimeline:
