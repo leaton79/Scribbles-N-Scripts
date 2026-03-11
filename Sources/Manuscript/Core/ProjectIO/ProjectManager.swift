@@ -1375,7 +1375,9 @@ final class FileSystemProjectManager: ProjectManager {
             editorFont: "Menlo",
             editorFontSize: 14,
             editorLineHeight: 1.6,
+            editorContentWidth: 860,
             theme: .system,
+            appearancePresets: [],
             defaultColorLabelNames: defaultLabelNames
         )
     }

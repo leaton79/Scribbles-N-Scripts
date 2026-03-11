@@ -17,6 +17,10 @@ struct WorkspaceCommandBindings {
         workspace.canShowImportExport
     }
 
+    var currentTheme: AppTheme {
+        workspace.projectSettings?.theme ?? .system
+    }
+
     var canReopenLastProject: Bool {
         workspace.canReopenLastProject
     }
@@ -217,6 +221,11 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func saveProject() -> String? {
         workspace.saveProjectNow()
+    }
+
+    @discardableResult
+    func setTheme(_ theme: AppTheme) -> String? {
+        workspace.setTheme(theme)
     }
 
     @discardableResult

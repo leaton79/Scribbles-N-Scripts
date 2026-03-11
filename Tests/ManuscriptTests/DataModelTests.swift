@@ -75,7 +75,19 @@ final class DataModelTests: XCTestCase {
                 editorFont: "Menlo",
                 editorFontSize: 14,
                 editorLineHeight: 1.6,
+                editorContentWidth: 860,
                 theme: .system,
+                appearancePresets: [
+                    AppearancePreset(
+                        id: UUID(),
+                        name: "Draft Focus",
+                        theme: .parchment,
+                        fontName: "Georgia",
+                        fontSize: 16,
+                        lineHeight: 1.8,
+                        editorContentWidth: 900
+                    )
+                ],
                 defaultColorLabelNames: [.red: "Red"]
             ),
             tags: [],
@@ -95,6 +107,30 @@ final class DataModelTests: XCTestCase {
         XCTAssertEqual(decoded.name, project.name)
         XCTAssertEqual(decoded.manuscript.parts.count, 1)
         XCTAssertEqual(decoded.manuscript.parts.first?.chapters.first?.scenes.count, 1)
+        XCTAssertEqual(decoded.settings.editorContentWidth, 860, accuracy: 0.001)
+        XCTAssertEqual(decoded.settings.appearancePresets.first?.name, "Draft Focus")
+    }
+
+    func testProjectSettingsBackwardDecodeDefaultsMissingAppearanceFields() throws {
+        let data = try XCTUnwrap("""
+        {
+          "autosaveIntervalSeconds": 30,
+          "backupIntervalMinutes": 30,
+          "backupRetentionCount": 20,
+          "backupLocation": null,
+          "customMetadataFields": [],
+          "customStatusOptions": null,
+          "editorFont": "Menlo",
+          "editorFontSize": 14,
+          "editorLineHeight": 1.6,
+          "theme": "system"
+        }
+        """.data(using: .utf8))
+
+        let decoded = try JSONDecoder().decode(ProjectSettings.self, from: data)
+
+        XCTAssertEqual(decoded.editorContentWidth, 860, accuracy: 0.001)
+        XCTAssertTrue(decoded.appearancePresets.isEmpty)
     }
 
     func testContentStatusHasExactlyFiveValues() {

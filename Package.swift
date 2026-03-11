@@ -15,7 +15,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "ScribblesNScripts",
-            path: "Sources/Manuscript"
+            path: "Sources/Manuscript",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "ScribblesNScriptsTests",

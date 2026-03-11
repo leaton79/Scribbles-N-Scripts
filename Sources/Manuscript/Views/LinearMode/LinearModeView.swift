@@ -26,7 +26,7 @@ struct LinearModeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            EditorView(state: editorState, presentation: presentation)
+            centeredEditor(EditorView(state: editorState, presentation: presentation))
 
             ForEach(linearState.boundaries, id: \.followingSceneId) { boundary in
                 Divider()
@@ -35,6 +35,16 @@ struct LinearModeView: View {
                         .font(.headline)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func centeredEditor<Content: View>(_ content: Content) -> some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            content
+                .frame(maxWidth: presentation.contentWidth, maxHeight: .infinity)
+            Spacer(minLength: 0)
         }
     }
 }

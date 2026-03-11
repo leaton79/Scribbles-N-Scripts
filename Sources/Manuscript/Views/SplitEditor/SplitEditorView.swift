@@ -9,20 +9,30 @@ struct SplitEditorView: View {
             if state.isSplit, let _ = state.secondarySceneId {
                 if state.orientation == .vertical {
                     HStack(spacing: 0) {
-                        EditorView(state: state.primaryEditor, presentation: presentation)
+                        centeredEditor(EditorView(state: state.primaryEditor, presentation: presentation))
                         Divider()
-                        EditorView(state: state.secondaryEditor, presentation: presentation)
+                        centeredEditor(EditorView(state: state.secondaryEditor, presentation: presentation))
                     }
                 } else {
                     VStack(spacing: 0) {
-                        EditorView(state: state.primaryEditor, presentation: presentation)
+                        centeredEditor(EditorView(state: state.primaryEditor, presentation: presentation))
                         Divider()
-                        EditorView(state: state.secondaryEditor, presentation: presentation)
+                        centeredEditor(EditorView(state: state.secondaryEditor, presentation: presentation))
                     }
                 }
             } else {
-                EditorView(state: state.primaryEditor, presentation: presentation)
+                centeredEditor(EditorView(state: state.primaryEditor, presentation: presentation))
             }
+        }
+    }
+
+    @ViewBuilder
+    private func centeredEditor<Content: View>(_ content: Content) -> some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            content
+                .frame(maxWidth: presentation.contentWidth, maxHeight: .infinity)
+            Spacer(minLength: 0)
         }
     }
 }

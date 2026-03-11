@@ -8,8 +8,10 @@ Feature-complete across the major manuscript-writing surfaces in the project Bib
 
 ## Milestones
 
+- [v1.0.1 Release Notes](docs/releases/v1.0.1.md)
 - [v1.0.0 Release Notes](docs/releases/v1.0.0.md)
 - [Post-v1 Roadmap](docs/POST-V1-ROADMAP.md)
+- [Screenshot Shot List](docs/screenshots/SHOTLIST.md)
 
 ## Current Surfaces
 
@@ -19,6 +21,7 @@ Feature-complete across the major manuscript-writing surfaces in the project Bib
 - Snapshots, tags, metadata schemas, goals/statistics, and advanced Find/Replace
 - Timeline, entities, notes, sources/research library, and scratchpad
 - Import/export with Markdown, HTML, DOCX, PDF, and EPUB output
+- Branded welcome screen, bundled app icon, workspace themes, and appearance presets
 
 ## Run
 

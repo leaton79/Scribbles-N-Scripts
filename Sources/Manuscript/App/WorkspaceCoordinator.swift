@@ -1044,18 +1044,23 @@ final class WorkspaceCoordinator: ObservableObject {
         return EditorPresentationSettings(
             fontName: settings.editorFont,
             fontSize: CGFloat(settings.editorFontSize),
-            lineHeight: CGFloat(settings.editorLineHeight)
+            lineHeight: CGFloat(settings.editorLineHeight),
+            contentWidth: CGFloat(settings.editorContentWidth),
+            theme: settings.theme
         )
     }
 
     var preferredColorScheme: ColorScheme? {
-        switch projectSettings?.theme {
-        case .light:
-            return .light
-        case .dark:
-            return .dark
-        default:
-            return nil
+        themePalette.colorScheme
+    }
+
+    var themePalette: AppThemePalette {
+        AppThemePalette.forTheme(projectSettings?.theme ?? .system)
+    }
+
+    var appearancePresets: [AppearancePreset] {
+        (projectSettings?.appearancePresets ?? []).sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 
@@ -1658,6 +1663,7 @@ final class WorkspaceCoordinator: ObservableObject {
         editorFont: String,
         editorFontSize: Int,
         editorLineHeight: Double,
+        editorContentWidth: Double,
         theme: AppTheme
     ) -> String? {
         guard var settings = projectSettings else { return "No project is currently open." }
@@ -1667,6 +1673,7 @@ final class WorkspaceCoordinator: ObservableObject {
         settings.editorFont = normalizeTitle(editorFont, fallback: settings.editorFont)
         settings.editorFontSize = max(8, editorFontSize)
         settings.editorLineHeight = max(1.0, min(editorLineHeight, 3.0))
+        settings.editorContentWidth = max(520, min(editorContentWidth, 1600))
         settings.theme = theme
         do {
             try projectManager.updateProjectSettings(settings)
@@ -1676,6 +1683,97 @@ final class WorkspaceCoordinator: ObservableObject {
             return nil
         } catch {
             return "Could not update project settings: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func setTheme(_ theme: AppTheme) -> String? {
+        guard let settings = projectSettings else { return "No project is currently open." }
+        return updateProjectSettings(
+            autosaveIntervalSeconds: settings.autosaveIntervalSeconds,
+            backupIntervalMinutes: settings.backupIntervalMinutes,
+            backupRetentionCount: settings.backupRetentionCount,
+            editorFont: settings.editorFont,
+            editorFontSize: settings.editorFontSize,
+            editorLineHeight: settings.editorLineHeight,
+            editorContentWidth: settings.editorContentWidth,
+            theme: theme
+        )
+    }
+
+    @discardableResult
+    func saveAppearancePreset(id: UUID? = nil, name rawName: String) -> String? {
+        guard var settings = projectSettings else { return "No project is currently open." }
+        let name = normalizeTitle(rawName, fallback: "")
+        guard !name.isEmpty else { return "Give the appearance preset a name." }
+
+        let preset = AppearancePreset(
+            id: id ?? UUID(),
+            name: name,
+            theme: settings.theme,
+            fontName: settings.editorFont,
+            fontSize: settings.editorFontSize,
+            lineHeight: settings.editorLineHeight,
+            editorContentWidth: settings.editorContentWidth
+        )
+
+        if let existingIndex = settings.appearancePresets.firstIndex(where: { $0.id == preset.id }) {
+            settings.appearancePresets[existingIndex] = preset
+        } else if let existingIndex = settings.appearancePresets.firstIndex(where: {
+            $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
+        }) {
+            settings.appearancePresets[existingIndex] = preset
+        } else {
+            settings.appearancePresets.append(preset)
+        }
+        settings.appearancePresets.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+        do {
+            try projectManager.updateProjectSettings(settings)
+            refreshDerivedStates()
+            objectWillChange.send()
+            return "Saved appearance preset “\(preset.name)”." 
+        } catch {
+            return "Could not save appearance preset: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func applyAppearancePreset(_ presetID: UUID) -> String? {
+        guard let settings = projectSettings else { return "No project is currently open." }
+        guard let preset = settings.appearancePresets.first(where: { $0.id == presetID }) else {
+            return "That appearance preset could not be found."
+        }
+        if let error = updateProjectSettings(
+            autosaveIntervalSeconds: settings.autosaveIntervalSeconds,
+            backupIntervalMinutes: settings.backupIntervalMinutes,
+            backupRetentionCount: settings.backupRetentionCount,
+            editorFont: preset.fontName,
+            editorFontSize: preset.fontSize,
+            editorLineHeight: preset.lineHeight,
+            editorContentWidth: preset.editorContentWidth,
+            theme: preset.theme
+        ) {
+            return error
+        }
+        return "Applied appearance preset “\(preset.name)”."
+    }
+
+    @discardableResult
+    func deleteAppearancePreset(_ presetID: UUID) -> String? {
+        guard var settings = projectSettings else { return "No project is currently open." }
+        guard let existingIndex = settings.appearancePresets.firstIndex(where: { $0.id == presetID }) else {
+            return "That appearance preset could not be found."
+        }
+        let name = settings.appearancePresets[existingIndex].name
+        settings.appearancePresets.remove(at: existingIndex)
+        do {
+            try projectManager.updateProjectSettings(settings)
+            refreshDerivedStates()
+            objectWillChange.send()
+            return "Deleted appearance preset “\(name)”."
+        } catch {
+            return "Could not delete appearance preset: \(error.localizedDescription)"
         }
     }
 

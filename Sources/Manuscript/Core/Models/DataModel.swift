@@ -552,12 +552,117 @@ struct ProjectSettings: Codable {
     var editorFont: String
     var editorFontSize: Int
     var editorLineHeight: Double
+    var editorContentWidth: Double
     var theme: AppTheme
+    var appearancePresets: [AppearancePreset]
     var defaultColorLabelNames: [ColorLabel: String]
+
+    init(
+        autosaveIntervalSeconds: Int,
+        backupIntervalMinutes: Int,
+        backupRetentionCount: Int,
+        backupLocation: String?,
+        customMetadataFields: [CustomMetadataField],
+        customStatusOptions: [String]?,
+        editorFont: String,
+        editorFontSize: Int,
+        editorLineHeight: Double,
+        editorContentWidth: Double = 860,
+        theme: AppTheme,
+        appearancePresets: [AppearancePreset] = [],
+        defaultColorLabelNames: [ColorLabel: String]
+    ) {
+        self.autosaveIntervalSeconds = autosaveIntervalSeconds
+        self.backupIntervalMinutes = backupIntervalMinutes
+        self.backupRetentionCount = backupRetentionCount
+        self.backupLocation = backupLocation
+        self.customMetadataFields = customMetadataFields
+        self.customStatusOptions = customStatusOptions
+        self.editorFont = editorFont
+        self.editorFontSize = editorFontSize
+        self.editorLineHeight = editorLineHeight
+        self.editorContentWidth = editorContentWidth
+        self.theme = theme
+        self.appearancePresets = appearancePresets
+        self.defaultColorLabelNames = defaultColorLabelNames
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case autosaveIntervalSeconds
+        case backupIntervalMinutes
+        case backupRetentionCount
+        case backupLocation
+        case customMetadataFields
+        case customStatusOptions
+        case editorFont
+        case editorFontSize
+        case editorLineHeight
+        case editorContentWidth
+        case theme
+        case appearancePresets
+        case defaultColorLabelNames
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        autosaveIntervalSeconds = try container.decode(Int.self, forKey: .autosaveIntervalSeconds)
+        backupIntervalMinutes = try container.decode(Int.self, forKey: .backupIntervalMinutes)
+        backupRetentionCount = try container.decode(Int.self, forKey: .backupRetentionCount)
+        backupLocation = try container.decodeIfPresent(String.self, forKey: .backupLocation)
+        customMetadataFields = try container.decodeIfPresent([CustomMetadataField].self, forKey: .customMetadataFields) ?? []
+        customStatusOptions = try container.decodeIfPresent([String].self, forKey: .customStatusOptions)
+        editorFont = try container.decode(String.self, forKey: .editorFont)
+        editorFontSize = try container.decode(Int.self, forKey: .editorFontSize)
+        editorLineHeight = try container.decode(Double.self, forKey: .editorLineHeight)
+        editorContentWidth = try container.decodeIfPresent(Double.self, forKey: .editorContentWidth) ?? 860
+        theme = try container.decodeIfPresent(AppTheme.self, forKey: .theme) ?? .system
+        appearancePresets = try container.decodeIfPresent([AppearancePreset].self, forKey: .appearancePresets) ?? []
+        defaultColorLabelNames = try container.decodeIfPresent([ColorLabel: String].self, forKey: .defaultColorLabelNames)
+            ?? Dictionary(uniqueKeysWithValues: ColorLabel.allCases.map { ($0, $0.rawValue.capitalized) })
+    }
+}
+
+struct AppearancePreset: Codable, Identifiable, Equatable {
+    var id: UUID
+    var name: String
+    var theme: AppTheme
+    var fontName: String
+    var fontSize: Int
+    var lineHeight: Double
+    var editorContentWidth: Double
 }
 
 enum AppTheme: String, Codable, CaseIterable {
+    case system
     case light
     case dark
-    case system
+    case parchment
+    case midnight
+    case forest
+    case rose
+
+    var displayName: String {
+        switch self {
+        case .system:
+            return "System"
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        case .parchment:
+            return "Parchment"
+        case .midnight:
+            return "Midnight Ink"
+        case .forest:
+            return "Forest Draft"
+        case .rose:
+            return "Rose Study"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        self = AppTheme(rawValue: value) ?? .system
+    }
 }

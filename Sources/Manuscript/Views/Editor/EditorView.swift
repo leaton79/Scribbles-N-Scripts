@@ -5,11 +5,15 @@ struct EditorPresentationSettings: Equatable {
     var fontName: String
     var fontSize: CGFloat
     var lineHeight: CGFloat
+    var contentWidth: CGFloat
+    var theme: AppTheme
 
     static let `default` = EditorPresentationSettings(
         fontName: "Menlo",
         fontSize: 14,
-        lineHeight: 1.6
+        lineHeight: 1.6,
+        contentWidth: 860,
+        theme: .system
     )
 }
 
@@ -48,7 +52,7 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.drawsBackground = true
-        textView.backgroundColor = .textBackgroundColor
+        textView.backgroundColor = AppThemePalette.forTheme(presentation.theme).editorBackground
         textView.delegate = context.coordinator
 
         let scrollView = NSScrollView()
@@ -125,25 +129,32 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
 
         private func applyPresentation(to textView: NSTextView) {
             let font = resolvedFont()
+            let palette = AppThemePalette.forTheme(presentation.theme)
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.lineSpacing = max(0, (presentation.lineHeight - 1.0) * font.pointSize)
 
             textView.font = font
             textView.defaultParagraphStyle = paragraphStyle
+            textView.backgroundColor = palette.editorBackground
+            textView.textColor = palette.editorText
+            textView.insertionPointColor = palette.editorText
             textView.typingAttributes[.font] = font
             textView.typingAttributes[.paragraphStyle] = paragraphStyle
+            textView.typingAttributes[.foregroundColor] = palette.editorText
 
             guard let storage = textView.textStorage else { return }
             let fullRange = NSRange(location: 0, length: storage.length)
             storage.beginEditing()
             storage.addAttribute(.font, value: font, range: fullRange)
             storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+            storage.addAttribute(.foregroundColor, value: palette.editorText, range: fullRange)
             storage.endEditing()
         }
 
         private func applyHighlightAttributes(on textView: NSTextView, content: String) {
             guard let storage = textView.textStorage else { return }
             let fullRange = NSRange(location: 0, length: storage.length)
+            let palette = AppThemePalette.forTheme(presentation.theme)
 
             isApplyingState = true
             storage.beginEditing()
@@ -154,7 +165,7 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
                 guard nsRange.length > 0 else { continue }
                 storage.addAttribute(
                     .backgroundColor,
-                    value: NSColor.systemTeal.withAlphaComponent(0.18),
+                    value: palette.entityHighlight,
                     range: nsRange
                 )
             }
@@ -164,7 +175,7 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
                 guard nsRange.length > 0 else { continue }
                 storage.addAttribute(
                     .backgroundColor,
-                    value: NSColor.systemYellow.withAlphaComponent(0.32),
+                    value: palette.searchHighlight,
                     range: nsRange
                 )
             }
@@ -174,7 +185,7 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
                 if nsRange.length > 0 {
                     storage.addAttribute(
                         .backgroundColor,
-                        value: NSColor.systemOrange.withAlphaComponent(0.45),
+                        value: palette.activeSearchHighlight,
                         range: nsRange
                     )
                 }

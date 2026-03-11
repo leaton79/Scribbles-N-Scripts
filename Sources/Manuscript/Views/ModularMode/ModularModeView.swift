@@ -8,6 +8,7 @@ struct ModularModeView: View {
     var grouping: CardGrouping
     var activeFilters: FilterSet
     @ObservedObject var modularState: ModularModeState
+    @Environment(\.appThemePalette) private var palette
 
     func selectCard(sceneId: UUID) {
         modularState.selectCard(sceneId: sceneId)
@@ -29,6 +30,7 @@ struct ModularModeView: View {
             }
             .padding()
         }
+        .background(palette.canvas)
     }
 
     private var modularControls: some View {
@@ -113,7 +115,11 @@ struct ModularModeView: View {
                     .padding(8)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(group.isStagingArea ? Color.orange.opacity(0.08) : Color.secondary.opacity(0.05))
+                            .fill(group.isStagingArea ? Color.orange.opacity(0.10) : palette.panel)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(group.isStagingArea ? Color.orange.opacity(0.22) : palette.border, lineWidth: 1)
                     )
                     .onDrop(of: [UTType.text], isTargeted: nil) { providers in
                         handleDrop(providers: providers, into: group)
@@ -144,7 +150,11 @@ struct ModularModeView: View {
                     }
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(section.isStagingArea ? Color.orange.opacity(0.08) : Color.secondary.opacity(0.05))
+                            .fill(section.isStagingArea ? Color.orange.opacity(0.10) : palette.panel)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(section.isStagingArea ? Color.orange.opacity(0.22) : palette.border, lineWidth: 1)
                     )
                 }
             }
@@ -198,6 +208,7 @@ private struct CardView: View {
     let card: CardData
     let isSelected: Bool
     let density: CorkboardDensity
+    @Environment(\.appThemePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -216,11 +227,17 @@ private struct CardView: View {
                 Spacer()
                 Text(card.status.rawValue)
                     .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(palette.statusFill(card.status), in: Capsule())
+                    .foregroundStyle(palette.statusText(card.status))
             }
 
             HStack(spacing: 6) {
                 if let colorLabel = card.colorLabel {
-                    Circle().frame(width: 8, height: 8)
+                    Circle()
+                        .fill(palette.colorLabelFill(colorLabel))
+                        .frame(width: 8, height: 8)
                         .overlay(Text(colorLabel.rawValue.prefix(1).uppercased()).font(.system(size: 1)))
                 }
                 ForEach(card.tags.prefix(density == .compact ? 2 : 3), id: \.id) { tag in
@@ -228,17 +245,18 @@ private struct CardView: View {
                         .font(.caption2)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.thinMaterial)
+                        .background(palette.tagFill())
+                        .foregroundStyle(palette.tagText)
                         .clipShape(Capsule())
                 }
             }
         }
         .padding(density == .compact ? 10 : 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.ultraThinMaterial))
+        .background(RoundedRectangle(cornerRadius: 10).fill(palette.card))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+                .stroke(isSelected ? palette.tint : palette.border, lineWidth: isSelected ? 2 : 1)
         )
     }
 }
@@ -248,13 +266,14 @@ private struct OutlineRowView: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onOpen: () -> Void
+    @Environment(\.appThemePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 if let colorLabel = row.colorLabel {
                     Circle()
-                        .fill(Color.accentColor.opacity(0.7))
+                        .fill(palette.colorLabelFill(colorLabel))
                         .frame(width: 8, height: 8)
                         .overlay(
                             Circle()
@@ -272,6 +291,10 @@ private struct OutlineRowView: View {
                 Spacer()
                 Text(row.status.rawValue)
                     .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(palette.statusFill(row.status), in: Capsule())
+                    .foregroundStyle(palette.statusText(row.status))
                 Text("\(row.wordCount) words")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -289,7 +312,8 @@ private struct OutlineRowView: View {
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(.thinMaterial)
+                            .background(palette.tagFill())
+                            .foregroundStyle(palette.tagText)
                             .clipShape(Capsule())
                     }
                 }
@@ -297,7 +321,7 @@ private struct OutlineRowView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? Color.accentColor.opacity(0.10) : Color.clear)
+        .background(isSelected ? palette.tint.opacity(0.12) : palette.card)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onTapGesture(count: 2, perform: onOpen)

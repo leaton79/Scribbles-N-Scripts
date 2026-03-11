@@ -12,6 +12,7 @@ enum CommandPaletteAction: Equatable {
     case duplicateRecoveryProject
     case exportRecoveryMarkdown
     case showProjectSettings
+    case setTheme(AppTheme)
     case showImportExport
     case showTimeline
     case showEntities
@@ -188,6 +189,16 @@ enum WorkspaceCommandPalette {
             isEnabled: workspace.hasOpenProject,
             action: .showProjectSettings
         )
+        for theme in AppTheme.allCases {
+            append(
+                "Theme: \(theme.displayName)",
+                subtitle: theme == commands.currentTheme ? "Current workspace theme" : "Switch the workspace appearance",
+                category: "Appearance",
+                keywords: ["theme", "appearance", "color", theme.displayName.lowercased()],
+                isEnabled: workspace.hasOpenProject,
+                action: .setTheme(theme)
+            )
+        }
         append(
             "Import / Export",
             subtitle: "Import scenes or compile the project to export formats",

@@ -390,6 +390,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
                 editorFont: "Menlo",
                 editorFontSize: 16,
                 editorLineHeight: 1.8,
+                editorContentWidth: 920,
                 theme: .dark
             )
         )
@@ -401,11 +402,56 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(settings.editorFont, "Menlo")
         XCTAssertEqual(settings.editorFontSize, 16)
         XCTAssertEqual(settings.editorLineHeight, 1.8, accuracy: 0.001)
+        XCTAssertEqual(settings.editorContentWidth, 920, accuracy: 0.001)
         XCTAssertEqual(settings.theme, .dark)
         XCTAssertEqual(coordinator.editorPresentationSettings.fontName, "Menlo")
         XCTAssertEqual(coordinator.editorPresentationSettings.fontSize, 16, accuracy: 0.001)
         XCTAssertEqual(coordinator.editorPresentationSettings.lineHeight, 1.8, accuracy: 0.001)
+        XCTAssertEqual(coordinator.editorPresentationSettings.contentWidth, 920, accuracy: 0.001)
         XCTAssertEqual(coordinator.preferredColorScheme, .dark)
+    }
+
+    func testAppearancePresetsPersistApplyAndDelete() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "AppearancePresets")
+
+        XCTAssertNil(
+            coordinator.updateProjectSettings(
+                autosaveIntervalSeconds: 30,
+                backupIntervalMinutes: 30,
+                backupRetentionCount: 20,
+                editorFont: "Georgia",
+                editorFontSize: 17,
+                editorLineHeight: 1.9,
+                editorContentWidth: 980,
+                theme: .parchment
+            )
+        )
+        XCTAssertEqual(coordinator.saveAppearancePreset(name: "Draft Focus"), "Saved appearance preset “Draft Focus”.")
+
+        XCTAssertNil(
+            coordinator.updateProjectSettings(
+                autosaveIntervalSeconds: 30,
+                backupIntervalMinutes: 30,
+                backupRetentionCount: 20,
+                editorFont: "Avenir Next",
+                editorFontSize: 14,
+                editorLineHeight: 1.4,
+                editorContentWidth: 760,
+                theme: .midnight
+            )
+        )
+
+        let savedPreset = try XCTUnwrap(coordinator.appearancePresets.first)
+        XCTAssertEqual(savedPreset.fontName, "Georgia")
+        XCTAssertEqual(savedPreset.editorContentWidth, 980, accuracy: 0.001)
+
+        XCTAssertEqual(coordinator.applyAppearancePreset(savedPreset.id), "Applied appearance preset “Draft Focus”.")
+        XCTAssertEqual(coordinator.projectSettings?.editorFont, "Georgia")
+        XCTAssertEqual(coordinator.projectSettings?.theme, .parchment)
+        XCTAssertEqual(try XCTUnwrap(coordinator.projectSettings?.editorContentWidth), 980, accuracy: 0.001)
+
+        XCTAssertEqual(coordinator.deleteAppearancePreset(savedPreset.id), "Deleted appearance preset “Draft Focus”.")
+        XCTAssertTrue(coordinator.appearancePresets.isEmpty)
     }
 
     func testExportProjectWritesMarkdownToExportsFolder() throws {
