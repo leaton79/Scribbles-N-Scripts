@@ -11,6 +11,8 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightCap")
         UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightSafetyThreshold")
         UserDefaults.standard.removeObject(forKey: "workspace.replaceSceneSelectionMode")
+        UserDefaults.standard.removeObject(forKey: "workspace.sidebarTextSize")
+        UserDefaults.standard.removeObject(forKey: "workspace.inspectorTextSize")
     }
 
     override func tearDownWithError() throws {
@@ -171,6 +173,28 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         try workspace.projectManager.closeProject()
         XCTAssertEqual(bindings.reopenLastProject(), "Reopened project \"BindingsTarget\".")
         XCTAssertEqual(workspace.projectDisplayName, "BindingsTarget")
+    }
+
+    func testAppearanceBindingsExposeAndAdjustIndependentTextSizes() throws {
+        let suiteName = "WorkspaceCommandBindingsTests.TextSizes.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "BindingsTextSizes",
+            searchPreferenceStore: defaults
+        )
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertEqual(bindings.editorTextSize, 14)
+        XCTAssertEqual(Int(bindings.sidebarTextSize), 15)
+        XCTAssertEqual(Int(bindings.inspectorTextSize), 14)
+
+        XCTAssertEqual(bindings.adjustSidebarTextSize(by: 1), "Sidebar text is now 16 pt.")
+        XCTAssertEqual(bindings.adjustInspectorTextSize(by: 2), "Inspector text is now 16 pt.")
+        XCTAssertNil(bindings.adjustEditorTextSize(by: 2))
+        XCTAssertEqual(bindings.editorTextSize, 16)
     }
 
     func testSaveAsAndRenameDelegationAndAvailability() throws {

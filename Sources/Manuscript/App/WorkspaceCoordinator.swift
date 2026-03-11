@@ -38,6 +38,8 @@ final class WorkspaceCoordinator: ObservableObject {
     private static let searchHighlightCapKey = "workspace.searchHighlightCap"
     private static let searchHighlightSafetyThresholdKey = "workspace.searchHighlightSafetyThreshold"
     private static let replaceSceneSelectionModeKey = "workspace.replaceSceneSelectionMode"
+    private static let sidebarTextSizeKey = "workspace.sidebarTextSize"
+    private static let inspectorTextSizeKey = "workspace.inspectorTextSize"
     private static let searchChapterPresetKeyPrefix = "workspace.searchChapterPresets"
     private static let maxRecentProjects = 10
     private static let maxSearchChapterPresets = 5
@@ -47,6 +49,10 @@ final class WorkspaceCoordinator: ObservableObject {
     private static let maxSearchHighlightCap = 1_000
     private static let minSearchHighlightSafetyThreshold = 100
     private static let maxSearchHighlightSafetyThreshold = 20_000
+    private static let defaultSidebarTextSize = 15.0
+    private static let defaultInspectorTextSize = 14.0
+    private static let minPeripheralTextSize = 11.0
+    private static let maxPeripheralTextSize = 24.0
     private static let exportTimestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -97,6 +103,8 @@ final class WorkspaceCoordinator: ObservableObject {
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var currentSearchResultIndex: Int?
     @Published private(set) var includedReplaceSceneIDs: Set<UUID> = []
+    @Published private(set) var sidebarTextSize: CGFloat
+    @Published private(set) var inspectorTextSize: CGFloat
     @Published private(set) var recoveryCandidateURL: URL?
     @Published private(set) var recoveryCandidateDetails: String?
     @Published var notesFocusSceneID: UUID?
@@ -359,6 +367,14 @@ final class WorkspaceCoordinator: ObservableObject {
         let normalized = Self.normalizeSearchHighlightPreferences(cap: storedCap, threshold: storedThreshold)
         self.searchHighlightCap = normalized.cap
         self.searchHighlightSafetyThreshold = normalized.threshold
+        let storedSidebarTextSize = searchPreferenceStore.object(forKey: Self.sidebarTextSizeKey) != nil
+            ? searchPreferenceStore.double(forKey: Self.sidebarTextSizeKey)
+            : Self.defaultSidebarTextSize
+        let storedInspectorTextSize = searchPreferenceStore.object(forKey: Self.inspectorTextSizeKey) != nil
+            ? searchPreferenceStore.double(forKey: Self.inspectorTextSizeKey)
+            : Self.defaultInspectorTextSize
+        self.sidebarTextSize = Self.normalizePeripheralTextSize(storedSidebarTextSize)
+        self.inspectorTextSize = Self.normalizePeripheralTextSize(storedInspectorTextSize)
         if let storedModeRawValue = searchPreferenceStore.string(forKey: Self.replaceSceneSelectionModeKey),
            let storedMode = ReplaceSceneSelectionMode(rawValue: storedModeRawValue) {
             self.replaceSceneSelectionMode = storedMode
@@ -3697,9 +3713,81 @@ final class WorkspaceCoordinator: ObservableObject {
         return (normalizedCap, normalizedThreshold)
     }
 
+    private static func normalizePeripheralTextSize(_ value: CGFloat) -> CGFloat {
+        min(max(value, CGFloat(minPeripheralTextSize)), CGFloat(maxPeripheralTextSize))
+    }
+
     private func persistSearchHighlightPreferences() {
         searchPreferenceStore.set(searchHighlightCap, forKey: Self.searchHighlightCapKey)
         searchPreferenceStore.set(searchHighlightSafetyThreshold, forKey: Self.searchHighlightSafetyThresholdKey)
+    }
+
+    @discardableResult
+    func setSidebarTextSize(_ size: CGFloat) -> String? {
+        let normalized = Self.normalizePeripheralTextSize(size)
+        guard normalized != sidebarTextSize else { return nil }
+        sidebarTextSize = normalized
+        searchPreferenceStore.set(Double(normalized), forKey: Self.sidebarTextSizeKey)
+        return "Sidebar text is now \(Int(normalized)) pt."
+    }
+
+    @discardableResult
+    func adjustSidebarTextSize(by delta: CGFloat) -> String? {
+        setSidebarTextSize(sidebarTextSize + delta)
+    }
+
+    @discardableResult
+    func resetSidebarTextSize() -> String? {
+        setSidebarTextSize(CGFloat(Self.defaultSidebarTextSize))
+    }
+
+    @discardableResult
+    func setInspectorTextSize(_ size: CGFloat) -> String? {
+        let normalized = Self.normalizePeripheralTextSize(size)
+        guard normalized != inspectorTextSize else { return nil }
+        inspectorTextSize = normalized
+        searchPreferenceStore.set(Double(normalized), forKey: Self.inspectorTextSizeKey)
+        return "Inspector text is now \(Int(normalized)) pt."
+    }
+
+    @discardableResult
+    func adjustInspectorTextSize(by delta: CGFloat) -> String? {
+        setInspectorTextSize(inspectorTextSize + delta)
+    }
+
+    @discardableResult
+    func resetInspectorTextSize() -> String? {
+        setInspectorTextSize(CGFloat(Self.defaultInspectorTextSize))
+    }
+
+    @discardableResult
+    func adjustEditorTextSize(by delta: Int) -> String? {
+        guard let settings = projectSettings else { return "No project is currently open." }
+        return updateProjectSettings(
+            autosaveIntervalSeconds: settings.autosaveIntervalSeconds,
+            backupIntervalMinutes: settings.backupIntervalMinutes,
+            backupRetentionCount: settings.backupRetentionCount,
+            editorFont: settings.editorFont,
+            editorFontSize: settings.editorFontSize + delta,
+            editorLineHeight: settings.editorLineHeight,
+            editorContentWidth: settings.editorContentWidth,
+            theme: settings.theme
+        )
+    }
+
+    @discardableResult
+    func resetEditorTextSize() -> String? {
+        guard let settings = projectSettings else { return "No project is currently open." }
+        return updateProjectSettings(
+            autosaveIntervalSeconds: settings.autosaveIntervalSeconds,
+            backupIntervalMinutes: settings.backupIntervalMinutes,
+            backupRetentionCount: settings.backupRetentionCount,
+            editorFont: settings.editorFont,
+            editorFontSize: 14,
+            editorLineHeight: settings.editorLineHeight,
+            editorContentWidth: settings.editorContentWidth,
+            theme: settings.theme
+        )
     }
 
     private func persistReplaceSceneSelectionModePreference() {

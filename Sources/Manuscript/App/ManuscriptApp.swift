@@ -170,7 +170,7 @@ struct ScribblesNScriptsApp: App {
                 .disabled(!commands.canSaveAndBackup)
             }
 
-            CommandMenu("View") {
+            CommandMenu("Workspace") {
                 Button("Linear Mode") {
                     commands.setModeLinear()
                 }
@@ -269,6 +269,71 @@ struct ScribblesNScriptsApp: App {
                 .keyboardShortcut("g", modifiers: [.command, .shift])
             }
 
+            CommandMenu("Appearance") {
+                Menu("Theme") {
+                    ForEach(AppTheme.allCases, id: \.self) { theme in
+                        Button(theme.displayName) {
+                            _ = commands.setTheme(theme)
+                        }
+                    }
+                }
+
+                Menu("Appearance Presets") {
+                    if commands.appearancePresets.isEmpty {
+                        Text("No Appearance Presets")
+                    } else {
+                        ForEach(commands.appearancePresets) { preset in
+                            Button(preset.name) {
+                                _ = commands.applyAppearancePreset(preset.id)
+                            }
+                        }
+                    }
+                }
+                .disabled(commands.appearancePresets.isEmpty)
+
+                Divider()
+
+                Menu("Sidebar Text (\(Int(commands.sidebarTextSize)) pt)") {
+                    Button("Smaller Sidebar Text") {
+                        _ = commands.adjustSidebarTextSize(by: -1)
+                    }
+                    Button("Larger Sidebar Text") {
+                        _ = commands.adjustSidebarTextSize(by: 1)
+                    }
+                    Divider()
+                    Button("Reset Sidebar Text") {
+                        _ = commands.resetSidebarTextSize()
+                    }
+                }
+
+                Menu("Editor Text (\(commands.editorTextSize) pt)") {
+                    Button("Smaller Editor Text") {
+                        _ = commands.adjustEditorTextSize(by: -1)
+                    }
+                    Button("Larger Editor Text") {
+                        _ = commands.adjustEditorTextSize(by: 1)
+                    }
+                    Divider()
+                    Button("Reset Editor Text") {
+                        _ = commands.resetEditorTextSize()
+                    }
+                }
+                .disabled(!workspace.hasOpenProject)
+
+                Menu("Inspector Text (\(Int(commands.inspectorTextSize)) pt)") {
+                    Button("Smaller Inspector Text") {
+                        _ = commands.adjustInspectorTextSize(by: -1)
+                    }
+                    Button("Larger Inspector Text") {
+                        _ = commands.adjustInspectorTextSize(by: 1)
+                    }
+                    Divider()
+                    Button("Reset Inspector Text") {
+                        _ = commands.resetInspectorTextSize()
+                    }
+                }
+            }
+
             CommandMenu("Find") {
                 Button("Find in Current Scene") {
                     NotificationCenter.default.post(name: .showInlineSearch, object: nil)
@@ -321,7 +386,7 @@ struct ScribblesNScriptsApp: App {
                 .disabled(!commands.canRedoLastReplaceBatch)
             }
 
-            CommandMenu("Help") {
+            CommandGroup(after: .help) {
                 Button("Scribbles-N-Scripts Help") {
                     NotificationCenter.default.post(name: .showHelpReference, object: nil)
                 }
@@ -481,6 +546,7 @@ private struct WorkspaceView: View {
                     RoundedRectangle(cornerRadius: 26, style: .continuous)
                         .stroke(workspace.themePalette.border, lineWidth: 1)
                 )
+                .shadow(color: workspace.themePalette.shadow, radius: 18, x: 0, y: 10)
 
                 HStack(alignment: .top, spacing: 20) {
                     recentProjectsHomeSection(commands: commands)
@@ -529,6 +595,7 @@ private struct WorkspaceView: View {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(workspace.themePalette.border, lineWidth: 1)
                 )
+                .shadow(color: workspace.themePalette.softShadow, radius: 14, x: 0, y: 8)
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(commands.recentProjects.prefix(8)) { project in
@@ -556,6 +623,7 @@ private struct WorkspaceView: View {
                                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                                     .stroke(workspace.themePalette.border, lineWidth: 1)
                             )
+                            .shadow(color: workspace.themePalette.softShadow, radius: 10, x: 0, y: 6)
                         }
                         .buttonStyle(.plain)
                     }
@@ -603,6 +671,7 @@ private struct WorkspaceView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(workspace.themePalette.border, lineWidth: 1)
         )
+        .shadow(color: workspace.themePalette.softShadow, radius: 16, x: 0, y: 10)
     }
 
     private func homeGuideRow(title: String, detail: String) -> some View {
@@ -632,11 +701,16 @@ private struct WorkspaceView: View {
 
     private func loadedWorkspaceView(commands: WorkspaceCommandBindings, geometry: GeometryProxy) -> AnyView {
         var view = AnyView(
-            HStack(spacing: 0) {
-                sidebarPane
+            HSplitView {
+                if workspace.activeEditorChromeVisibility.showSidebar {
+                    sidebarPane
+                }
                 mainPane(commands: commands, geometry: geometry)
-                inspectorPane
+                if workspace.isInspectorVisible && workspace.activeEditorChromeVisibility.showInspector {
+                    inspectorPane
+                }
             }
+            .padding(14)
             .background(workspace.themePalette.canvas)
         )
         view = AnyView(view.onChange(of: workspace.modeController.activeMode) { _, mode in
@@ -928,27 +1002,31 @@ private struct WorkspaceView: View {
 
     @ViewBuilder
     private var sidebarPane: some View {
-        if workspace.activeEditorChromeVisibility.showSidebar {
-            VStack(spacing: 0) {
-                SidebarView(
-                    navigationState: workspace.navigationState,
-                    nodes: sidebarNodes,
-                    onSelect: workspace.select(node:)
-                )
-                if workspace.stagingSceneCount > 0 {
-                    Divider()
-                    StagingTrayView(workspace: workspace) { notice in
-                        actionNotice = notice
-                    }
-                    .frame(maxHeight: 240)
-                    .background(workspace.themePalette.panel)
+        VStack(spacing: 0) {
+            SidebarView(
+                navigationState: workspace.navigationState,
+                nodes: sidebarNodes,
+                baseFontSize: workspace.sidebarTextSize,
+                onSelect: workspace.select(node:)
+            )
+            if workspace.stagingSceneCount > 0 {
+                Divider()
+                StagingTrayView(workspace: workspace) { notice in
+                    actionNotice = notice
                 }
+                .frame(maxHeight: 240)
+                .background(workspace.themePalette.panel)
             }
-            .frame(minWidth: 260, idealWidth: 300, maxWidth: 360)
-            .background(workspace.themePalette.sidebar)
-
-            Divider()
         }
+        .font(.system(size: workspace.sidebarTextSize))
+        .frame(minWidth: 220, idealWidth: 300, maxWidth: 420)
+        .padding(10)
+        .background(workspace.themePalette.sidebar, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(workspace.themePalette.border, lineWidth: 1)
+        )
+        .shadow(color: workspace.themePalette.softShadow, radius: 14, x: 0, y: 8)
     }
 
     private func mainPane(commands: WorkspaceCommandBindings, geometry: GeometryProxy) -> some View {
@@ -975,40 +1053,53 @@ private struct WorkspaceView: View {
                 editorPresentation: workspace.editorPresentationSettings
             )
         }
+        .background(workspace.themePalette.panel, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(workspace.themePalette.border, lineWidth: 1)
+        )
+        .shadow(color: workspace.themePalette.shadow, radius: 18, x: 0, y: 10)
     }
 
     @ViewBuilder
     private var inspectorPane: some View {
-        if workspace.isInspectorVisible && workspace.activeEditorChromeVisibility.showInspector {
-            Divider()
-            InspectorPanelView(
-                workspace: workspace,
-                onNotice: { notice in
-                    actionNotice = notice
-                },
-                onShowMetadataSchema: {
-                    showingProjectSettings = true
-                }
-            )
-            .frame(minWidth: 300, idealWidth: 340, maxWidth: 380)
-            .background(workspace.themePalette.panel)
-        }
+        InspectorPanelView(
+            workspace: workspace,
+            onNotice: { notice in
+                actionNotice = notice
+            },
+            onShowMetadataSchema: {
+                showingProjectSettings = true
+            }
+        )
+        .frame(minWidth: 280, idealWidth: 340, maxWidth: 460)
+        .padding(10)
+        .background(workspace.themePalette.panel, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(workspace.themePalette.border, lineWidth: 1)
+        )
+        .shadow(color: workspace.themePalette.softShadow, radius: 14, x: 0, y: 8)
     }
 
     private func workspaceChrome(commands: WorkspaceCommandBindings, geometry: GeometryProxy) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(nsImage: AppIconRenderer.brandImage(size: 56))
                     .resizable()
                     .interpolation(.high)
-                    .frame(width: 42, height: 42)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: 46, height: 46)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(workspace.themePalette.border, lineWidth: 1)
+                    )
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(workspace.projectDisplayName)
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
                     Text("Long-form writing workspace")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -1202,17 +1293,17 @@ private struct WorkspaceView: View {
                     recentProjectsMenu(commands: commands)
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.regular)
+                .controlSize(.large)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(workspace.themePalette.chrome)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(workspace.themePalette.border)
-                .frame(height: 1)
-        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .background(workspace.themePalette.chrome, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(workspace.themePalette.border, lineWidth: 1)
+        )
+        .padding([.top, .horizontal], 12)
     }
 
     private func recentProjectsMenu(commands: WorkspaceCommandBindings) -> some View {
@@ -1263,27 +1354,33 @@ private struct WorkspaceView: View {
                     }
                 }
                 .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
             }
-            .background(.ultraThinMaterial.opacity(0.5))
+            .background(workspace.themePalette.panel.opacity(0.92), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(workspace.themePalette.border, lineWidth: 1)
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
         }
     }
 
     private func chromePrimaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
+            .controlSize(.large)
     }
 
     private func chromeBadge(title: String, tone: Color) -> some View {
         Text(title)
             .font(.caption.weight(.medium))
             .foregroundStyle(tone)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
             .background(
-                Capsule()
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(tone == .secondary ? workspace.themePalette.mutedBadge : tone.opacity(0.12))
             )
     }
@@ -1304,8 +1401,12 @@ private struct WorkspaceView: View {
             .font(.caption)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(workspace.themePalette.notice, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 10)
+        .background(workspace.themePalette.notice, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(workspace.themePalette.border, lineWidth: 1)
+        )
     }
 
     private var recoveryChromeBanner: some View {
@@ -1649,6 +1750,7 @@ private struct InspectorPanelView: View {
             }
             .padding(16)
         }
+        .font(.system(size: workspace.inspectorTextSize))
         .onAppear(perform: syncDraftsFromWorkspace)
         .onChange(of: workspace.inspectorScene?.id) { _, _ in
             syncDraftsFromWorkspace()
@@ -2846,6 +2948,7 @@ private struct StagingTrayView: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @State private var selectedChapterID: UUID?
+    @Environment(\.appThemePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -2921,6 +3024,11 @@ private struct StagingTrayView: View {
             }
         }
         .padding(12)
+        .background(palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
         .onAppear {
             selectedChapterID = workspace.stagingRecoveryTargetChapters.first?.id
         }
@@ -2930,6 +3038,7 @@ private struct StagingTrayView: View {
 private struct EditorEntityAssistantBar: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
+    @Environment(\.appThemePalette) private var palette
 
     private var scene: ManifestScene? {
         workspace.inspectorScene
@@ -3002,7 +3111,13 @@ private struct EditorEntityAssistantBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.thinMaterial)
+        .background(palette.panel, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 }
 
@@ -3011,6 +3126,7 @@ private struct ImportExportSheet: View {
     let onNotice: (String?) -> Void
     let onImport: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appThemePalette) private var palette
     @State private var presetName = ""
     @State private var presetFormat: ExportFormat = .markdown
     @State private var presetFontFamily = "Menlo"
@@ -3485,6 +3601,8 @@ private struct ImportExportSheet: View {
         }
         .padding(20)
         .frame(minWidth: 620, minHeight: 520)
+        .groupBoxStyle(WorkspacePanelGroupBoxStyle())
+        .background(palette.canvas.opacity(0.96))
         .onAppear(perform: syncDrafts)
     }
 
@@ -3621,6 +3739,7 @@ private struct TimelineSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appThemePalette) private var palette
     @State private var eventTitle = ""
     @State private var eventDescription = ""
     @State private var eventTrack = "Main Plot"
@@ -3769,6 +3888,12 @@ private struct TimelineSheet: View {
                                                 .foregroundStyle(.secondary)
                                         }
                                     }
+                                    .padding(12)
+                                    .background(palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(palette.border, lineWidth: 1)
+                                    )
                                 }
                             }
                         }
@@ -3778,6 +3903,8 @@ private struct TimelineSheet: View {
         }
         .padding(20)
         .frame(minWidth: 620, minHeight: 540)
+        .groupBoxStyle(WorkspacePanelGroupBoxStyle())
+        .background(palette.canvas.opacity(0.96))
     }
 
     private func sceneForID(_ sceneID: UUID) -> ManifestScene? {
@@ -3829,6 +3956,7 @@ private struct SourceLibrarySheet: View {
     let onImportResearch: (UUID) -> Void
     let onNotice: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appThemePalette) private var palette
     @State private var sourceTitle = ""
     @State private var sourceAuthor = ""
     @State private var sourceDate = ""
@@ -3875,6 +4003,8 @@ private struct SourceLibrarySheet: View {
         }
         .padding(20)
         .frame(minWidth: 720, minHeight: 620)
+        .groupBoxStyle(WorkspacePanelGroupBoxStyle())
+        .background(palette.canvas.opacity(0.96))
         .onAppear {
             if selectedSourceID == nil {
                 selectedSourceID = workspace.sources.first?.id
@@ -4251,11 +4381,14 @@ private struct SourceLibrarySheet: View {
         .onTapGesture {
             selectedSourceID = source.id
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(selectedSourceID == source.id ? Color.accentColor.opacity(0.08) : Color.clear)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(selectedSourceID == source.id ? palette.tint.opacity(0.12) : palette.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(selectedSourceID == source.id ? palette.tint.opacity(0.55) : palette.border, lineWidth: 1)
         )
     }
 
@@ -4324,11 +4457,14 @@ private struct SourceLibrarySheet: View {
                 }
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(selectedAttachmentID == attachment.id ? Color.accentColor.opacity(0.08) : Color.clear)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(selectedAttachmentID == attachment.id ? palette.tint.opacity(0.12) : palette.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(selectedAttachmentID == attachment.id ? palette.tint.opacity(0.55) : palette.border, lineWidth: 1)
         )
     }
 
@@ -4469,6 +4605,7 @@ private struct ScratchpadSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appThemePalette) private var palette
     @State private var itemTitle = ""
     @State private var itemContent = ""
     @State private var itemKind: ScratchpadItemKind = .scratch
@@ -4581,7 +4718,12 @@ private struct ScratchpadSheet: View {
                                             .lineLimit(4)
                                             .foregroundStyle(.secondary)
                                     }
-                                    .padding(.vertical, 4)
+                                    .padding(12)
+                                    .background(palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(palette.border, lineWidth: 1)
+                                    )
                                 }
                             }
                         }
@@ -4591,6 +4733,8 @@ private struct ScratchpadSheet: View {
         }
         .padding(20)
         .frame(minWidth: 620, minHeight: 500)
+        .groupBoxStyle(WorkspacePanelGroupBoxStyle())
+        .background(palette.canvas.opacity(0.96))
     }
 
     private func resetDraft() {
@@ -4605,6 +4749,7 @@ private struct EntityTrackerSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appThemePalette) private var palette
     @State private var entityName = ""
     @State private var entityType: EntityType = .character
     @State private var aliasDraft = ""
@@ -4862,6 +5007,12 @@ private struct EntityTrackerSheet: View {
                                             }
                                         }
                                     }
+                                    .padding(12)
+                                    .background(palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(palette.border, lineWidth: 1)
+                                    )
                                 }
                             }
                         }
@@ -4872,6 +5023,8 @@ private struct EntityTrackerSheet: View {
         }
         .padding(20)
         .frame(minWidth: 520, minHeight: 420)
+        .groupBoxStyle(WorkspacePanelGroupBoxStyle())
+        .background(palette.canvas.opacity(0.96))
     }
 
     private func resetDrafts() {
@@ -4908,6 +5061,7 @@ private struct NotesSheet: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     let onNotice: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appThemePalette) private var palette
     @State private var noteTitle = ""
     @State private var noteFolder = ""
     @State private var noteContent = ""
@@ -5142,6 +5296,12 @@ private struct NotesSheet: View {
                                         }
                                     }
                                 }
+                                .padding(12)
+                                .background(palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(palette.border, lineWidth: 1)
+                                )
                             }
                         }
                     }
@@ -5151,6 +5311,8 @@ private struct NotesSheet: View {
         }
         .padding(20)
         .frame(minWidth: 560, minHeight: 520)
+        .groupBoxStyle(WorkspacePanelGroupBoxStyle())
+        .background(palette.canvas.opacity(0.96))
         .onAppear(perform: applyWorkspaceFocus)
         .onChange(of: workspace.notesFocusSceneID) { _, _ in
             applyWorkspaceFocus()
@@ -5220,6 +5382,169 @@ private struct FlowAliasesView: View {
     }
 }
 
+private struct WorkspacePanelGroupBoxStyle: GroupBoxStyle {
+    @Environment(\.appThemePalette) private var palette
+
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            configuration.label
+                .font(.headline.weight(.semibold))
+            configuration.content
+        }
+        .padding(16)
+        .background(palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
+        .shadow(color: palette.softShadow, radius: 10, x: 0, y: 6)
+    }
+}
+
+private struct InteractiveSurfaceButtonStyle: ButtonStyle {
+    let isSelected: Bool
+    let isHovered: Bool
+    @Environment(\.appThemePalette) private var palette
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        palette.interactiveFill(
+                            isSelected: isSelected,
+                            isHovered: isHovered,
+                            isPressed: configuration.isPressed
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(
+                        palette.interactiveBorder(
+                            isSelected: isSelected,
+                            isHovered: isHovered,
+                            isPressed: configuration.isPressed
+                        ),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+            .shadow(
+                color: isHovered ? palette.softShadow.opacity(1.25) : .clear,
+                radius: 8,
+                x: 0,
+                y: 4
+            )
+            .scaleEffect(configuration.isPressed ? 0.992 : (isHovered ? 1.003 : 1.0))
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.14), value: isHovered)
+    }
+}
+
+private struct GroupedResultsSectionHeaderView: View {
+    let title: String
+    let matchCount: Int
+    let isCollapsed: Bool
+    let onToggle: () -> Void
+    @Environment(\.appThemePalette) private var palette
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 8) {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text("\(matchCount)")
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(palette.mutedBadge, in: Capsule())
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(InteractiveSurfaceButtonStyle(isSelected: false, isHovered: isHovering))
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+private struct GroupedResultsSceneHeaderView: View {
+    let title: String
+    let matchCount: Int
+    let isCollapsed: Bool
+    let onToggle: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 8) {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text("\(matchCount) match\(matchCount == 1 ? "" : "es")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(InteractiveSurfaceButtonStyle(isSelected: false, isHovered: isHovering))
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+private struct GroupedResultsItemRowView: View {
+    let resultIndex: Int
+    let snippet: Text
+    let isSelected: Bool
+    let onSelect: () -> Void
+    @Environment(\.appThemePalette) private var palette
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(alignment: .top, spacing: 10) {
+                Text("\(resultIndex + 1).")
+                    .font(.caption.monospacedDigit().weight(.medium))
+                    .foregroundStyle(isSelected ? palette.tint : .secondary)
+                    .frame(width: 34, alignment: .leading)
+
+                snippet
+                    .font(.caption)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .multilineTextAlignment(.leading)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(InteractiveSurfaceButtonStyle(isSelected: isSelected, isHovered: isHovering))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isSelected ? palette.focusRing : .clear, lineWidth: 0.5)
+        )
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
 private struct WorkspaceSheetHeader: View {
     let title: String
     let subtitle: String
@@ -5249,9 +5574,9 @@ private struct WorkspaceSheetHeader: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.title3.weight(.semibold))
+                    .font(.title2.weight(.semibold))
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -5267,7 +5592,14 @@ private struct WorkspaceSheetHeader: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
         }
-        .padding(.bottom, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
+        .shadow(color: palette.softShadow, radius: 10, x: 0, y: 6)
     }
 }
 
@@ -5318,6 +5650,7 @@ private struct WorkspaceMetricStrip: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(palette.border, lineWidth: 1)
                     )
+                    .shadow(color: palette.softShadow, radius: 6, x: 0, y: 3)
                 }
             }
         }
@@ -6315,40 +6648,30 @@ private struct SearchPanelSheet: View {
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private func groupedResultsSectionHeader(_ section: SearchResultSection) -> some View {
-        Button {
-            toggleChapterCollapse(section.id)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: collapsedSearchChapters.contains(section.id) ? "chevron.right" : "chevron.down")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("\(section.chapterTitle) (\(section.matchCount))")
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        GroupedResultsSectionHeaderView(
+            title: section.chapterTitle,
+            matchCount: section.matchCount,
+            isCollapsed: collapsedSearchChapters.contains(section.id),
+            onToggle: { toggleChapterCollapse(section.id) }
+        )
+        .listRowInsets(EdgeInsets(top: 8, leading: 10, bottom: 4, trailing: 10))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private func groupedResultsScene(_ scene: SearchResultSceneGroup, commands: WorkspaceCommandBindings) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Button {
-                toggleSceneCollapse(scene.id)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: collapsedSearchScenes.contains(scene.id) ? "chevron.right" : "chevron.down")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("\(scene.sceneTitle) (\(scene.matchCount))")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            GroupedResultsSceneHeaderView(
+                title: scene.sceneTitle,
+                matchCount: scene.matchCount,
+                isCollapsed: collapsedSearchScenes.contains(scene.id),
+                onToggle: { toggleSceneCollapse(scene.id) }
+            )
 
             if !collapsedSearchScenes.contains(scene.id) {
                 ForEach(scene.results) { item in
@@ -6356,23 +6679,19 @@ private struct SearchPanelSheet: View {
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
+        .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 4, trailing: 10))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private func groupedResultsItem(_ item: SearchResultListItem, commands: WorkspaceCommandBindings) -> some View {
-        Button {
-            commands.selectSearchResult(at: item.resultIndex)
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                Text("\(item.resultIndex + 1).")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                highlightedSnippetText(for: item.result)
-                    .font(.caption)
-                    .foregroundStyle(workspace.currentSearchResultIndex == item.resultIndex ? .primary : .secondary)
-            }
-        }
-        .buttonStyle(.plain)
+        GroupedResultsItemRowView(
+            resultIndex: item.resultIndex,
+            snippet: highlightedSnippetText(for: item.result),
+            isSelected: workspace.currentSearchResultIndex == item.resultIndex,
+            onSelect: { commands.selectSearchResult(at: item.resultIndex) }
+        )
         .padding(.leading, 18)
     }
 

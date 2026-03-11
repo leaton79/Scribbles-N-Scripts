@@ -12,11 +12,40 @@ struct AppThemePalette {
     let border: Color
     let mutedBadge: Color
     let notice: Color
+    let shadow: Color
+    let softShadow: Color
     let editorBackground: NSColor
     let editorText: NSColor
     let entityHighlight: NSColor
     let searchHighlight: NSColor
     let activeSearchHighlight: NSColor
+
+    func interactiveFill(isSelected: Bool = false, isHovered: Bool = false, isPressed: Bool = false) -> Color {
+        if isPressed {
+            return tint.opacity(colorScheme == .dark ? 0.24 : 0.14)
+        }
+        if isSelected {
+            return tint.opacity(colorScheme == .dark ? 0.20 : 0.11)
+        }
+        if isHovered {
+            return mutedBadge.opacity(colorScheme == .dark ? 1.15 : 1.35)
+        }
+        return card
+    }
+
+    func interactiveBorder(isSelected: Bool = false, isHovered: Bool = false, isPressed: Bool = false) -> Color {
+        if isPressed || isSelected {
+            return tint.opacity(colorScheme == .dark ? 0.75 : 0.55)
+        }
+        if isHovered {
+            return tint.opacity(colorScheme == .dark ? 0.38 : 0.24)
+        }
+        return border
+    }
+
+    var focusRing: Color {
+        tint.opacity(colorScheme == .dark ? 0.42 : 0.22)
+    }
 
     func tagFill(isEmphasized: Bool = false) -> Color {
         isEmphasized ? tint.opacity(0.18) : mutedBadge
@@ -107,6 +136,8 @@ struct AppThemePalette {
                 border: Color.black.opacity(0.08),
                 mutedBadge: Color.black.opacity(0.04),
                 notice: Color(red: 0.90, green: 0.95, blue: 1.00),
+                shadow: Color.black.opacity(0.10),
+                softShadow: Color.black.opacity(0.04),
                 editorBackground: NSColor(calibratedWhite: 1.0, alpha: 1.0),
                 editorText: NSColor.textColor,
                 entityHighlight: NSColor.systemTeal.withAlphaComponent(0.18),
@@ -125,6 +156,8 @@ struct AppThemePalette {
                 border: Color.white.opacity(0.08),
                 mutedBadge: Color.white.opacity(0.08),
                 notice: Color(red: 0.18, green: 0.24, blue: 0.34),
+                shadow: Color.black.opacity(0.34),
+                softShadow: Color.black.opacity(0.18),
                 editorBackground: NSColor(calibratedRed: 0.11, green: 0.12, blue: 0.15, alpha: 1.0),
                 editorText: NSColor(calibratedRed: 0.92, green: 0.93, blue: 0.96, alpha: 1.0),
                 entityHighlight: NSColor.systemTeal.withAlphaComponent(0.24),
@@ -143,6 +176,8 @@ struct AppThemePalette {
                 border: Color(red: 0.45, green: 0.33, blue: 0.20).opacity(0.14),
                 mutedBadge: Color(red: 0.45, green: 0.33, blue: 0.20).opacity(0.08),
                 notice: Color(red: 0.97, green: 0.91, blue: 0.79),
+                shadow: Color(red: 0.31, green: 0.22, blue: 0.13).opacity(0.12),
+                softShadow: Color(red: 0.31, green: 0.22, blue: 0.13).opacity(0.05),
                 editorBackground: NSColor(calibratedRed: 0.99, green: 0.97, blue: 0.92, alpha: 1.0),
                 editorText: NSColor(calibratedRed: 0.22, green: 0.16, blue: 0.10, alpha: 1.0),
                 entityHighlight: NSColor(calibratedRed: 0.30, green: 0.56, blue: 0.54, alpha: 0.22),
@@ -161,6 +196,8 @@ struct AppThemePalette {
                 border: Color(red: 0.39, green: 0.71, blue: 0.89).opacity(0.16),
                 mutedBadge: Color.white.opacity(0.08),
                 notice: Color(red: 0.11, green: 0.19, blue: 0.29),
+                shadow: Color.black.opacity(0.36),
+                softShadow: Color.black.opacity(0.18),
                 editorBackground: NSColor(calibratedRed: 0.07, green: 0.11, blue: 0.18, alpha: 1.0),
                 editorText: NSColor(calibratedRed: 0.88, green: 0.94, blue: 0.99, alpha: 1.0),
                 entityHighlight: NSColor(calibratedRed: 0.24, green: 0.72, blue: 0.74, alpha: 0.25),
@@ -179,6 +216,8 @@ struct AppThemePalette {
                 border: Color(red: 0.18, green: 0.42, blue: 0.29).opacity(0.14),
                 mutedBadge: Color(red: 0.18, green: 0.42, blue: 0.29).opacity(0.08),
                 notice: Color(red: 0.86, green: 0.94, blue: 0.86),
+                shadow: Color(red: 0.14, green: 0.22, blue: 0.16).opacity(0.12),
+                softShadow: Color(red: 0.14, green: 0.22, blue: 0.16).opacity(0.05),
                 editorBackground: NSColor(calibratedRed: 0.97, green: 0.99, blue: 0.96, alpha: 1.0),
                 editorText: NSColor(calibratedRed: 0.14, green: 0.22, blue: 0.16, alpha: 1.0),
                 entityHighlight: NSColor(calibratedRed: 0.18, green: 0.55, blue: 0.48, alpha: 0.20),
@@ -197,6 +236,8 @@ struct AppThemePalette {
                 border: Color(red: 0.66, green: 0.26, blue: 0.36).opacity(0.14),
                 mutedBadge: Color(red: 0.66, green: 0.26, blue: 0.36).opacity(0.08),
                 notice: Color(red: 0.99, green: 0.89, blue: 0.90),
+                shadow: Color(red: 0.32, green: 0.16, blue: 0.20).opacity(0.12),
+                softShadow: Color(red: 0.32, green: 0.16, blue: 0.20).opacity(0.05),
                 editorBackground: NSColor(calibratedRed: 1.00, green: 0.98, blue: 0.98, alpha: 1.0),
                 editorText: NSColor(calibratedRed: 0.28, green: 0.15, blue: 0.18, alpha: 1.0),
                 entityHighlight: NSColor(calibratedRed: 0.29, green: 0.60, blue: 0.62, alpha: 0.18),
@@ -215,6 +256,8 @@ struct AppThemePalette {
                 border: Color.primary.opacity(0.08),
                 mutedBadge: Color.primary.opacity(0.05),
                 notice: Color.accentColor.opacity(0.10),
+                shadow: Color.black.opacity(0.12),
+                softShadow: Color.black.opacity(0.05),
                 editorBackground: .textBackgroundColor,
                 editorText: .textColor,
                 entityHighlight: NSColor.systemTeal.withAlphaComponent(0.18),

@@ -114,13 +114,14 @@ struct ModularModeView: View {
                     }
                     .padding(8)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(group.isStagingArea ? Color.orange.opacity(0.10) : palette.panel)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(group.isStagingArea ? Color.orange.opacity(0.22) : palette.border, lineWidth: 1)
                     )
+                    .shadow(color: palette.softShadow, radius: 10, x: 0, y: 5)
                     .onDrop(of: [UTType.text], isTargeted: nil) { providers in
                         handleDrop(providers: providers, into: group)
                     }
@@ -149,13 +150,14 @@ struct ModularModeView: View {
                         }
                     }
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(section.isStagingArea ? Color.orange.opacity(0.10) : palette.panel)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(section.isStagingArea ? Color.orange.opacity(0.22) : palette.border, lineWidth: 1)
                     )
+                    .shadow(color: palette.softShadow, radius: 10, x: 0, y: 5)
                 }
             }
         }
@@ -164,14 +166,15 @@ struct ModularModeView: View {
     private func groupHeader(title: String, matchingCount: Int?) -> some View {
         HStack {
             Text(title)
-                .font(.headline)
+                .font(.headline.weight(.semibold))
             if let matchingCount {
                 Text("(\(matchingCount) matching)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
     }
 
     private func handleDrop(providers: [NSItemProvider], into group: CardGroup) -> Bool {
@@ -209,6 +212,7 @@ private struct CardView: View {
     let isSelected: Bool
     let density: CorkboardDensity
     @Environment(\.appThemePalette) private var palette
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -253,11 +257,20 @@ private struct CardView: View {
         }
         .padding(density == .compact ? 10 : 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(palette.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? palette.tint : palette.border, lineWidth: isSelected ? 2 : 1)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(palette.interactiveFill(isSelected: isSelected, isHovered: isHovering))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(palette.interactiveBorder(isSelected: isSelected, isHovered: isHovering), lineWidth: isSelected ? 2 : 1)
+        )
+        .shadow(color: isHovering ? palette.softShadow.opacity(1.4) : palette.softShadow, radius: isHovering ? 12 : 8, x: 0, y: isHovering ? 8 : 4)
+        .scaleEffect(isHovering ? 1.01 : 1.0)
+        .animation(.easeOut(duration: 0.14), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
     }
 }
 
@@ -267,6 +280,7 @@ private struct OutlineRowView: View {
     let onSelect: () -> Void
     let onOpen: () -> Void
     @Environment(\.appThemePalette) private var palette
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -321,10 +335,21 @@ private struct OutlineRowView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? palette.tint.opacity(0.12) : palette.card)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(palette.interactiveFill(isSelected: isSelected, isHovered: isHovering))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(palette.interactiveBorder(isSelected: isSelected, isHovered: isHovering), lineWidth: isSelected ? 1.5 : 1)
+        )
+        .shadow(color: isHovering ? palette.softShadow.opacity(1.3) : .clear, radius: 8, x: 0, y: 4)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onTapGesture(count: 2, perform: onOpen)
+        .onHover { hovering in
+            isHovering = hovering
+        }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

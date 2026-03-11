@@ -25,6 +25,18 @@ struct WorkspaceCommandBindings {
         workspace.appearancePresets
     }
 
+    var sidebarTextSize: CGFloat {
+        workspace.sidebarTextSize
+    }
+
+    var inspectorTextSize: CGFloat {
+        workspace.inspectorTextSize
+    }
+
+    var editorTextSize: Int {
+        workspace.projectSettings?.editorFontSize ?? Int(EditorPresentationSettings.default.fontSize)
+    }
+
     var canReopenLastProject: Bool {
         workspace.canReopenLastProject
     }
@@ -235,6 +247,36 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func applyAppearancePreset(_ presetID: UUID) -> String? {
         workspace.applyAppearancePreset(presetID)
+    }
+
+    @discardableResult
+    func adjustSidebarTextSize(by delta: CGFloat) -> String? {
+        workspace.adjustSidebarTextSize(by: delta)
+    }
+
+    @discardableResult
+    func adjustInspectorTextSize(by delta: CGFloat) -> String? {
+        workspace.adjustInspectorTextSize(by: delta)
+    }
+
+    @discardableResult
+    func adjustEditorTextSize(by delta: Int) -> String? {
+        workspace.adjustEditorTextSize(by: delta)
+    }
+
+    @discardableResult
+    func resetSidebarTextSize() -> String? {
+        workspace.resetSidebarTextSize()
+    }
+
+    @discardableResult
+    func resetInspectorTextSize() -> String? {
+        workspace.resetInspectorTextSize()
+    }
+
+    @discardableResult
+    func resetEditorTextSize() -> String? {
+        workspace.resetEditorTextSize()
     }
 
     @discardableResult

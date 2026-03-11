@@ -12,6 +12,8 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightCap")
         UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightSafetyThreshold")
         UserDefaults.standard.removeObject(forKey: "workspace.replaceSceneSelectionMode")
+        UserDefaults.standard.removeObject(forKey: "workspace.sidebarTextSize")
+        UserDefaults.standard.removeObject(forKey: "workspace.inspectorTextSize")
     }
 
     override func tearDownWithError() throws {
@@ -452,6 +454,30 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.deleteAppearancePreset(savedPreset.id), "Deleted appearance preset “Draft Focus”.")
         XCTAssertTrue(coordinator.appearancePresets.isEmpty)
+    }
+
+    func testPeripheralTextSizesPersistInPreferenceStore() throws {
+        let suiteName = "WorkspaceCoordinatorTests.TextSizes.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let coordinator = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "TextSizes",
+            searchPreferenceStore: defaults
+        )
+
+        XCTAssertEqual(coordinator.adjustSidebarTextSize(by: 2), "Sidebar text is now 17 pt.")
+        XCTAssertEqual(coordinator.adjustInspectorTextSize(by: 3), "Inspector text is now 17 pt.")
+
+        let reopened = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "TextSizes",
+            searchPreferenceStore: defaults
+        )
+
+        XCTAssertEqual(reopened.sidebarTextSize, 17, accuracy: 0.001)
+        XCTAssertEqual(reopened.inspectorTextSize, 17, accuracy: 0.001)
     }
 
     func testExportProjectWritesMarkdownToExportsFolder() throws {
