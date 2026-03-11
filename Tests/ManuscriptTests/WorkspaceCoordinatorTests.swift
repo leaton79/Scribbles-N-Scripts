@@ -209,7 +209,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
             bootstrapProjectName: "WorkflowSeed",
             recentProjectStore: defaults
         )
-        XCTAssertNil(coordinator.createAndOpenProject(named: "WorkflowMain"))
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "WorkflowMain"), "Created project \"WorkflowMain\".")
         let workflowRoot = try XCTUnwrap(coordinator.projectManager.projectRootURL)
         let sceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
 
@@ -219,7 +219,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         try coordinator.projectManager.closeProject()
         XCTAssertFalse(coordinator.hasOpenProject)
 
-        XCTAssertNil(coordinator.reopenLastProject())
+        XCTAssertEqual(coordinator.reopenLastProject(), "Reopened project \"WorkflowMain\".")
         XCTAssertEqual(coordinator.projectManager.projectRootURL, workflowRoot)
         let reopenedContent = try coordinator.projectManager.loadSceneContent(sceneId: sceneId)
         XCTAssertEqual(reopenedContent, "workflow text")
@@ -241,12 +241,12 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         )
         let targetURL = tempDir.appendingPathComponent("TargetOpen", isDirectory: true)
 
-        XCTAssertNil(coordinator.openProject(at: targetURL))
+        XCTAssertEqual(coordinator.openProject(at: targetURL), "Opened project \"TargetOpen\".")
         XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
         XCTAssertEqual(coordinator.projectDisplayName, "TargetOpen")
 
         try coordinator.projectManager.closeProject()
-        XCTAssertNil(coordinator.reopenLastProject())
+        XCTAssertEqual(coordinator.reopenLastProject(), "Reopened project \"TargetOpen\".")
         XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
     }
 
@@ -309,10 +309,10 @@ final class WorkspaceCoordinatorTests: XCTestCase {
             bootstrapProjectName: "RecentSeed",
             recentProjectStore: defaults
         )
-        XCTAssertNil(coordinator.createAndOpenProject(named: "RecentA"))
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "RecentA"), "Created project \"RecentA\".")
         let recentA = tempDir.appendingPathComponent("RecentA", isDirectory: true)
-        XCTAssertNil(coordinator.createAndOpenProject(named: "RecentB"))
-        XCTAssertNil(coordinator.openProject(at: recentA))
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "RecentB"), "Created project \"RecentB\".")
+        XCTAssertEqual(coordinator.openProject(at: recentA), "Opened project \"RecentA\".")
 
         let names = coordinator.recentProjects.map(\.name)
         XCTAssertGreaterThanOrEqual(names.count, 2)
@@ -1240,10 +1240,10 @@ final class WorkspaceCoordinatorTests: XCTestCase {
             bootstrapProjectName: "SwitchSeed",
             recentProjectStore: defaults
         )
-        XCTAssertNil(coordinator.createAndOpenProject(named: "SwitchA"))
-        XCTAssertNil(coordinator.createAndOpenProject(named: "SwitchB"))
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "SwitchA"), "Created project \"SwitchA\".")
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "SwitchB"), "Created project \"SwitchB\".")
         let switchAURL = tempDir.appendingPathComponent("SwitchA", isDirectory: true)
-        XCTAssertNil(coordinator.openProject(at: switchAURL))
+        XCTAssertEqual(coordinator.openProject(at: switchAURL), "Opened project \"SwitchA\".")
 
         let names = coordinator.switchableProjects.map(\.name)
         XCTAssertGreaterThanOrEqual(names.count, 2)
@@ -1965,7 +1965,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
             bootstrapProjectName: "RecentClearSeed",
             recentProjectStore: defaults
         )
-        XCTAssertNil(coordinator.createAndOpenProject(named: "RecentClearA"))
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "RecentClearA"), "Created project \"RecentClearA\".")
         XCTAssertTrue(coordinator.canReopenLastProject)
         XCTAssertTrue(coordinator.canClearRecentProjects)
         XCTAssertFalse(coordinator.recentProjects.isEmpty)
@@ -2015,8 +2015,8 @@ final class WorkspaceCoordinatorTests: XCTestCase {
             bootstrapProjectName: "UndoSeed",
             recentProjectStore: defaults
         )
-        XCTAssertNil(coordinator.createAndOpenProject(named: "UndoA"))
-        XCTAssertNil(coordinator.createAndOpenProject(named: "UndoB"))
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "UndoA"), "Created project \"UndoA\".")
+        XCTAssertEqual(coordinator.createAndOpenProject(named: "UndoB"), "Created project \"UndoB\".")
         let before = coordinator.snapshotRecentProjects()
         XCTAssertFalse(before.paths.isEmpty)
 
@@ -2037,7 +2037,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         let message = coordinator.saveProjectAs(named: "SaveAsCopy")
 
-        XCTAssertNil(message)
+        XCTAssertEqual(message, "Saved project as \"SaveAsCopy\".")
         let copyURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
         XCTAssertNotEqual(copyURL, sourceURL)
         XCTAssertEqual(copyURL.lastPathComponent, "SaveAsCopy")
@@ -2063,7 +2063,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
 
         let message = coordinator.renameCurrentProject(to: "RenamedProject")
 
-        XCTAssertNil(message)
+        XCTAssertEqual(message, "Renamed project to \"RenamedProject\".")
         let renamedURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
         XCTAssertEqual(renamedURL.lastPathComponent, "RenamedProject")
         XCTAssertFalse(FileManager.default.fileExists(atPath: sourceURL.path))

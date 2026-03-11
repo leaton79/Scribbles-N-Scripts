@@ -156,7 +156,7 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
             recentProjectStore: defaults
         )
         let bindings = WorkspaceCommandBindings(workspace: workspace)
-        XCTAssertNil(bindings.createProject(named: "BindingsNew"))
+        XCTAssertEqual(bindings.createProject(named: "BindingsNew"), "Created project \"BindingsNew\".")
         XCTAssertEqual(workspace.projectDisplayName, "BindingsNew")
 
         let target = FileSystemProjectManager()
@@ -164,12 +164,12 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         try target.closeProject()
         let targetURL = tempDir.appendingPathComponent("BindingsTarget", isDirectory: true)
 
-        XCTAssertNil(bindings.openProject(at: targetURL))
+        XCTAssertEqual(bindings.openProject(at: targetURL), "Opened project \"BindingsTarget\".")
         XCTAssertEqual(workspace.projectDisplayName, "BindingsTarget")
         XCTAssertTrue(bindings.canReopenLastProject)
 
         try workspace.projectManager.closeProject()
-        XCTAssertNil(bindings.reopenLastProject())
+        XCTAssertEqual(bindings.reopenLastProject(), "Reopened project \"BindingsTarget\".")
         XCTAssertEqual(workspace.projectDisplayName, "BindingsTarget")
     }
 
@@ -179,10 +179,10 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertTrue(bindings.canSaveProjectAs)
         XCTAssertTrue(bindings.canRenameProject)
 
-        XCTAssertNil(bindings.saveProjectAs(named: "BindingsCopy"))
+        XCTAssertEqual(bindings.saveProjectAs(named: "BindingsCopy"), "Saved project as \"BindingsCopy\".")
         XCTAssertEqual(workspace.projectDisplayName, "BindingsCopy")
 
-        XCTAssertNil(bindings.renameProject(to: "BindingsRenamed"))
+        XCTAssertEqual(bindings.renameProject(to: "BindingsRenamed"), "Renamed project to \"BindingsRenamed\".")
         XCTAssertEqual(workspace.projectDisplayName, "BindingsRenamed")
 
         try workspace.projectManager.closeProject()
@@ -204,10 +204,10 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         )
         let bindings = WorkspaceCommandBindings(workspace: workspace)
 
-        XCTAssertNil(bindings.createProject(named: "BindingsRecentA"))
+        XCTAssertEqual(bindings.createProject(named: "BindingsRecentA"), "Created project \"BindingsRecentA\".")
         let recentA = tempDir.appendingPathComponent("BindingsRecentA", isDirectory: true)
-        XCTAssertNil(bindings.createProject(named: "BindingsRecentB"))
-        XCTAssertNil(bindings.openProject(at: recentA))
+        XCTAssertEqual(bindings.createProject(named: "BindingsRecentB"), "Created project \"BindingsRecentB\".")
+        XCTAssertEqual(bindings.openProject(at: recentA), "Opened project \"BindingsRecentA\".")
 
         let names = bindings.recentProjects.map(\.name)
         XCTAssertGreaterThanOrEqual(names.count, 2)
@@ -226,10 +226,10 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
             recentProjectStore: defaults
         )
         let bindings = WorkspaceCommandBindings(workspace: workspace)
-        XCTAssertNil(bindings.createProject(named: "BindingsSwitchA"))
-        XCTAssertNil(bindings.createProject(named: "BindingsSwitchB"))
+        XCTAssertEqual(bindings.createProject(named: "BindingsSwitchA"), "Created project \"BindingsSwitchA\".")
+        XCTAssertEqual(bindings.createProject(named: "BindingsSwitchB"), "Created project \"BindingsSwitchB\".")
         let switchAURL = tempDir.appendingPathComponent("BindingsSwitchA", isDirectory: true)
-        XCTAssertNil(bindings.openProject(at: switchAURL))
+        XCTAssertEqual(bindings.openProject(at: switchAURL), "Opened project \"BindingsSwitchA\".")
 
         let names = bindings.switchableProjects.map(\.name)
         XCTAssertGreaterThanOrEqual(names.count, 2)
@@ -457,7 +457,7 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
             recentProjectStore: defaults
         )
         let bindings = WorkspaceCommandBindings(workspace: workspace)
-        XCTAssertNil(bindings.createProject(named: "BindingsRecentClearA"))
+        XCTAssertEqual(bindings.createProject(named: "BindingsRecentClearA"), "Created project \"BindingsRecentClearA\".")
         XCTAssertTrue(bindings.canClearRecentProjects)
         XCTAssertTrue(bindings.canReopenLastProject)
 
@@ -508,8 +508,8 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
             recentProjectStore: defaults
         )
         let bindings = WorkspaceCommandBindings(workspace: workspace)
-        XCTAssertNil(bindings.createProject(named: "BindingsUndoA"))
-        XCTAssertNil(bindings.createProject(named: "BindingsUndoB"))
+        XCTAssertEqual(bindings.createProject(named: "BindingsUndoA"), "Created project \"BindingsUndoA\".")
+        XCTAssertEqual(bindings.createProject(named: "BindingsUndoB"), "Created project \"BindingsUndoB\".")
 
         let snapshot = bindings.snapshotRecentProjects()
         bindings.clearRecentProjects()

@@ -764,7 +764,7 @@ private struct WorkspaceView: View {
                 projectName: $saveAsProjectName,
                 onCancel: { showingSaveAsSheet = false },
                 onCreate: {
-                    actionNotice = commands.saveProjectAs(named: saveAsProjectName) ?? "Project saved as \(saveAsProjectName)."
+                    actionNotice = commands.saveProjectAs(named: saveAsProjectName)
                     showingSaveAsSheet = false
                 }
             )
@@ -776,7 +776,7 @@ private struct WorkspaceView: View {
                 projectName: $renameProjectName,
                 onCancel: { showingRenameSheet = false },
                 onCreate: {
-                    actionNotice = commands.renameProject(to: renameProjectName) ?? "Project renamed to \(renameProjectName)."
+                    actionNotice = commands.renameProject(to: renameProjectName)
                     showingRenameSheet = false
                 }
             )
@@ -1066,7 +1066,7 @@ private struct WorkspaceView: View {
                     }
                     .disabled(!commands.canSaveProject)
                     if !workspace.hasOpenProject || !commands.canCreateProjectContent {
-                        Button("Why Disabled?") {
+                        Button("Why Is This Disabled?") {
                             NotificationCenter.default.post(name: .showHelpReference, object: "disabled-commands")
                         }
                         .buttonStyle(.bordered)
@@ -3081,12 +3081,12 @@ private struct ImportExportSheet: View {
                         }
                         .accessibilityLabel("Export HTML")
                         .buttonStyle(.bordered)
-                        Button("DOCX Groundwork") {
+                        Button("Export DOCX") {
                             onNotice(workspace.isRecoveryMode ? workspace.exportRecoveryProject(format: .docx) : workspace.exportProject(format: .docx))
                         }
                         .accessibilityLabel("Export DOCX")
                         .buttonStyle(.bordered)
-                        Button("PDF Groundwork") {
+                        Button("Export PDF") {
                             onNotice(workspace.isRecoveryMode ? workspace.exportRecoveryProject(format: .pdf) : workspace.exportProject(format: .pdf))
                         }
                         .accessibilityLabel("Export PDF")
@@ -3427,11 +3427,14 @@ private struct ImportExportSheet: View {
                         Picker("Preview As", selection: $previewFormat) {
                             Text("Markdown").tag(ExportFormat.markdown)
                             Text("HTML").tag(ExportFormat.html)
-                            Text("DOCX Source").tag(ExportFormat.docx)
-                            Text("PDF Source").tag(ExportFormat.pdf)
-                            Text("EPUB HTML").tag(ExportFormat.epub)
+                            Text("DOCX Preview").tag(ExportFormat.docx)
+                            Text("PDF Preview").tag(ExportFormat.pdf)
+                            Text("EPUB Preview").tag(ExportFormat.epub)
                         }
                         .pickerStyle(.segmented)
+                        Text("DOCX previews use the manuscript’s Markdown draft. PDF and EPUB previews use the generated HTML layout.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         TextEditor(text: $previewContent)
                             .font(.system(.caption, design: .monospaced))
                             .frame(height: 160)

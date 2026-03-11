@@ -5,6 +5,7 @@
 .swiftpm/
 Packages/
 Package.resolved
+dist/
 
 # Xcode
 DerivedData/

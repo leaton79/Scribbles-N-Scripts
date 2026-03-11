@@ -65,10 +65,10 @@ final class WorkspaceCommandPaletteTests: XCTestCase {
             recentProjectStore: defaults
         )
         let commands = WorkspaceCommandBindings(workspace: workspace)
-        XCTAssertNil(workspace.createAndOpenProject(named: "PaletteAlpha"))
-        XCTAssertNil(workspace.createAndOpenProject(named: "PaletteBeta"))
+        XCTAssertEqual(workspace.createAndOpenProject(named: "PaletteAlpha"), "Created project \"PaletteAlpha\".")
+        XCTAssertEqual(workspace.createAndOpenProject(named: "PaletteBeta"), "Created project \"PaletteBeta\".")
         let alphaURL = tempDir.appendingPathComponent("PaletteAlpha", isDirectory: true)
-        XCTAssertNil(workspace.openProject(at: alphaURL))
+        XCTAssertEqual(workspace.openProject(at: alphaURL), "Opened project \"PaletteAlpha\".")
 
         let chapter = try workspace.projectManager.addChapter(to: nil, at: nil, title: "Filter Chapter")
         _ = try workspace.projectManager.addScene(to: chapter.id, at: nil, title: "Filter Scene")

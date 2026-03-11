@@ -49,6 +49,34 @@ If you already built the app, the debug binary is usually:
 swift build
 ```
 
+## Install As A Mac App
+
+To build Scribbles-N-Scripts as a normal macOS `.app` bundle:
+
+```bash
+Tools/package_app.sh
+```
+
+That writes a standalone app bundle to:
+
+```bash
+dist/Scribbles-N-Scripts.app
+```
+
+To install it into your user Applications folder so it behaves like a normal Mac app:
+
+```bash
+Tools/package_app.sh --install-dir "$HOME/Applications"
+```
+
+This default packaging flow is aimed at local-machine use on your own Mac. It does not require signing or notarization.
+
+If you later want wider distribution, the same script supports optional signing:
+
+```bash
+Tools/package_app.sh --sign "Developer ID Application: Your Name (TEAMID)"
+```
+
 ## Test
 
 ```bash

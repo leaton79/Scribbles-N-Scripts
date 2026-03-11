@@ -794,7 +794,7 @@ final class WorkspaceCoordinator: ObservableObject {
             let rootURL = try projectRootForNewProjects()
             _ = try projectManager.createProject(name: name, at: rootURL)
             didOpenProject()
-            return nil
+            return "Created project \"\(projectDisplayName)\"."
         } catch {
             return "Could not create project: \(error.localizedDescription)"
         }
@@ -811,7 +811,7 @@ final class WorkspaceCoordinator: ObservableObject {
             recoveryCandidateURL = nil
             recoveryCandidateDetails = nil
             didOpenProject()
-            return nil
+            return "Opened project \"\(projectDisplayName)\"."
         } catch {
             if case let ProjectIOError.corruptManifest(details) = error {
                 recoveryCandidateURL = projectURL
@@ -843,7 +843,11 @@ final class WorkspaceCoordinator: ObservableObject {
         guard let projectURL = lastOpenedProjectURL() else {
             return "Could not reopen project: No recent project found."
         }
-        return openProject(at: projectURL)
+        let result = openProject(at: projectURL)
+        if result?.hasPrefix("Opened project ") == true {
+            return "Reopened project \"\(projectDisplayName)\"."
+        }
+        return result
     }
 
     func clearRecentProjects() {
@@ -3254,7 +3258,7 @@ final class WorkspaceCoordinator: ObservableObject {
             try projectManager.updateProjectName(name)
             try projectManager.saveManifest()
             didOpenProject()
-            return nil
+            return "Saved project as \"\(projectDisplayName)\"."
         } catch {
             if copied {
                 try? FileManager.default.removeItem(at: destinationURL)
@@ -3305,7 +3309,7 @@ final class WorkspaceCoordinator: ObservableObject {
             try projectManager.updateProjectName(name)
             try projectManager.saveManifest()
             didOpenProject()
-            return nil
+            return "Renamed project to \"\(projectDisplayName)\"."
         } catch {
             if moved {
                 _ = try? projectManager.openProject(at: destinationURL)
@@ -4746,7 +4750,7 @@ final class WorkspaceCoordinator: ObservableObject {
             } else {
                 stagingHTML = ""
             }
-            let exporterComment = format == .pdf ? "<!-- PDF groundwork source generated from compile preset -->" : ""
+            let exporterComment = format == .pdf ? "<!-- PDF export HTML generated from compile preset -->" : ""
             return """
             <!doctype html>
             <html lang="en">
