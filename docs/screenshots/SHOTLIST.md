@@ -35,3 +35,4 @@ Capture at least one hero screenshot in each of:
 - Use realistic sample manuscript content instead of empty placeholders
 - Avoid clipping menus or sheets at the bottom edge
 - Confirm color contrast for chips, highlights, and notices in each theme
+- Use `Tools/focus_app_window.sh` to bring the app forward and size the window consistently before capture

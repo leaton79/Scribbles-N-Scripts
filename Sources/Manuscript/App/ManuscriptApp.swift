@@ -4,6 +4,7 @@ import AppKit
 
 @main
 struct ScribblesNScriptsApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var workspace = WorkspaceCoordinator()
 
@@ -319,6 +320,16 @@ struct ScribblesNScriptsApp: App {
     }
 }
 
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
+        }
+    }
+}
+
 private struct WorkspaceView: View {
     @ObservedObject var workspace: WorkspaceCoordinator
     @State private var splitNotice: String?
@@ -530,6 +541,17 @@ private struct WorkspaceView: View {
                 homeGuideRow(title: "Draft in context", detail: "Write in linear mode, split scenes, or jump into modular corkboard and outliner views.")
                 homeGuideRow(title: "Track structure", detail: "Keep notes, entities, timeline events, tags, and metadata attached to the manuscript.")
                 homeGuideRow(title: "Compile cleanly", detail: "Export to Markdown, HTML, DOCX, PDF, and EPUB from the same project.")
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Appearance")
+                    .font(.headline)
+                Text("Use Project Settings to save appearance presets, or open Commands and search for a theme or preset name to switch looks quickly.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(20)
@@ -2310,6 +2332,9 @@ private struct ProjectSettingsSheet: View {
                         Text("Save the current theme, font, editor width, and line spacing as reusable appearance combinations.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Text("Tip: presets also appear in the Workspace menu and Command Palette, so you can switch writing looks without reopening settings.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                         HStack {
                             TextField("Preset name", text: $appearancePresetNameDraft)
                                 .textFieldStyle(.roundedBorder)
@@ -2334,39 +2359,7 @@ private struct ProjectSettingsSheet: View {
                         } else {
                             VStack(alignment: .leading, spacing: 10) {
                                 ForEach(workspace.appearancePresets) { preset in
-                                    HStack(alignment: .top, spacing: 12) {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(AppThemePalette.forTheme(preset.theme).tint)
-                                            .frame(width: 10, height: 52)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(preset.name)
-                                                .font(.headline)
-                                            Text("\(preset.theme.displayName) • \(preset.fontName) \(preset.fontSize) pt • \(String(format: "%.1f", preset.lineHeight)) line height • \(Int(preset.editorContentWidth)) pt width")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Button("Apply") {
-                                            onNotice(workspace.applyAppearancePreset(preset.id))
-                                            syncDrafts()
-                                        }
-                                        Button("Use Current Name") {
-                                            editingAppearancePresetID = preset.id
-                                            appearancePresetNameDraft = preset.name
-                                        }
-                                        .buttonStyle(.borderless)
-                                        Button("Delete") {
-                                            onNotice(workspace.deleteAppearancePreset(preset.id))
-                                            syncDrafts()
-                                        }
-                                        .buttonStyle(.borderless)
-                                    }
-                                    .padding(10)
-                                    .background(workspace.themePalette.panel.opacity(0.75), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(workspace.themePalette.border, lineWidth: 1)
-                                    )
+                                    appearancePresetCard(for: preset)
                                 }
                             }
                         }
@@ -2594,6 +2587,84 @@ private struct ProjectSettingsSheet: View {
                 }
             }
         }
+    }
+
+    private func appearancePresetCard(for preset: AppearancePreset) -> some View {
+        let palette = AppThemePalette.forTheme(preset.theme)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(palette.tint)
+                    .frame(width: 10, height: 64)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(preset.name)
+                        .font(.headline)
+                    Text("\(preset.theme.displayName) • \(preset.fontName) \(preset.fontSize) pt • \(String(format: "%.1f", preset.lineHeight)) line height • \(Int(preset.editorContentWidth)) pt width")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Apply") {
+                    onNotice(workspace.applyAppearancePreset(preset.id))
+                    syncDrafts()
+                }
+                Button("Edit Name") {
+                    editingAppearancePresetID = preset.id
+                    appearancePresetNameDraft = preset.name
+                }
+                .buttonStyle(.borderless)
+                Button("Delete") {
+                    onNotice(workspace.deleteAppearancePreset(preset.id))
+                    syncDrafts()
+                }
+                .buttonStyle(.borderless)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Preview")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(palette.canvas)
+                            .frame(width: 22, height: 18)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(palette.border, lineWidth: 1)
+                            )
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(palette.tint)
+                            .frame(width: 22, height: 18)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(palette.notice)
+                            .frame(width: 22, height: 18)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("A manuscript line preview")
+                            .font(.custom(preset.fontName, size: CGFloat(preset.fontSize), relativeTo: .body))
+                            .lineSpacing(max(0, (preset.lineHeight - 1.0) * CGFloat(preset.fontSize) * 0.45))
+                            .foregroundStyle(Color(palette.editorText))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(palette.border.opacity(0.9))
+                            .frame(width: min(CGFloat(preset.editorContentWidth) * 0.22, 220), height: 3)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(palette.editorBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(palette.border, lineWidth: 1)
+                )
+            }
+        }
+        .padding(10)
+        .background(workspace.themePalette.panel.opacity(0.75), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(workspace.themePalette.border, lineWidth: 1)
+        )
     }
 
     private var projectGoalSummaryText: String {

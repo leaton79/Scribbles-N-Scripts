@@ -61,6 +61,12 @@ For screenshot-driven UI review or automation-driven window resizing on macOS, t
 - Accessibility access
 - Screen Recording access
 
+To bring the app forward and size it consistently before capture:
+
+```bash
+Tools/focus_app_window.sh
+```
+
 Without those permissions, the app still runs normally, but automated visual inspection can be limited.
 
 ## License
