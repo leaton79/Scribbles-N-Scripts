@@ -161,6 +161,36 @@ struct WorkspaceCommandBindings {
         workspace.canRedoLastReplaceBatch
     }
 
+    var projectActionsDisabledReason: String? {
+        if !workspace.hasOpenProject {
+            return "Open or create a project to save, rename, export, or create manuscript content."
+        }
+        if workspace.isRecoveryMode {
+            return "This project is open as a read-only recovery copy. Export it or create a writable recovery copy before changing content."
+        }
+        return nil
+    }
+
+    var workspaceActionsDisabledReason: String? {
+        if !workspace.hasOpenProject {
+            return "Open a project to switch modes, use split view, navigate scenes, or open workspace panels."
+        }
+        if workspace.isRecoveryMode {
+            return "Recovery mode keeps editing tools limited. Create a writable recovery copy to restore full workspace actions."
+        }
+        if workspace.modeController.activeMode != .linear {
+            return "Some workspace actions are only available in Linear mode, such as scene-to-scene navigation and opening the current selection in split view."
+        }
+        return nil
+    }
+
+    var searchActionsDisabledReason: String? {
+        if !workspace.hasOpenProject {
+            return "Open a project before using scene or project search."
+        }
+        return nil
+    }
+
     var replaceUndoMenuTitle: String {
         let depth = workspace.replaceUndoDepth
         if depth > 1 {

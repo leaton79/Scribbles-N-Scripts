@@ -263,10 +263,23 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.hasOpenProject)
 
         let notice = coordinator.openRecoveryModeForFailedProject()
-        XCTAssertTrue(notice?.contains("recovery mode") == true)
+        XCTAssertTrue(notice?.contains("read-only recovery copy") == true)
         XCTAssertTrue(coordinator.hasOpenProject)
         XCTAssertTrue(coordinator.isRecoveryMode)
         XCTAssertFalse(coordinator.editorState.isEditable)
+    }
+
+    func testOpenProjectFailureMessageOffersRecoveryForCorruptProject() throws {
+        let creator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RecoveryPrompt")
+        let rootURL = try XCTUnwrap(creator.projectManager.projectRootURL)
+        try creator.projectManager.closeProject()
+        try FileManager.default.removeItem(at: rootURL.appendingPathComponent("manifest.json"))
+
+        let current = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CurrentProject")
+        let notice = current.openProject(at: rootURL)
+
+        XCTAssertEqual(notice, "Could not open project normally. You can open a read-only recovery copy from this window.")
+        XCTAssertEqual(current.recoveryCandidateURL, rootURL)
     }
 
     func testRecoveryModeSurfacesDiagnosticsAndSafeSalvageActions() throws {
@@ -284,7 +297,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         try FileManager.default.removeItem(at: rootURL.appendingPathComponent("manifest.json"))
 
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RecoveryActions")
-        XCTAssertTrue(coordinator.openRecoveryModeForFailedProject()?.contains("recovery mode") == true)
+        XCTAssertTrue(coordinator.openRecoveryModeForFailedProject()?.contains("read-only recovery copy") == true)
         XCTAssertFalse(coordinator.recoveryDiagnostics.isEmpty)
         XCTAssertTrue(coordinator.recoveryDiagnostics.contains(where: { $0.message.contains("Skipped") }))
 

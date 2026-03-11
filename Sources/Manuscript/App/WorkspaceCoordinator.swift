@@ -183,7 +183,7 @@ final class WorkspaceCoordinator: ObservableObject {
         guard isRecoveryMode else { return nil }
         let sceneCount = projectManager.currentProject?.manuscript.chapters.reduce(0) { $0 + $1.scenes.count } ?? 0
         let stagingCount = projectManager.currentProject?.manuscript.stagingArea.count ?? 0
-        return "\(sceneCount) recovered scene(s), \(stagingCount) staging scene(s), \(recoveryDiagnostics.count) recovery note(s)."
+        return "Recovered \(sceneCount) scene(s), found \(stagingCount) staging scene(s), and logged \(recoveryDiagnostics.count) recovery note(s)."
     }
 
     var canShowImportExport: Bool {
@@ -836,7 +836,7 @@ final class WorkspaceCoordinator: ObservableObject {
                 recoveryCandidateURL = nil
                 recoveryCandidateDetails = nil
             }
-            return "Could not open project: \(error.localizedDescription)"
+            return projectOpenFailureMessage(for: error)
         }
     }
 
@@ -848,7 +848,7 @@ final class WorkspaceCoordinator: ObservableObject {
         do {
             _ = try projectManager.openProjectInRecoveryMode(at: recoveryCandidateURL, details: recoveryCandidateDetails)
             didOpenProject()
-            return "Opened \(projectManager.currentProject?.name ?? recoveryCandidateURL.lastPathComponent) in recovery mode."
+            return "Opened \(projectManager.currentProject?.name ?? recoveryCandidateURL.lastPathComponent) as a read-only recovery copy."
         } catch {
             return "Could not open recovery mode: \(error.localizedDescription)"
         }
@@ -5292,6 +5292,19 @@ final class WorkspaceCoordinator: ObservableObject {
         let singleContent = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !singleContent.isEmpty else { return [] }
         return [(normalizeTitle(sourceName, fallback: "Imported Scene"), "", singleContent)]
+    }
+
+    private func projectOpenFailureMessage(for error: Error) -> String {
+        switch error {
+        case ProjectIOError.concurrentAccess:
+            return "Could not open project: It is already open in another Scribbles-N-Scripts window or process."
+        case ProjectIOError.corruptManifest:
+            return "Could not open project normally. You can open a read-only recovery copy from this window."
+        case ProjectIOError.fileMoved:
+            return "Could not open project: The selected project folder is no longer available where Scribbles-N-Scripts last saw it."
+        default:
+            return "Could not open project: \(error.localizedDescription)"
+        }
     }
 
     private func nextGeneratedChapterTitle() -> String {

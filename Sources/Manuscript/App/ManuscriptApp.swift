@@ -168,6 +168,14 @@ struct ScribblesNScriptsApp: App {
                 }
                 .keyboardShortcut("S", modifiers: [.command, .option])
                 .disabled(!commands.canSaveAndBackup)
+
+                if let reason = commands.projectActionsDisabledReason {
+                    Divider()
+                    Button("Why Are Some Project Actions Disabled?") {
+                        NotificationCenter.default.post(name: .showHelpReference, object: "disabled-commands")
+                    }
+                    Text(reason)
+                }
             }
 
             CommandMenu("Workspace") {
@@ -267,6 +275,14 @@ struct ScribblesNScriptsApp: App {
                     NotificationCenter.default.post(name: .showGoalsDashboard, object: nil)
                 }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
+
+                if let reason = commands.workspaceActionsDisabledReason {
+                    Divider()
+                    Button("Why Are Some Workspace Actions Disabled?") {
+                        NotificationCenter.default.post(name: .showHelpReference, object: "disabled-commands")
+                    }
+                    Text(reason)
+                }
             }
 
             CommandMenu("Appearance") {
@@ -384,6 +400,14 @@ struct ScribblesNScriptsApp: App {
                     _ = commands.redoLastReplaceBatch()
                 }
                 .disabled(!commands.canRedoLastReplaceBatch)
+
+                if let reason = commands.searchActionsDisabledReason {
+                    Divider()
+                    Button("Why Is Search Disabled?") {
+                        NotificationCenter.default.post(name: .showHelpReference, object: "disabled-commands")
+                    }
+                    Text(reason)
+                }
             }
 
             CommandGroup(after: .help) {
@@ -789,7 +813,7 @@ private struct WorkspaceView: View {
                 guard let folder = urls.first else { return }
                 actionNotice = commands.openProject(at: folder)
             case let .failure(error):
-                actionNotice = "Could not open project: \(error.localizedDescription)"
+                actionNotice = "Could not open that project folder: \(error.localizedDescription)"
             }
         })
         view = AnyView(view.fileImporter(
@@ -802,7 +826,7 @@ private struct WorkspaceView: View {
                 guard let file = urls.first else { return }
                 actionNotice = workspace.importScenes(from: file)
             case let .failure(error):
-                actionNotice = "Could not import file: \(error.localizedDescription)"
+                actionNotice = "Could not import that file: \(error.localizedDescription)"
             }
         })
         view = AnyView(view.fileImporter(
@@ -815,7 +839,7 @@ private struct WorkspaceView: View {
                 guard let file = urls.first, let sourceID = pendingResearchImportSourceID else { return }
                 actionNotice = workspace.importResearchFile(from: file, into: sourceID)
             case let .failure(error):
-                actionNotice = "Could not import research file: \(error.localizedDescription)"
+                actionNotice = "Could not import that research file: \(error.localizedDescription)"
             }
             pendingResearchImportSourceID = nil
         })
@@ -1156,7 +1180,7 @@ private struct WorkspaceView: View {
                         actionNotice = commands.saveProject() ?? "Project saved."
                     }
                     .disabled(!commands.canSaveProject)
-                    if !workspace.hasOpenProject || !commands.canCreateProjectContent {
+                    if commands.projectActionsDisabledReason != nil || commands.workspaceActionsDisabledReason != nil || commands.searchActionsDisabledReason != nil {
                         Button("Why Is This Disabled?") {
                             NotificationCenter.default.post(name: .showHelpReference, object: "disabled-commands")
                         }
@@ -3175,7 +3199,7 @@ private struct ImportExportSheet: View {
 
             WorkspaceMetricStrip(items: [
                 ("Format", presetFormat.rawValue.uppercased()),
-                ("Chapters", "\(selectedSectionIDs.count)"),
+                ("Sections", "\(selectedSectionIDs.count)"),
                 ("Template", presetTemplateStyle.rawValue.capitalized),
                 ("Theme", presetHTMLTheme.rawValue.capitalized)
             ])
@@ -3183,7 +3207,7 @@ private struct ImportExportSheet: View {
             GroupBox("Export") {
                 VStack(alignment: .leading, spacing: 10) {
                     InlineHelpTopics(topicIDs: ["import-export", "epub-export"])
-                    Text(workspace.isRecoveryMode ? "Recovery exports are written outside the damaged project into a sibling recovery-exports folder." : "Exports are written into the project’s `exports/` folder. Save a preset when you want to reuse this exact compile setup later.")
+                    Text(workspace.isRecoveryMode ? "Recovery exports are written beside the damaged project in a matching recovery-exports folder so the original files stay untouched." : "Exports are written into the project’s `exports/` folder. Save a setup when you want to reuse these exact export settings later.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -3215,7 +3239,7 @@ private struct ImportExportSheet: View {
                         .buttonStyle(.borderedProminent)
                     }
                     if workspace.isRecoveryMode {
-                        Button("Duplicate as Writable Recovery Copy") {
+                        Button("Create Writable Recovery Copy") {
                             onNotice(workspace.duplicateRecoveryProjectAsWritableCopy())
                         }
                         .accessibilityLabel("Duplicate as writable recovery copy")
@@ -3226,7 +3250,7 @@ private struct ImportExportSheet: View {
             }
 
             if workspace.isRecoveryMode {
-                GroupBox("Recovery Diagnostics") {
+                GroupBox("Recovery Notes") {
                     VStack(alignment: .leading, spacing: 8) {
                         InlineHelpTopics(topicIDs: ["recovery-actions", "recovery-banner"])
                         if let details = workspace.recoveryModeDetails {
@@ -3248,10 +3272,13 @@ private struct ImportExportSheet: View {
                 }
             }
 
-            GroupBox("Compile Presets") {
+            GroupBox("Saved Export Setups") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         InlineHelpTopics(topicIDs: ["compile-presets", "export-review"])
+                        Text("Build reusable export setups for print, sharing, or e-book output, then preview or export with the current settings below.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         TextField("Preset name", text: $presetName)
                             .textFieldStyle(.roundedBorder)
                         HStack {
@@ -3410,7 +3437,7 @@ private struct ImportExportSheet: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 if warnings.isEmpty {
-                                    Text("Draft is ready for preview or export.")
+                                    Text("Current settings are ready for preview or export.")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 } else {
@@ -3470,7 +3497,7 @@ private struct ImportExportSheet: View {
                                 syncDrafts()
                             }
                             .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            Button("Export Draft") {
+                            Button("Export with Current Settings") {
                                 onNotice(
                                     workspace.exportProjectDraft(
                                         format: presetFormat,
@@ -3506,7 +3533,7 @@ private struct ImportExportSheet: View {
                                 )
                             }
                             .disabled(!warnings.isEmpty)
-                            Button("Generate Preview") {
+                            Button("Refresh Preview") {
                                 previewContent = workspace.compilePreview(
                                     format: previewFormat,
                                     includedSectionIds: Array(selectedSectionIDs),
@@ -3539,6 +3566,11 @@ private struct ImportExportSheet: View {
                                 ) ?? ""
                             }
                         }
+                        if !warnings.isEmpty {
+                            Text("Export with current settings is disabled until the warnings above are resolved.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
 
                         Picker("Preview As", selection: $previewFormat) {
                             Text("Markdown").tag(ExportFormat.markdown)
@@ -3548,7 +3580,7 @@ private struct ImportExportSheet: View {
                             Text("EPUB Preview").tag(ExportFormat.epub)
                         }
                         .pickerStyle(.segmented)
-                        Text("DOCX previews use the manuscript’s Markdown draft. PDF and EPUB previews use the generated HTML layout.")
+                        Text("Markdown and DOCX previews show the manuscript draft text. PDF and EPUB previews show the generated HTML layout.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextEditor(text: $previewContent)

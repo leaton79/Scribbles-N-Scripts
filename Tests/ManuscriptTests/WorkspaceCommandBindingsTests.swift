@@ -31,6 +31,7 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertFalse(bindings.canSaveProject)
         XCTAssertFalse(bindings.canNavigateToPreviousScene)
         XCTAssertFalse(bindings.canNavigateToNextScene)
+        XCTAssertNil(bindings.projectActionsDisabledReason)
         XCTAssertEqual(bindings.splitToggleTitle, "Toggle Split")
         XCTAssertEqual(bindings.inspectorToggleTitle, "Hide Inspector")
 
@@ -46,6 +47,24 @@ final class WorkspaceCommandBindingsTests: XCTestCase {
         XCTAssertFalse(bindings.canSwitchToModularMode)
         XCTAssertFalse(bindings.canToggleSplitEditor)
         XCTAssertFalse(bindings.canToggleInspector)
+        XCTAssertEqual(bindings.projectActionsDisabledReason, "Open or create a project to save, rename, export, or create manuscript content.")
+        XCTAssertEqual(bindings.workspaceActionsDisabledReason, "Open a project to switch modes, use split view, navigate scenes, or open workspace panels.")
+        XCTAssertEqual(bindings.searchActionsDisabledReason, "Open a project before using scene or project search.")
+    }
+
+    func testDisabledReasonsReflectRecoveryMode() throws {
+        let creator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsRecoverySeed")
+        let rootURL = try XCTUnwrap(creator.projectManager.projectRootURL)
+        try creator.projectManager.closeProject()
+        try FileManager.default.removeItem(at: rootURL.appendingPathComponent("manifest.json"))
+
+        let workspace = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "BindingsRecoverySeed")
+        _ = workspace.openRecoveryModeForFailedProject()
+        let bindings = WorkspaceCommandBindings(workspace: workspace)
+
+        XCTAssertEqual(bindings.projectActionsDisabledReason, "This project is open as a read-only recovery copy. Export it or create a writable recovery copy before changing content.")
+        XCTAssertEqual(bindings.workspaceActionsDisabledReason, "Recovery mode keeps editing tools limited. Create a writable recovery copy to restore full workspace actions.")
+        XCTAssertNil(bindings.searchActionsDisabledReason)
     }
 
     func testInspectorToggleDelegatesToWorkspaceCoordinator() throws {
