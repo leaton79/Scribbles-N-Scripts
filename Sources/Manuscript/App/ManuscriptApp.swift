@@ -1059,6 +1059,13 @@ private struct WorkspaceView: View {
                         actionNotice = commands.saveProject() ?? "Project saved."
                     }
                     .disabled(!commands.canSaveProject)
+                    if !workspace.hasOpenProject || !commands.canCreateProjectContent {
+                        Button("Why Disabled?") {
+                            NotificationCenter.default.post(name: .showHelpReference, object: "disabled-commands")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                    }
 
                     Menu("Project") {
                         Button("New Project") {

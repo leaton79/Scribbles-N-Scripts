@@ -1205,6 +1205,20 @@ enum HelpReferenceLibrary {
             menuPath: "Help > Scribbles-N-Scripts Help",
             shortcut: "Shift-Command-?",
             related: ["command-palette", "welcome-screen"]
+        ),
+        entry(
+            "disabled-commands",
+            "Why Commands Are Disabled",
+            category: "Help",
+            summary: "Many commands are only available when the app has the right project or selection context.",
+            what: "A dimmed command usually means one of three things: no project is open, no scene is selected, or the current mode does not support that action.",
+            how: [
+                "If project-level commands are disabled, open or create a project first.",
+                "If scene actions are disabled, select a scene in the sidebar, linear view, modular view, or search results.",
+                "If mode-specific commands are disabled, switch to the mode they require, such as Linear Mode for previous/next scene navigation."
+            ],
+            why: "Use this topic when the app looks unresponsive or a menu item is unavailable and you want to know what context is missing.",
+            related: ["welcome-screen", "scene-actions", "linear-mode", "modular-mode", "inspector"]
         )
     ]
 
@@ -1248,6 +1262,14 @@ struct HelpReferenceSheet: View {
     @State private var query = ""
     @State private var selectedEntryID: String?
 
+    private let guidedPathIDs = [
+        "welcome-screen",
+        "command-palette",
+        "inspector",
+        "find-project",
+        "disabled-commands"
+    ]
+
     private var filteredEntries: [HelpReferenceEntry] {
         HelpReferenceLibrary.entries.filter { $0.matches(query: query) }
     }
@@ -1274,6 +1296,20 @@ struct HelpReferenceSheet: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityLabel("Help search")
                     .accessibilityHint("Search help topics by command name, panel, or keyword")
+                if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Start Here")
+                            .font(.headline)
+                        ForEach(guidedPathIDs, id: \.self) { id in
+                            if let entry = HelpReferenceLibrary.entry(for: id) {
+                                Button(entry.title) {
+                                    selectedEntryID = entry.id
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+                }
                 if filteredEntries.isEmpty {
                     ContentUnavailableView(
                         "No Matching Help Topics",
