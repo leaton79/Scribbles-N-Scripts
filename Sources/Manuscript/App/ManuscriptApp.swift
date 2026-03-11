@@ -882,6 +882,9 @@ private struct WorkspaceView: View {
         })
         view = AnyView(view.alert(recentActionTitle, isPresented: $showingRecentActionConfirmation) {
             Button("Cancel", role: .cancel) {}
+            Button("Help") {
+                NotificationCenter.default.post(name: .showHelpReference, object: "open-recent")
+            }
             Button(recentActionButtonTitle, role: .destructive) {
                 performRecentAction(using: commands)
             }
@@ -2358,6 +2361,7 @@ private struct ProjectSettingsSheet: View {
 
                 GroupBox("Appearance Presets") {
                     VStack(alignment: .leading, spacing: 12) {
+                        InlineHelpTopics(topicIDs: ["appearance-presets", "themes-and-presets"])
                         Text("Save the current theme, font, editor width, and line spacing as reusable appearance combinations.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2397,6 +2401,7 @@ private struct ProjectSettingsSheet: View {
 
                 GroupBox("Staging Recovery") {
                     VStack(alignment: .leading, spacing: 12) {
+                        InlineHelpTopics(topicIDs: ["staging-tray", "staging-recovery", "scene-actions"])
                         Text("\(workspace.stagingSceneCount) staged scene(s) currently parked outside the manuscript flow.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2441,6 +2446,7 @@ private struct ProjectSettingsSheet: View {
 
                 GroupBox("Metadata Schema") {
                     VStack(alignment: .leading, spacing: 16) {
+                        InlineHelpTopics(topicIDs: ["metadata-schema", "project-settings-metadata"])
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Add Field")
                                 .font(.subheadline.weight(.medium))
@@ -2978,6 +2984,7 @@ private struct ImportExportSheet: View {
 
             GroupBox("Export") {
                 VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["import-export", "epub-export"])
                     Text(workspace.isRecoveryMode ? "Recovery exports are written outside the damaged project into a sibling recovery-exports folder." : "Exports are written into the project’s `exports/` folder. Save a preset when you want to reuse this exact compile setup later.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -3023,6 +3030,7 @@ private struct ImportExportSheet: View {
             if workspace.isRecoveryMode {
                 GroupBox("Recovery Diagnostics") {
                     VStack(alignment: .leading, spacing: 8) {
+                        InlineHelpTopics(topicIDs: ["recovery-actions", "recovery-banner"])
                         if let details = workspace.recoveryModeDetails {
                             Text(details)
                                 .font(.caption)
@@ -3045,6 +3053,7 @@ private struct ImportExportSheet: View {
             GroupBox("Compile Presets") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
+                        InlineHelpTopics(topicIDs: ["compile-presets", "export-review"])
                         TextField("Preset name", text: $presetName)
                             .textFieldStyle(.roundedBorder)
                         HStack {
@@ -3539,18 +3548,18 @@ private struct TimelineSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Timeline")
-                    .font(.headline)
-                Spacer()
-                Button("Done") {
-                    dismiss()
-                }
-            }
+            WorkspaceSheetHeader(
+                title: "Timeline",
+                subtitle: "Track story events, ordering, and scene links in one chronology view.",
+                dismissLabel: "Done",
+                helpTopicID: "timeline-events",
+                onDismiss: { dismiss() }
+            )
 
             GroupBox(editingEventID == nil ? "New Event" : "Edit Event") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        InlineHelpTopics(topicIDs: ["timeline-events", "timeline-tracks"])
                         TextField("Title", text: $eventTitle)
                             .textFieldStyle(.roundedBorder)
                         TextField("Track", text: $eventTrack)
@@ -3626,48 +3635,50 @@ private struct TimelineSheet: View {
             }
 
             GroupBox("Events") {
-                if workspace.timelineEvents.isEmpty {
-                    ContentUnavailableView(
-                        "No Timeline Events Yet",
-                        systemImage: "timeline.selection",
-                        description: Text("Add events here to map plot beats, chronology, and scene-linked story tracks.")
-                    )
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(workspace.timelineEvents, id: \.id) { event in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(event.title)
-                                            Text("\(event.track) • \(positionLabel(event.position))")
+                VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["timeline-events", "scene-actions"])
+                    if workspace.timelineEvents.isEmpty {
+                        ContentUnavailableView(
+                            "No Timeline Events Yet",
+                            systemImage: "timeline.selection",
+                            description: Text("Add events here to map plot beats, chronology, and scene-linked story tracks.")
+                        )
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(workspace.timelineEvents, id: \.id) { event in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(event.title)
+                                                Text("\(event.track) • \(positionLabel(event.position))")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Button("Edit") {
+                                                loadEvent(event)
+                                            }
+                                            .buttonStyle(.borderless)
+                                            Button("Delete") {
+                                                onNotice(workspace.deleteTimelineEvent(event.id))
+                                                if editingEventID == event.id {
+                                                    resetDrafts()
+                                                }
+                                            }
+                                            .buttonStyle(.borderless)
+                                        }
+                                        if !event.description.isEmpty {
+                                            Text(event.description)
                                                 .font(.caption)
+                                        }
+                                        if !event.linkedSceneIds.isEmpty {
+                                            Text(event.linkedSceneIds.map(workspace.sceneTitleForDisplay).joined(separator: " • "))
+                                                .font(.caption2)
                                                 .foregroundStyle(.secondary)
                                         }
-                                        Spacer()
-                                        Button("Edit") {
-                                            loadEvent(event)
-                                        }
-                                        .buttonStyle(.borderless)
-                                        Button("Delete") {
-                                            onNotice(workspace.deleteTimelineEvent(event.id))
-                                            if editingEventID == event.id {
-                                                resetDrafts()
-                                            }
-                                        }
-                                        .buttonStyle(.borderless)
-                                    }
-                                    if !event.description.isEmpty {
-                                        Text(event.description)
-                                            .font(.caption)
-                                    }
-                                    if !event.linkedSceneIds.isEmpty {
-                                        Text(event.linkedSceneIds.map(workspace.sceneTitleForDisplay).joined(separator: " • "))
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
                                     }
                                 }
-                                .padding(.vertical, 4)
                             }
                         }
                     }
@@ -3807,6 +3818,7 @@ private struct SourceLibrarySheet: View {
         GroupBox(editingSourceID == nil ? "New Source" : "Edit Source") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["sources", "citation-insertion", "source-links"])
                     TextField("Title", text: $sourceTitle)
                         .textFieldStyle(.roundedBorder)
                         .accessibilityLabel("Source title")
@@ -3896,15 +3908,18 @@ private struct SourceLibrarySheet: View {
 
     private var librarySection: some View {
         GroupBox("Library") {
-            if filteredSources.isEmpty {
-                Text(libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No sources yet. Add a reference, URL, or research file to start your library." : "No sources match the current filter. Clear or change the filter to see more references.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(filteredSources, id: \.id) { source in
-                            sourceRow(source)
+            VStack(alignment: .leading, spacing: 10) {
+                InlineHelpTopics(topicIDs: ["sources", "source-links", "citation-insertion"])
+                if filteredSources.isEmpty {
+                    Text(libraryFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No sources yet. Add a reference, URL, or research file to start your library." : "No sources match the current filter. Clear or change the filter to see more references.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(filteredSources, id: \.id) { source in
+                                sourceRow(source)
+                            }
                         }
                     }
                 }
@@ -3914,33 +3929,36 @@ private struct SourceLibrarySheet: View {
 
     private var researchBrowserSection: some View {
         GroupBox("Research Browser") {
-            if let selectedSource {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(selectedSource.title)
-                            .font(.headline)
-                        Text(sourceSummary(selectedSource))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(researchAttachmentSummary(for: selectedSource))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if let url = selectedSource.url, !url.isEmpty {
-                            Text(url)
+            VStack(alignment: .leading, spacing: 10) {
+                InlineHelpTopics(topicIDs: ["research-browser", "source-attachments"])
+                if let selectedSource {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(selectedSource.title)
+                                .font(.headline)
+                            Text(sourceSummary(selectedSource))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(researchAttachmentSummary(for: selectedSource))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                            if let url = selectedSource.url, !url.isEmpty {
+                                Text(url)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            researchAttachmentBrowser(for: selectedSource)
+                            linkedScenesSection(for: selectedSource)
+                            citationMentionsSection(for: selectedSource)
+                            linkedEntitiesSection(for: selectedSource)
+                            linkedNotesSection(for: selectedSource)
                         }
-                        researchAttachmentBrowser(for: selectedSource)
-                        linkedScenesSection(for: selectedSource)
-                        citationMentionsSection(for: selectedSource)
-                        linkedEntitiesSection(for: selectedSource)
-                        linkedNotesSection(for: selectedSource)
                     }
+                } else {
+                    Text("Select a source to browse research files, linked scenes, citations, entities, and notes.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-            } else {
-                Text("Select a source to browse research files, linked scenes, citations, entities, and notes.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -4359,21 +4377,27 @@ private struct ScratchpadSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Scratchpad")
-                    .font(.headline)
-                Spacer()
-                Button("Capture Selection") {
-                    onNotice(workspace.captureSelectionToScratchpad(title: itemTitle, as: itemKind))
-                }
-                .accessibilityLabel("Capture selected text to scratchpad")
-                Button("Done") {
-                    dismiss()
-                }
-            }
+            WorkspaceSheetHeader(
+                title: "Scratchpad",
+                subtitle: "Save loose text, reusable snippets, and captured selections for quick reuse.",
+                dismissLabel: "Done",
+                helpTopicID: "scratchpad",
+                trailingContent: {
+                    AnyView(
+                        Button("Capture Selection") {
+                            onNotice(workspace.captureSelectionToScratchpad(title: itemTitle, as: itemKind))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .accessibilityLabel("Capture selected text to scratchpad")
+                    )
+                },
+                onDismiss: { dismiss() }
+            )
 
             GroupBox(editingItemID == nil ? "New Item" : "Edit Item") {
                 VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["scratchpad", "scratchpad-capture"])
                     TextField("Title", text: $itemTitle)
                         .textFieldStyle(.roundedBorder)
                     Picker("Kind", selection: $itemKind) {
@@ -4404,53 +4428,56 @@ private struct ScratchpadSheet: View {
             }
 
             GroupBox("Items") {
-                if workspace.scratchpadItems.isEmpty {
-                    ContentUnavailableView(
-                        "No Scratchpad Items Yet",
-                        systemImage: "square.and.pencil.on.square",
-                        description: Text("Capture a selection or add a reusable snippet here for fast reinsertion while drafting.")
-                    )
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(workspace.scratchpadItems, id: \.id) { item in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.title)
-                                            Text(item.kind.rawValue.capitalized)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Button("Insert") {
-                                            onNotice(workspace.insertScratchpadItem(item.id))
-                                        }
-                                        .buttonStyle(.borderless)
-                                        .accessibilityLabel("Insert scratchpad item \(item.title)")
-                                        Button("Edit") {
-                                            itemTitle = item.title
-                                            itemContent = item.content
-                                            itemKind = item.kind
-                                            editingItemID = item.id
-                                        }
-                                        .buttonStyle(.borderless)
-                                        .accessibilityLabel("Edit scratchpad item \(item.title)")
-                                        Button("Delete") {
-                                            onNotice(workspace.deleteScratchpadItem(item.id))
-                                            if editingItemID == item.id {
-                                                resetDraft()
+                VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["scratchpad", "scratchpad-capture"])
+                    if workspace.scratchpadItems.isEmpty {
+                        ContentUnavailableView(
+                            "No Scratchpad Items Yet",
+                            systemImage: "square.and.pencil.on.square",
+                            description: Text("Capture a selection or add a reusable snippet here for fast reinsertion while drafting.")
+                        )
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(workspace.scratchpadItems, id: \.id) { item in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(item.title)
+                                                Text(item.kind.rawValue.capitalized)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
                                             }
+                                            Spacer()
+                                            Button("Insert") {
+                                                onNotice(workspace.insertScratchpadItem(item.id))
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .accessibilityLabel("Insert scratchpad item \(item.title)")
+                                            Button("Edit") {
+                                                itemTitle = item.title
+                                                itemContent = item.content
+                                                itemKind = item.kind
+                                                editingItemID = item.id
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .accessibilityLabel("Edit scratchpad item \(item.title)")
+                                            Button("Delete") {
+                                                onNotice(workspace.deleteScratchpadItem(item.id))
+                                                if editingItemID == item.id {
+                                                    resetDraft()
+                                                }
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .accessibilityLabel("Delete scratchpad item \(item.title)")
                                         }
-                                        .buttonStyle(.borderless)
-                                        .accessibilityLabel("Delete scratchpad item \(item.title)")
+                                        Text(item.content)
+                                            .font(.caption)
+                                            .lineLimit(4)
+                                            .foregroundStyle(.secondary)
                                     }
-                                    Text(item.content)
-                                        .font(.caption)
-                                        .lineLimit(4)
-                                        .foregroundStyle(.secondary)
+                                    .padding(.vertical, 4)
                                 }
-                                .padding(.vertical, 4)
                             }
                         }
                     }
@@ -4505,6 +4532,7 @@ private struct EntityTrackerSheet: View {
 
             GroupBox("New Entity") {
                 VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["entities", "entity-relationships"])
                     TextField("Name", text: $entityName)
                         .textFieldStyle(.roundedBorder)
                     Picker("Type", selection: $entityType) {
@@ -4625,96 +4653,101 @@ private struct EntityTrackerSheet: View {
             }
 
             GroupBox("Tracked") {
-                if workspace.entities.isEmpty {
-                    ContentUnavailableView(
-                        "No Entities Yet",
-                        systemImage: "person.2.crop.square.stack",
-                        description: Text("Track characters, places, objects, and aliases here so scene context and mention scanning have something to build on.")
-                    )
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(workspace.entities, id: \.id) { entity in
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(entity.name)
-                                        Text(entity.entityType.rawValue.capitalized)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Text("\(entity.sceneMentions.count) linked scene(s)")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                        Text("\(workspace.notesLinkedToEntity(entity.id).count) note(s)")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Button("Link Current Scene") {
-                                        onNotice(workspace.linkSelectedSceneToEntity(entity.id))
-                                    }
-                                    .buttonStyle(.borderless)
-                                    Button("Scan Mentions") {
-                                        onNotice(workspace.scanEntityMentions(entity.id))
-                                    }
-                                    .buttonStyle(.borderless)
-                                    Button("Notes") {
-                                        workspace.focusNotes(onEntity: entity.id)
-                                        NotificationCenter.default.post(name: .showNotesSheet, object: nil)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    Button("Edit") {
-                                        loadEntity(entity)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    Button("Delete") {
-                                        onNotice(workspace.deleteEntity(entity.id))
-                                    }
-                                    .buttonStyle(.borderless)
-                                }
-                                if !entity.aliases.isEmpty {
-                                    Text("Aliases: \(entity.aliases.joined(separator: ", "))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if !entity.fields.isEmpty {
-                                    Text(entity.fields.keys.sorted().map { "\($0): \(entity.fields[$0] ?? "")" }.joined(separator: " • "))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                let relationships = workspace.entityRelationships(entity.id)
-                                if !relationships.isEmpty {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Relationships")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                        ForEach(relationships, id: \.target.id) { item in
-                                            HStack {
-                                                Text(workspace.relationshipDescription(source: entity, relationship: item.relationship, target: item.target))
+                VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["entities", "entity-relationships"])
+                    if workspace.entities.isEmpty {
+                        ContentUnavailableView(
+                            "No Entities Yet",
+                            systemImage: "person.2.crop.square.stack",
+                            description: Text("Track characters, places, objects, and aliases here so scene context and mention scanning have something to build on.")
+                        )
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(workspace.entities, id: \.id) { entity in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(alignment: .top) {
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(entity.name)
+                                                Text(entity.entityType.rawValue.capitalized)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                Text("\(entity.sceneMentions.count) linked scene(s)")
                                                     .font(.caption2)
-                                                Spacer()
-                                                Button("Remove") {
-                                                    onNotice(workspace.removeEntityRelationship(from: entity.id, to: item.target.id, label: item.relationship.label))
+                                                    .foregroundStyle(.secondary)
+                                                Text("\(workspace.notesLinkedToEntity(entity.id).count) note(s)")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Button("Link Current Scene") {
+                                                onNotice(workspace.linkSelectedSceneToEntity(entity.id))
+                                            }
+                                            .buttonStyle(.borderless)
+                                            Button("Scan Mentions") {
+                                                onNotice(workspace.scanEntityMentions(entity.id))
+                                            }
+                                            .buttonStyle(.borderless)
+                                            Button("Notes") {
+                                                workspace.focusNotes(onEntity: entity.id)
+                                                NotificationCenter.default.post(name: .showNotesSheet, object: nil)
+                                            }
+                                            .buttonStyle(.borderless)
+                                            Button("Edit") {
+                                                loadEntity(entity)
+                                            }
+                                            .buttonStyle(.borderless)
+                                            Button("Delete") {
+                                                onNotice(workspace.deleteEntity(entity.id))
+                                            }
+                                            .buttonStyle(.borderless)
+                                        }
+                                        if !entity.aliases.isEmpty {
+                                            Text("Aliases: \(entity.aliases.joined(separator: ", "))")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if !entity.fields.isEmpty {
+                                            Text(entity.fields.keys.sorted().map { "\($0): \(entity.fields[$0] ?? "")" }.joined(separator: " • "))
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        let relationships = workspace.entityRelationships(entity.id)
+                                        if !relationships.isEmpty {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text("Relationships")
+                                                    .font(.caption2.weight(.semibold))
+                                                    .foregroundStyle(.secondary)
+                                                ForEach(relationships, id: \.target.id) { item in
+                                                    HStack {
+                                                        Text(workspace.relationshipDescription(source: entity, relationship: item.relationship, target: item.target))
+                                                            .font(.caption2)
+                                                        Spacer()
+                                                        Button("Remove") {
+                                                            onNotice(workspace.removeEntityRelationship(from: entity.id, to: item.target.id, label: item.relationship.label))
+                                                        }
+                                                        .buttonStyle(.borderless)
+                                                    }
                                                 }
-                                                .buttonStyle(.borderless)
                                             }
                                         }
-                                    }
-                                }
-                                let linkedScenes = workspace.entityLinkedScenes(entity.id)
-                                if !linkedScenes.isEmpty {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Linked Scenes")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                        ForEach(linkedScenes, id: \.id) { scene in
-                                            HStack {
-                                                Text(scene.title)
-                                                    .font(.caption2)
-                                                Spacer()
-                                                Button("Open") {
-                                                    workspace.navigateToScene(scene.id)
+                                        let linkedScenes = workspace.entityLinkedScenes(entity.id)
+                                        if !linkedScenes.isEmpty {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text("Linked Scenes")
+                                                    .font(.caption2.weight(.semibold))
+                                                    .foregroundStyle(.secondary)
+                                                ForEach(linkedScenes, id: \.id) { scene in
+                                                    HStack {
+                                                        Text(scene.title)
+                                                            .font(.caption2)
+                                                        Spacer()
+                                                        Button("Open") {
+                                                            workspace.navigateToScene(scene.id)
+                                                        }
+                                                        .buttonStyle(.borderless)
+                                                    }
                                                 }
-                                                .buttonStyle(.borderless)
                                             }
                                         }
                                     }
@@ -4722,8 +4755,8 @@ private struct EntityTrackerSheet: View {
                             }
                         }
                     }
-                    .frame(maxHeight: 220)
                 }
+                .frame(maxHeight: 220)
             }
         }
         .padding(20)
@@ -4804,6 +4837,7 @@ private struct NotesSheet: View {
             GroupBox(editingNoteID == nil ? "New Note" : "Edit Note") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        InlineHelpTopics(topicIDs: ["notes", "note-linking"])
                         TextField("Title", text: $noteTitle)
                             .textFieldStyle(.roundedBorder)
                         TextField("Folder", text: $noteFolder)
@@ -4890,6 +4924,7 @@ private struct NotesSheet: View {
 
             GroupBox("Filters") {
                 VStack(alignment: .leading, spacing: 10) {
+                    InlineHelpTopics(topicIDs: ["notes-filters", "notes"])
                     TextField("Filter by folder", text: $folderFilter)
                         .textFieldStyle(.roundedBorder)
                     Picker("Scene", selection: $filteredSceneID) {
@@ -5073,8 +5108,25 @@ private struct WorkspaceSheetHeader: View {
     let subtitle: String
     let dismissLabel: String
     let helpTopicID: String?
+    let trailingContent: () -> AnyView
     let onDismiss: () -> Void
     @Environment(\.appThemePalette) private var palette
+
+    init(
+        title: String,
+        subtitle: String,
+        dismissLabel: String,
+        helpTopicID: String?,
+        trailingContent: @escaping () -> AnyView = { AnyView(EmptyView()) },
+        onDismiss: @escaping () -> Void
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.dismissLabel = dismissLabel
+        self.helpTopicID = helpTopicID
+        self.trailingContent = trailingContent
+        self.onDismiss = onDismiss
+    }
 
     var body: some View {
         HStack(alignment: .top) {
@@ -5093,11 +5145,37 @@ private struct WorkspaceSheetHeader: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+            trailingContent()
             Button(dismissLabel, action: onDismiss)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
         }
         .padding(.bottom, 4)
+    }
+}
+
+private struct InlineHelpTopics: View {
+    let topicIDs: [String]
+
+    private var entries: [HelpReferenceEntry] {
+        topicIDs.compactMap(HelpReferenceLibrary.entry(for:))
+    }
+
+    var body: some View {
+        if !entries.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Related Help:")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(entries) { entry in
+                    Button(entry.title) {
+                        NotificationCenter.default.post(name: .showHelpReference, object: entry.id)
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption2)
+                }
+            }
+        }
     }
 }
 
@@ -5477,6 +5555,9 @@ private struct SearchPanelSheet: View {
         }
         .alert("Replace All?", isPresented: $showingReplaceConfirmation) {
             Button("Cancel", role: .cancel) {}
+            Button("Help") {
+                NotificationCenter.default.post(name: .showHelpReference, object: "replace-batches")
+            }
             Button("Replace", role: .destructive) {
                 let message = commands.replaceAllSearchResults()
                 replaceUndoNotice = workspace.canUndoLastReplaceBatch ? message : nil

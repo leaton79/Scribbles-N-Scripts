@@ -297,6 +297,22 @@ enum HelpReferenceLibrary {
             related: ["notes", "sources", "command-palette"]
         ),
         entry(
+            "scratchpad-capture",
+            "Capture Selection to Scratchpad",
+            category: "Project",
+            summary: "Capture Selection turns current editor text into a scratchpad item.",
+            what: "It is the fastest way to save a fragment, paragraph, or line before you cut or revise it.",
+            how: [
+                "Select text in the editor first.",
+                "Open `Project > Scratchpad…`.",
+                "Use `Capture Selection` in the sheet header.",
+                "Give the captured text a title if needed, then insert it later from the item list."
+            ],
+            why: "Use it when you are moving fast in revision and want to keep text nearby without creating a formal note.",
+            menuPath: "Project > Scratchpad…",
+            related: ["scratchpad", "editor-writing", "notes"]
+        ),
+        entry(
             "new-chapter",
             "New Chapter",
             category: "Project",
@@ -642,6 +658,21 @@ enum HelpReferenceLibrary {
             related: ["send-to-staging", "move-to-chapter", "project-settings"]
         ),
         entry(
+            "staging-recovery",
+            "Staging Recovery",
+            category: "Workspace",
+            summary: "Staging recovery moves parked scenes back into normal manuscript chapters.",
+            what: "It gives you a controlled way to restore selected or all staged scenes into an active chapter.",
+            how: [
+                "Open `Project > Project Settings…` and go to `Staging Recovery`, or use the staging tray.",
+                "Choose the destination chapter.",
+                "Run `Move Selected Out of Staging` or `Move All Staging Scenes`."
+            ],
+            why: "Use it when you have revised scenes in staging that should return to the manuscript without manual recreation.",
+            menuPath: "Project > Project Settings…",
+            related: ["staging-tray", "send-to-staging", "move-to-chapter"]
+        ),
+        entry(
             "themes-and-presets",
             "Themes and Appearance Presets",
             category: "Workspace",
@@ -857,6 +888,21 @@ enum HelpReferenceLibrary {
             related: ["notes", "entities", "sidebar"]
         ),
         entry(
+            "note-linking",
+            "Linking Notes to Scenes and Entities",
+            category: "Project",
+            summary: "Notes become much more useful when they are linked to specific manuscript context.",
+            what: "A linked note can point at one or more scenes and entities, which makes filtering, navigation, and review easier later.",
+            how: [
+                "Open `Project > Notes…`.",
+                "Create a note or edit an existing note.",
+                "Use the `Linked Scenes` and `Linked Entities` checkboxes before saving."
+            ],
+            why: "Use linked notes when a thought belongs to concrete story material instead of the project in general.",
+            menuPath: "Project > Notes…",
+            related: ["notes", "notes-filters", "entities"]
+        ),
+        entry(
             "source-attachments",
             "Source Attachments and Research Files",
             category: "Project",
@@ -872,6 +918,36 @@ enum HelpReferenceLibrary {
             menuPath: "Project > Sources…",
             related: ["sources", "citation-insertion", "notes", "entities"],
             keywords: ["research", "attachment", "file"]
+        ),
+        entry(
+            "research-browser",
+            "Research Browser",
+            category: "Project",
+            summary: "The research browser is the detailed source view for files, links, and citation context.",
+            what: "It shows the selected source's attachments, linked scenes, citation mentions, linked entities, and linked notes in one place.",
+            how: [
+                "Open `Project > Sources…`.",
+                "Select a source in the library list.",
+                "Use the `Research Browser` section to inspect files and jump into linked manuscript context."
+            ],
+            why: "Use it when editing bibliography fields is not enough and you need to see how one source actually supports the draft.",
+            menuPath: "Project > Sources…",
+            related: ["sources", "source-attachments", "source-links"]
+        ),
+        entry(
+            "source-links",
+            "Source Links to Scenes, Entities, and Notes",
+            category: "Project",
+            summary: "Sources can connect directly to the manuscript material they support.",
+            what: "Linking a source to scenes, entities, and notes helps you trace where research is used and what it informs.",
+            how: [
+                "Open `Project > Sources…`.",
+                "Create or edit a source.",
+                "Use the `Links` section to select scenes, entities, and notes before saving."
+            ],
+            why: "Use links when you want research context to stay connected to story material instead of floating as isolated references.",
+            menuPath: "Project > Sources…",
+            related: ["sources", "research-browser", "notes", "entities"]
         ),
         entry(
             "citation-insertion",
@@ -902,6 +978,21 @@ enum HelpReferenceLibrary {
             why: "Use tracks when one chronological list is not enough and you need separate strands such as character arcs or parallel plots.",
             menuPath: "Project > Timeline…",
             related: ["timeline", "entities", "notes"]
+        ),
+        entry(
+            "timeline-tracks",
+            "Timeline Tracks and Positions",
+            category: "Project",
+            summary: "Tracks group kinds of events, and positions control their order.",
+            what: "You can separate events into tracks like main plot, backstory, or subplot, then place them by real date or relative order.",
+            how: [
+                "Open `Project > Timeline…`.",
+                "Set a track name when creating an event.",
+                "Choose `Use Absolute Date` for calendar time, or leave it off to manage events with `Relative Order`."
+            ],
+            why: "Use this when your story has multiple strands or when chronology matters even if exact dates do not.",
+            menuPath: "Project > Timeline…",
+            related: ["timeline-events", "timeline", "scene-actions"]
         ),
         entry(
             "compile-presets",
