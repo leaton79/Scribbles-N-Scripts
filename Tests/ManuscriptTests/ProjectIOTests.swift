@@ -342,7 +342,7 @@ final class ProjectIOTests: XCTestCase {
         }
     }
 
-    func testOpenProjectFailureDuringLateLockCreationLeavesNoOpenState() throws {
+    func testOpenProjectLateLockFileWriteDoesNotPreventOpen() throws {
         let creator = FileSystemProjectManager()
         let project = try creator.createProject(name: "LateLockFailure", at: tempDir)
         let root = tempDir.appendingPathComponent(project.name)
@@ -377,21 +377,13 @@ final class ProjectIOTests: XCTestCase {
             try data.write(to: url, options: .atomic)
         }
 
-        XCTAssertThrowsError(try opener.openProject(at: root)) { error in
-            guard case ProjectIOError.concurrentAccess = error else {
-                return XCTFail("Expected concurrentAccess, got \(error)")
-            }
-        }
-        XCTAssertNil(opener.currentProject)
-        XCTAssertNil(opener.projectRootURL)
-        XCTAssertThrowsError(try opener.saveManifest()) { error in
-            guard case ProjectIOError.noOpenProject = error else {
-                return XCTFail("Expected noOpenProject after failed open")
-            }
-        }
+        XCTAssertNoThrow(try opener.openProject(at: root))
+        XCTAssertNotNil(opener.currentProject)
+        XCTAssertEqual(opener.projectRootURL, root)
+        XCTAssertNoThrow(try opener.saveManifest())
     }
 
-    func testCreateProjectFailureDuringLateLockCreationLeavesNoOpenState() throws {
+    func testCreateProjectLateLockFileWriteDoesNotPreventCreate() throws {
         let manager = FileSystemProjectManager()
         manager.manifestWriteInterceptor = { url, data in
             let lockURL = url.deletingLastPathComponent().appendingPathComponent(".lock")
@@ -403,18 +395,10 @@ final class ProjectIOTests: XCTestCase {
             try data.write(to: url, options: .atomic)
         }
 
-        XCTAssertThrowsError(try manager.createProject(name: "CreateLateLockFailure", at: tempDir)) { error in
-            guard case ProjectIOError.concurrentAccess = error else {
-                return XCTFail("Expected concurrentAccess, got \(error)")
-            }
-        }
-        XCTAssertNil(manager.currentProject)
-        XCTAssertNil(manager.projectRootURL)
-        XCTAssertThrowsError(try manager.saveManifest()) { error in
-            guard case ProjectIOError.noOpenProject = error else {
-                return XCTFail("Expected noOpenProject after failed create")
-            }
-        }
+        XCTAssertNoThrow(try manager.createProject(name: "CreateLateLockFailure", at: tempDir))
+        XCTAssertNotNil(manager.currentProject)
+        XCTAssertEqual(manager.projectRootURL, tempDir.appendingPathComponent("CreateLateLockFailure"))
+        XCTAssertNoThrow(try manager.saveManifest())
     }
 
     func testOpenProjectSwitchesProjectsAndReleasesPreviousLock() throws {

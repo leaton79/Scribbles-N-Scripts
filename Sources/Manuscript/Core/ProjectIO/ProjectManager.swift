@@ -82,6 +82,12 @@ struct RecoveryDiagnostic: Equatable {
 }
 
 final class FileSystemProjectManager: ProjectManager {
+    private struct ProjectLockHandle {
+        let descriptor: Int32
+        let url: URL
+        let inode: UInt64
+    }
+
     private let fileManager: FileManager
     private var projectURL: URL?
     private var manifest: Manifest?
@@ -95,6 +101,7 @@ final class FileSystemProjectManager: ProjectManager {
 
     private let supportedFormatVersion = ManifestCoder.formatVersion
     private let lockFilename = ".lock"
+    private var currentLockHandle: ProjectLockHandle?
     private(set) var isReadOnlyRecoveryMode = false
     private(set) var recoveryModeDetails: String?
     private(set) var recoveryDiagnostics: [RecoveryDiagnostic] = []
@@ -122,7 +129,8 @@ final class FileSystemProjectManager: ProjectManager {
         let previousProject = currentProject
         let previousDirtySceneIds = dirtySceneIds
         let previousManifestDirty = isManifestDirty
-        var createdLock = false
+        let previousLockHandle = currentLockHandle
+        var targetLockHandle: ProjectLockHandle?
 
         do {
             try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
@@ -197,30 +205,34 @@ final class FileSystemProjectManager: ProjectManager {
             try saveSupportMetadataFiles(at: rootURL)
             try writeManifest(manifest, to: rootURL.appendingPathComponent("manifest.json"))
             try writeStringAtomically(ManifestCoder.formatVersion, to: rootURL.appendingPathComponent(".manuscript-version"))
-            try createLockFileIfNeeded(at: rootURL)
-            createdLock = true
+            targetLockHandle = try createLockFileIfNeeded(at: rootURL)
 
             stopAutosave()
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
+            self.currentLockHandle = targetLockHandle
             self.isReadOnlyRecoveryMode = false
             self.recoveryModeDetails = nil
             self.recoveryDiagnostics = []
             isManifestDirty = false
             dirtySceneIds.removeAll()
+            targetLockHandle = nil
 
-            if let previousProjectURL, previousProjectURL != rootURL {
+            if let previousProjectURL, previousProjectURL != rootURL, let previousLockHandle {
+                releaseLockHandle(previousLockHandle, removeFileAtPath: true)
+            } else if let previousProjectURL, previousProjectURL != rootURL {
                 removeLockFileIfPresent(at: previousProjectURL)
             }
             return currentProject!
         } catch {
-            if createdLock {
-                removeLockFileIfPresent(at: rootURL)
+            if let targetLockHandle {
+                releaseLockHandle(targetLockHandle, removeFileAtPath: true)
             }
             self.projectURL = previousProjectURL
             self.manifest = previousManifest
             self.currentProject = previousProject
+            self.currentLockHandle = previousLockHandle
             self.dirtySceneIds = previousDirtySceneIds
             self.isManifestDirty = previousManifestDirty
             throw error
@@ -248,21 +260,13 @@ final class FileSystemProjectManager: ProjectManager {
         let rootURL = url
         if projectURL == rootURL, let currentProject {
             let lockURL = rootURL.appendingPathComponent(lockFilename)
-            if !fileManager.fileExists(atPath: lockURL.path) || !lockOwnedByCurrentProcess(at: lockURL) {
-                // Same-process reopen should self-heal lock drift/corruption.
-                if fileManager.fileExists(atPath: lockURL.path) {
-                    try? fileManager.removeItem(at: lockURL)
+            if currentLockHandle?.url != lockURL || !lockFilePathStillMatchesCurrentHandle() {
+                if let currentLockHandle {
+                    releaseLockHandle(currentLockHandle, removeFileAtPath: true)
                 }
-                try createLockFileIfNeeded(at: rootURL)
+                currentLockHandle = try createLockFileIfNeeded(at: rootURL)
             }
             return currentProject
-        }
-        let lockURL = rootURL.appendingPathComponent(lockFilename)
-        if fileManager.fileExists(atPath: lockURL.path) {
-            if lockRepresentsActiveSession(at: lockURL) {
-                throw ProjectIOError.concurrentAccess(lockFile: lockURL)
-            }
-            try? fileManager.removeItem(at: lockURL)
         }
 
         let previousProjectURL = projectURL
@@ -270,9 +274,11 @@ final class FileSystemProjectManager: ProjectManager {
         let previousProject = currentProject
         let previousDirtySceneIds = dirtySceneIds
         let previousManifestDirty = isManifestDirty
-        var createdTargetLock = false
+        let previousLockHandle = currentLockHandle
+        var targetLockHandle: ProjectLockHandle?
 
         do {
+            targetLockHandle = try createLockFileIfNeeded(at: rootURL)
             try checkVersionCompatibility(projectRoot: rootURL)
 
             let manifestURL = rootURL.appendingPathComponent("manifest.json")
@@ -284,31 +290,33 @@ final class FileSystemProjectManager: ProjectManager {
                 try writeManifest(manifest, to: manifestURL)
             }
 
-            try createLockFileIfNeeded(at: rootURL)
-            createdTargetLock = true
-
             stopAutosave()
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
+            self.currentLockHandle = targetLockHandle
             self.isReadOnlyRecoveryMode = false
             self.recoveryModeDetails = nil
             self.recoveryDiagnostics = []
             isManifestDirty = false
             dirtySceneIds.removeAll()
+            targetLockHandle = nil
 
-            if let previousProjectURL, previousProjectURL != rootURL {
+            if let previousProjectURL, previousProjectURL != rootURL, let previousLockHandle {
+                releaseLockHandle(previousLockHandle, removeFileAtPath: true)
+            } else if let previousProjectURL, previousProjectURL != rootURL {
                 removeLockFileIfPresent(at: previousProjectURL)
             }
 
             return currentProject!
         } catch {
-            if createdTargetLock {
-                removeLockFileIfPresent(at: rootURL)
+            if let targetLockHandle {
+                releaseLockHandle(targetLockHandle, removeFileAtPath: true)
             }
             self.projectURL = previousProjectURL
             self.manifest = previousManifest
             self.currentProject = previousProject
+            self.currentLockHandle = previousLockHandle
             self.dirtySceneIds = previousDirtySceneIds
             self.isManifestDirty = previousManifestDirty
             throw error
@@ -1056,21 +1064,60 @@ final class FileSystemProjectManager: ProjectManager {
         try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("compile-presets.json"))
     }
 
-    private func createLockFileIfNeeded(at rootURL: URL) throws {
+    private func createLockFileIfNeeded(at rootURL: URL) throws -> ProjectLockHandle {
         let lockURL = rootURL.appendingPathComponent(lockFilename)
-        if fileManager.fileExists(atPath: lockURL.path) {
-            if lockRepresentsActiveSession(at: lockURL) {
+        let descriptor = open(lockURL.path, O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+
+        if flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            let lockError = errno
+            close(descriptor)
+            if lockError == EWOULDBLOCK {
                 throw ProjectIOError.concurrentAccess(lockFile: lockURL)
             }
-            try? fileManager.removeItem(at: lockURL)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(lockError))
+        }
+
+        var statBuffer = stat()
+        if fstat(descriptor, &statBuffer) != 0 {
+            let statError = errno
+            flock(descriptor, LOCK_UN)
+            close(descriptor)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(statError))
         }
 
         let lockPayload = [
             "pid": String(ProcessInfo.processInfo.processIdentifier),
-            "openedAt": ISO8601DateFormatter().string(from: Date())
+            "openedAt": ISO8601DateFormatter().string(from: Date()),
+            "executablePath": ProcessInfo.processInfo.arguments.first ?? ""
         ]
         let lockData = try JSONSerialization.data(withJSONObject: lockPayload, options: [.sortedKeys])
-        try lockData.write(to: lockURL, options: .atomic)
+        if ftruncate(descriptor, 0) != 0 {
+            let truncateError = errno
+            flock(descriptor, LOCK_UN)
+            close(descriptor)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(truncateError))
+        }
+        _ = lseek(descriptor, 0, SEEK_SET)
+        let writeCount = lockData.withUnsafeBytes { rawBuffer -> Int in
+            guard let baseAddress = rawBuffer.baseAddress else { return 0 }
+            return write(descriptor, baseAddress, rawBuffer.count)
+        }
+        if writeCount != lockData.count {
+            let writeError = errno
+            flock(descriptor, LOCK_UN)
+            close(descriptor)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(writeError == 0 ? EIO : writeError))
+        }
+        _ = fsync(descriptor)
+
+        return ProjectLockHandle(
+            descriptor: descriptor,
+            url: lockURL,
+            inode: UInt64(statBuffer.st_ino)
+        )
     }
 
     private func lockRepresentsActiveSession(at lockURL: URL) -> Bool {
@@ -1084,11 +1131,37 @@ final class FileSystemProjectManager: ProjectManager {
 
     private func removeLockFileIfPresent(at rootURL: URL) {
         let lockURL = rootURL.appendingPathComponent(lockFilename)
-        if fileManager.fileExists(atPath: lockURL.path) {
-            if lockOwnedByCurrentProcess(at: lockURL) {
-                try? fileManager.removeItem(at: lockURL)
-            }
+        if let currentLockHandle, currentLockHandle.url == lockURL {
+            releaseLockHandle(currentLockHandle, removeFileAtPath: true)
+            self.currentLockHandle = nil
+            return
         }
+
+        if fileManager.fileExists(atPath: lockURL.path), !lockRepresentsActiveSession(at: lockURL) {
+            try? fileManager.removeItem(at: lockURL)
+        }
+    }
+
+    private func releaseLockHandle(_ handle: ProjectLockHandle, removeFileAtPath: Bool) {
+        if removeFileAtPath, lockFilePathStillMatchesHandle(handle) {
+            try? fileManager.removeItem(at: handle.url)
+        }
+        flock(handle.descriptor, LOCK_UN)
+        close(handle.descriptor)
+    }
+
+    private func lockFilePathStillMatchesCurrentHandle() -> Bool {
+        guard let currentLockHandle else { return false }
+        return lockFilePathStillMatchesHandle(currentLockHandle)
+    }
+
+    private func lockFilePathStillMatchesHandle(_ handle: ProjectLockHandle) -> Bool {
+        guard fileManager.fileExists(atPath: handle.url.path),
+              let attributes = try? fileManager.attributesOfItem(atPath: handle.url.path),
+              let inodeNumber = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value else {
+            return false
+        }
+        return inodeNumber == handle.inode
     }
 
     private func lockPIDInfo(at lockURL: URL) -> (readable: Bool, pid: Int?) {
