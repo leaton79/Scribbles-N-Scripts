@@ -313,6 +313,13 @@ struct ScribblesNScriptsApp: App {
                 }
                 .disabled(!commands.canRedoLastReplaceBatch)
             }
+
+            CommandMenu("Help") {
+                Button("Scribbles-N-Scripts Help") {
+                    NotificationCenter.default.post(name: .showHelpReference, object: nil)
+                }
+                .keyboardShortcut("/", modifiers: [.command, .shift])
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             workspace.handleScenePhase(newPhase)
@@ -340,6 +347,7 @@ private struct WorkspaceView: View {
     @State private var showingRenameSheet = false
     @State private var showingProjectSwitcher = false
     @State private var showingCommandPalette = false
+    @State private var showingHelpReference = false
     @State private var showingGoalsDashboard = false
     @State private var showingProjectSettings = false
     @State private var showingImportExport = false
@@ -361,11 +369,22 @@ private struct WorkspaceView: View {
     @State private var newProjectName = ""
     @State private var saveAsProjectName = ""
     @State private var renameProjectName = ""
+    @State private var helpReferenceEntryID: String?
 
     var body: some View {
         let commands = WorkspaceCommandBindings(workspace: workspace)
         GeometryReader { geometry in
             workspaceBody(commands: commands, geometry: geometry)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showHelpReference)) { notification in
+            helpReferenceEntryID = notification.object as? String
+            showingHelpReference = true
+        }
+        .sheet(isPresented: $showingHelpReference) {
+            HelpReferenceSheet(startingEntryID: helpReferenceEntryID)
+                .preferredColorScheme(workspace.preferredColorScheme)
+                .tint(workspace.themePalette.tint)
+                .environment(\.appThemePalette, workspace.themePalette)
         }
     }
 
@@ -784,6 +803,10 @@ private struct WorkspaceView: View {
                 },
                 onShowScratchpad: {
                     showingScratchpadSheet = true
+                },
+                onShowHelp: { entryID in
+                    helpReferenceEntryID = entryID
+                    showingHelpReference = true
                 },
                 onShowProjectSwitcher: {
                     projectSwitcherQuery = ""
@@ -1271,6 +1294,11 @@ private struct WorkspaceView: View {
             .controlSize(.small)
             .accessibilityLabel("Duplicate recovery project")
             .accessibilityHint("Creates a writable recovered copy beside the damaged project")
+            Button("Help") {
+                NotificationCenter.default.post(name: .showHelpReference, object: "recovery-actions")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .padding(10)
         .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -2252,6 +2280,7 @@ private struct ProjectSettingsSheet: View {
                     title: "Project Settings",
                     subtitle: "General preferences, staging recovery, and metadata schema live here.",
                     dismissLabel: "Done",
+                    helpTopicID: "project-settings",
                     onDismiss: { dismiss() }
                 )
 
@@ -2936,6 +2965,7 @@ private struct ImportExportSheet: View {
                 title: "Import / Export",
                 subtitle: "Compile the manuscript to project exports, or import Markdown and text files as new scenes.",
                 dismissLabel: "Done",
+                helpTopicID: "import-export",
                 onDismiss: { dismiss() }
             )
 
@@ -3477,6 +3507,11 @@ private struct ModularBatchActionsBar: View {
                 onNotice(workspace.batchSendSelectedScenesToStaging())
             }
             .disabled(!workspace.canBatchStageSelectedScenes)
+            Button("Help") {
+                NotificationCenter.default.post(name: .showHelpReference, object: "modular-batch-actions")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -3716,6 +3751,7 @@ private struct SourceLibrarySheet: View {
                 title: "Sources",
                 subtitle: "Research references, imported files, citations, and cross-links.",
                 dismissLabel: "Done",
+                helpTopicID: "sources",
                 onDismiss: { dismiss() }
             )
 
@@ -4457,6 +4493,7 @@ private struct EntityTrackerSheet: View {
                 title: "Entities",
                 subtitle: "Track characters, places, objects, aliases, and linked scene context.",
                 dismissLabel: "Done",
+                helpTopicID: "entities",
                 onDismiss: { dismiss() }
             )
 
@@ -4753,6 +4790,7 @@ private struct NotesSheet: View {
                 title: "Notes",
                 subtitle: "Linked working notes for scenes, entities, and folders.",
                 dismissLabel: "Done",
+                helpTopicID: "notes",
                 onDismiss: { dismiss() }
             )
 
@@ -5034,6 +5072,7 @@ private struct WorkspaceSheetHeader: View {
     let title: String
     let subtitle: String
     let dismissLabel: String
+    let helpTopicID: String?
     let onDismiss: () -> Void
     @Environment(\.appThemePalette) private var palette
 
@@ -5047,6 +5086,13 @@ private struct WorkspaceSheetHeader: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let helpTopicID {
+                Button("Help") {
+                    NotificationCenter.default.post(name: .showHelpReference, object: helpTopicID)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
             Button(dismissLabel, action: onDismiss)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -5125,6 +5171,7 @@ private struct GoalsDashboardSheet: View {
                 title: "Writing Goals & Statistics",
                 subtitle: "Session progress, project pacing, and recent history.",
                 dismissLabel: "Close",
+                helpTopicID: "goals-dashboard",
                 onDismiss: { dismiss() }
             )
             WorkspaceMetricStrip(items: [
@@ -5443,8 +5490,16 @@ private struct SearchPanelSheet: View {
 
     private func sheetContent(commands: WorkspaceCommandBindings) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Find & Replace")
-                .font(.headline)
+            HStack {
+                Text("Find & Replace")
+                    .font(.headline)
+                Spacer()
+                Button("Help") {
+                    NotificationCenter.default.post(name: .showHelpReference, object: "find-project")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
             searchInputs(commands: commands)
             replaceControls(commands: commands)
             replaceMeta(commands: commands)
@@ -6173,6 +6228,7 @@ private struct CommandPaletteSheet: View {
     let onShowSources: () -> Void
     let onShowNotes: () -> Void
     let onShowScratchpad: () -> Void
+    let onShowHelp: (String?) -> Void
     let onShowProjectSwitcher: () -> Void
     @State private var selectedItemID: String?
 
@@ -6311,6 +6367,10 @@ private struct CommandPaletteSheet: View {
         guard item.isEnabled else { return }
         onCancel()
         switch item.action {
+        case let .showHelp(entryID):
+            DispatchQueue.main.async {
+                onShowHelp(entryID)
+            }
         case .createProject:
             DispatchQueue.main.async(execute: onShowNewProject)
         case .openProject:
@@ -6521,8 +6581,16 @@ private struct ProjectSwitcherSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Switch Project")
-                .font(.headline)
+            HStack {
+                Text("Switch Project")
+                    .font(.headline)
+                Spacer()
+                Button("Help") {
+                    NotificationCenter.default.post(name: .showHelpReference, object: "project-switcher")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
             TextField("Search projects", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(openSelectedProject)
@@ -6599,6 +6667,7 @@ private extension Notification.Name {
     static let showSourcesSheet = Notification.Name("workspace.showSourcesSheet")
     static let showNotesSheet = Notification.Name("workspace.showNotesSheet")
     static let showScratchpadSheet = Notification.Name("workspace.showScratchpadSheet")
+    static let showHelpReference = Notification.Name("workspace.showHelpReference")
     static let showMoveSceneSheet = Notification.Name("workspace.showMoveSceneSheet")
     static let showInlineSearch = Notification.Name("workspace.showInlineSearch")
     static let showProjectSearch = Notification.Name("workspace.showProjectSearch")

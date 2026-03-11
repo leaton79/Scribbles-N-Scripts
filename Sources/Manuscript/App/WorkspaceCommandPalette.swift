@@ -1,6 +1,7 @@
 import Foundation
 
 enum CommandPaletteAction: Equatable {
+    case showHelp(String?)
     case createProject
     case openProject
     case switchProject
@@ -110,6 +111,14 @@ enum WorkspaceCommandPalette {
             order += 1
         }
 
+        append(
+            "Help Reference",
+            subtitle: "Browse what commands and panels do, how to use them, and why they matter",
+            category: "Help",
+            shortcut: "⇧⌘?",
+            keywords: ["help", "manual", "guide", "reference", "shortcuts", "learn"],
+            action: .showHelp(nil)
+        )
         append(
             "New Project",
             subtitle: "Create a new project",

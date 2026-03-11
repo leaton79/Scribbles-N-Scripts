@@ -24,6 +24,7 @@ final class WorkspaceCommandPaletteTests: XCTestCase {
 
         let items = WorkspaceCommandPalette.items(workspace: workspace, commands: commands)
 
+        XCTAssertTrue(items.contains(where: { $0.title == "Help Reference" && $0.action == .showHelp(nil) }))
         XCTAssertTrue(items.contains(where: { $0.title == "New Project" && $0.action == .createProject }))
         XCTAssertTrue(items.contains(where: { $0.title == "Switch Project" && $0.shortcut == "⇧⌘K" }))
         XCTAssertTrue(items.contains(where: { $0.title == "Project Settings" && $0.action == .showProjectSettings }))
