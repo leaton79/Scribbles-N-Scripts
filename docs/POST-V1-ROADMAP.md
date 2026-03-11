@@ -6,10 +6,17 @@ Date: March 10, 2026
 
 Separate stable core product work from the next wave of feature depth and release hardening.
 
+## Completed And Frozen
+
+- In-app Help Reference is complete enough for the current product surface.
+- Contextual help entry points are in place across the major sheets, key empty states, transient notices, and guided onboarding flow.
+- Additional help work should now be treated as exception-based maintenance, not an active roadmap stream.
+
 ## Priority 1: Release Hardening
 
+- Primary next focus after Help completion
 - Run a full keyboard-only and VoiceOver-oriented pass across all major surfaces
-- Tighten consistency for empty states, notices, help text, and command discoverability
+- Tighten consistency for empty states, notices, command discoverability, and disabled-state behavior outside the now-frozen Help system
 - Perform screenshot-driven visual QA once macOS permissions allow automated capture and resizing
 - Do manual ship checks for recovery mode, export flows, staging, and project switching
 
