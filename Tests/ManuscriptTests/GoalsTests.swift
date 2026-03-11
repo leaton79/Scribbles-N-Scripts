@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 @MainActor
 final class GoalsTests: XCTestCase {
@@ -138,6 +138,39 @@ final class GoalsTests: XCTestCase {
         let nodes = SidebarHierarchyBuilder.build(project: project)
         let chapterNode = try XCTUnwrap(nodes.first(where: { $0.id == chapterId }))
         XCTAssertEqual(chapterNode.goalProgressText, "3,200 / 5,000")
+    }
+
+    func testTodayWordsWrittenReturnsCurrentDayTotal() throws {
+        let manager = try makeManager(name: "TodayWords")
+        let goals = GoalsManager(projectManager: manager)
+        let today = Date()
+        goals.writingHistory = [
+            DailyWritingRecord(date: dayKey(today), wordsWritten: 321, wordsGross: 400, timeSpentSeconds: 120, sessionsCount: 1)
+        ]
+
+        XCTAssertEqual(goals.todayWordsWritten(referenceDate: today), 321)
+    }
+
+    func testRecordsForLastNDaysBackfillsMissingDays() throws {
+        let manager = try makeManager(name: "HistoryWindow")
+        let goals = GoalsManager(projectManager: manager)
+        let calendar = Calendar(identifier: .gregorian)
+        let today = calendar.startOfDay(for: Date())
+        let twoDaysAgo = calendar.date(byAdding: .day, value: -2, to: today)!
+
+        goals.writingHistory = [
+            DailyWritingRecord(date: dayKey(twoDaysAgo), wordsWritten: 100, wordsGross: 100, timeSpentSeconds: 60, sessionsCount: 1),
+            DailyWritingRecord(date: dayKey(today), wordsWritten: 250, wordsGross: 260, timeSpentSeconds: 90, sessionsCount: 1)
+        ]
+
+        let records = goals.recordsForLastNDays(3, referenceDate: today)
+
+        XCTAssertEqual(records.count, 3)
+        XCTAssertEqual(records[0].date, dayKey(twoDaysAgo))
+        XCTAssertEqual(records[0].wordsWritten, 100)
+        XCTAssertEqual(records[1].wordsWritten, 0)
+        XCTAssertEqual(records[2].date, dayKey(today))
+        XCTAssertEqual(records[2].wordsWritten, 250)
     }
 
     func testCorruptedHistoryFileIsBackedUpAndReset() throws {

@@ -1,5 +1,5 @@
 # Module 06: Mode Switching
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Module 04 (Linear Mode), Module 05 (Modular Mode)

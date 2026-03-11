@@ -10,8 +10,10 @@ final class EditorState: ObservableObject {
     @Published var characterCount: Int
     @Published var isModified: Bool
     @Published var isFocusMode: Bool
+    @Published var isEditable: Bool
     @Published private(set) var searchHighlightRanges: [Range<Int>]
     @Published private(set) var activeSearchHighlightRange: Range<Int>?
+    @Published private(set) var entityMentionRanges: [Range<Int>]
     @Published private(set) var placeholderVisible: Bool
     @Published private(set) var renderedBlocks: [MarkdownBlock]
 
@@ -35,8 +37,10 @@ final class EditorState: ObservableObject {
         self.characterCount = initialContent.count
         self.isModified = false
         self.isFocusMode = false
+        self.isEditable = true
         self.searchHighlightRanges = []
         self.activeSearchHighlightRange = nil
+        self.entityMentionRanges = []
         self.placeholderVisible = initialContent.isEmpty
         self.renderedBlocks = parser.parse(initialContent)
     }
@@ -51,6 +55,7 @@ final class EditorState: ObservableObject {
         isModified = false
         searchHighlightRanges = []
         activeSearchHighlightRange = nil
+        entityMentionRanges = []
         placeholderVisible = content.isEmpty
         renderedBlocks = parser.parse(content)
         undoStack.removeAll()
@@ -59,14 +64,17 @@ final class EditorState: ObservableObject {
     }
 
     func insertText(_ text: String, at position: Int) {
+        guard isEditable else { return }
         replaceText(in: clampedRange(position..<position), with: text, actionType: .typing)
     }
 
     func replaceText(in range: Range<Int>, with text: String) {
+        guard isEditable else { return }
         replaceText(in: clampedRange(range), with: text, actionType: .structural)
     }
 
     func pasteRichText(_ text: String, at position: Int) {
+        guard isEditable else { return }
         let plain = Self.stripRichText(text)
         replaceText(in: clampedRange(position..<position), with: plain, actionType: .structural)
     }
@@ -120,6 +128,14 @@ final class EditorState: ObservableObject {
     func clearSearchHighlights() {
         searchHighlightRanges = []
         activeSearchHighlightRange = nil
+    }
+
+    func setEntityMentionHighlights(ranges: [Range<Int>]) {
+        entityMentionRanges = ranges.map { clampToContent($0) }.filter { $0.lowerBound < $0.upperBound }
+    }
+
+    func clearEntityMentionHighlights() {
+        entityMentionRanges = []
     }
 
     private func replaceText(in range: Range<Int>, with incomingText: String, actionType: ActionType) {

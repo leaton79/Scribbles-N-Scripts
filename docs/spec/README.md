@@ -1,4 +1,4 @@
-# Manuscript — AI-Optimized Design Specification
+# Scribbles-N-Scripts — AI-Optimized Design Specification
 ## How to Use This Document Set
 
 ---

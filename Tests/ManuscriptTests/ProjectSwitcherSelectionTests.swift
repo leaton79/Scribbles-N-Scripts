@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 final class ProjectSwitcherSelectionTests: XCTestCase {
     func testSynchronizeSelectionDefaultsToFirstProject() {

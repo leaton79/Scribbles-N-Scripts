@@ -15,6 +15,7 @@ enum ProjectIOError: Error, LocalizedError {
     case backupNotFound(String)
     case unsupportedMigration(projectVersion: String, supportedVersion: String)
     case projectAlreadyExists(URL)
+    case readOnlyProject(details: String)
 
     var errorDescription: String? {
         switch self {
@@ -46,6 +47,8 @@ enum ProjectIOError: Error, LocalizedError {
             return "Cannot migrate project format \(projectVersion) with app support \(supportedVersion)."
         case let .projectAlreadyExists(url):
             return "A project already exists at \(url.path)."
+        case let .readOnlyProject(details):
+            return "Project is open in recovery mode and is read-only. \(details)"
         }
     }
 }

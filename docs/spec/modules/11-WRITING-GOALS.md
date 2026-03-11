@@ -1,5 +1,5 @@
 # Module 11: Writing Goals & Statistics
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Module 01 (Project I/O) — stores history data; Module 02 (Editor) — subscribes to word count changes

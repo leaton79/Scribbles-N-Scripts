@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 @MainActor
 final class SearchTests: XCTestCase {
@@ -115,6 +115,30 @@ final class SearchTests: XCTestCase {
         XCTAssertEqual(try manager.loadSceneContent(sceneId: sceneId), "Smith, John")
     }
 
+    func testReplaceAllProgressReportsSceneCompletion() throws {
+        let fixture = try makeThreeSceneFixture(name: "ReplaceProgress")
+        let manager = fixture.manager
+        try manager.saveSceneContent(sceneId: fixture.sceneIds[0], content: "color")
+        try manager.saveSceneContent(sceneId: fixture.sceneIds[1], content: "color color")
+        try manager.saveSceneContent(sceneId: fixture.sceneIds[2], content: "nomatch")
+
+        let engine = IndexedSearchEngine(projectManager: manager)
+        var snapshots: [SearchReplaceProgress] = []
+
+        let report = try engine.replaceAll(
+            query: SearchQuery(text: "color", scope: .entireProject),
+            replacement: "colour",
+            inSceneIDs: fixture.sceneIds
+        ) { progress in
+            snapshots.append(progress)
+        }
+
+        XCTAssertEqual(report.replacementCount, 3)
+        XCTAssertEqual(snapshots.first?.completedScenes, 0)
+        XCTAssertEqual(snapshots.last?.completedScenes, 3)
+        XCTAssertEqual(snapshots.last?.replacementsCompleted, 3)
+    }
+
     func testSearchIndexIncrementalUpdate() async throws {
         let manager = FileSystemProjectManager()
         _ = try manager.createProject(name: "Incremental", at: tempDir)
@@ -145,6 +169,53 @@ final class SearchTests: XCTestCase {
         let results = engine.search(query: query).map(\.matchText)
 
         XCTAssertEqual(results, ["absolutely", "plan"])
+    }
+
+    func testSelectedChaptersScopeSearchesOnlyChosenChapterIds() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "SelectedChapters", at: tempDir)
+        let firstChapterId = try XCTUnwrap(manager.getManifest().hierarchy.chapters.first?.id)
+        let secondChapter = try manager.addChapter(to: nil, at: nil, title: "Second")
+        let firstSceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        let secondScene = try manager.addScene(to: secondChapter.id, at: nil, title: "Second Scene")
+
+        try manager.saveSceneContent(sceneId: firstSceneId, content: "token in first")
+        try manager.saveSceneContent(sceneId: secondScene.id, content: "token in second")
+
+        let engine = IndexedSearchEngine(projectManager: manager)
+        let results = engine.search(query: SearchQuery(text: "token", scope: .selectedChapters(ids: [secondChapter.id])))
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.sceneId, secondScene.id)
+        XCTAssertNotEqual(results.first?.sceneId, firstSceneId)
+        XCTAssertNotEqual(firstChapterId, secondChapter.id)
+    }
+
+    func testFindByFormattingSupportsAdditionalElements() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "FormattingExtra", at: tempDir)
+        let sceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        try manager.saveSceneContent(
+            sceneId: sceneId,
+            content: """
+            ~~cut~~
+            `inline`
+            ```swift
+            let x = 1
+            ```
+            > quote
+            [link](https://example.com)
+            [^foot]
+            """
+        )
+
+        let engine = IndexedSearchEngine(projectManager: manager)
+        XCTAssertEqual(engine.search(query: SearchQuery(text: "", scope: .markdownFormatting(.strikethrough))).map(\.matchText), ["cut"])
+        XCTAssertEqual(engine.search(query: SearchQuery(text: "", scope: .markdownFormatting(.inlineCode))).map(\.matchText), ["inline"])
+        XCTAssertEqual(engine.search(query: SearchQuery(text: "", scope: .markdownFormatting(.codeBlock))).map(\.matchText), ["let x = 1\n"])
+        XCTAssertEqual(engine.search(query: SearchQuery(text: "", scope: .markdownFormatting(.blockQuote))).map(\.matchText), ["quote"])
+        XCTAssertEqual(engine.search(query: SearchQuery(text: "", scope: .markdownFormatting(.link))).map(\.matchText), ["link"])
+        XCTAssertEqual(engine.search(query: SearchQuery(text: "", scope: .markdownFormatting(.footnote))).map(\.matchText), ["foot"])
     }
 
     private func makeThreeSceneFixture(name: String) throws -> (manager: FileSystemProjectManager, sceneIds: [UUID]) {

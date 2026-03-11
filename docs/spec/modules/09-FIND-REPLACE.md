@@ -1,5 +1,5 @@
 # Module 09: Find & Replace
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Module 02 (Editor) — inline highlight and replace in current scene; Module 01 (Project I/O) — loads scene content for project-wide search

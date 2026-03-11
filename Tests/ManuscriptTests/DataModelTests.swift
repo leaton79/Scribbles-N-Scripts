@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 final class DataModelTests: XCTestCase {
     func testSceneRoundTripsThroughJSON() throws {
@@ -99,5 +99,16 @@ final class DataModelTests: XCTestCase {
 
     func testContentStatusHasExactlyFiveValues() {
         XCTAssertEqual(ContentStatus.allCases.count, 5)
+    }
+
+    func testCustomMetadataFieldOptionsRoundTripThroughCodable() throws {
+        let field = CustomMetadataField(id: UUID(), name: "POV", fieldType: .singleSelect, options: ["Alice", "Bob"])
+
+        let data = try JSONEncoder().encode(field)
+        let decoded = try JSONDecoder().decode(CustomMetadataField.self, from: data)
+
+        XCTAssertEqual(decoded.name, field.name)
+        XCTAssertEqual(decoded.fieldType, .singleSelect)
+        XCTAssertEqual(decoded.options, ["Alice", "Bob"])
     }
 }

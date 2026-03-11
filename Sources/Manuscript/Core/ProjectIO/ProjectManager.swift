@@ -4,6 +4,7 @@ import Darwin
 protocol ProjectManager {
     func createProject(name: String, at url: URL) throws -> Project
     func openProject(at url: URL) throws -> Project
+    func openProjectInRecoveryMode(at url: URL, details: String) throws -> Project
     func closeProject() throws
 
     func saveManifest() throws
@@ -28,7 +29,14 @@ protocol ProjectManager {
 
     func updateSceneMetadata(sceneId: UUID, updates: SceneMetadataUpdate) throws
     func updateChapterMetadata(chapterId: UUID, updates: ChapterMetadataUpdate) throws
+    func updateProjectSettings(_ settings: ProjectSettings) throws
     func updateProjectName(_ name: String) throws
+    func updateCompilePresets(_ presets: [CompilePreset]) throws
+    func updateEntities(_ entities: [Entity]) throws
+    func updateSources(_ sources: [Source]) throws
+    func updateTimelineEvents(_ timelineEvents: [TimelineEvent]) throws
+    func updateNotes(_ notes: [Note]) throws
+    func updateScratchpadItems(_ items: [ScratchpadItem]) throws
 
     func startAutosave(intervalSeconds: Int)
     func stopAutosave()
@@ -50,6 +58,7 @@ struct SceneMetadataUpdate {
     var status: ContentStatus?
     var tags: [UUID]?
     var colorLabel: ColorLabel?
+    var clearColorLabel: Bool = false
     var metadata: [String: String]?
 }
 
@@ -58,6 +67,18 @@ struct ChapterMetadataUpdate {
     var synopsis: String?
     var status: ContentStatus?
     var goalWordCount: Int?
+    var clearGoalWordCount: Bool = false
+}
+
+struct RecoveryDiagnostic: Equatable {
+    enum Severity: String, Equatable {
+        case info
+        case warning
+        case error
+    }
+
+    let severity: Severity
+    let message: String
 }
 
 final class FileSystemProjectManager: ProjectManager {
@@ -74,6 +95,9 @@ final class FileSystemProjectManager: ProjectManager {
 
     private let supportedFormatVersion = ManifestCoder.formatVersion
     private let lockFilename = ".lock"
+    private(set) var isReadOnlyRecoveryMode = false
+    private(set) var recoveryModeDetails: String?
+    private(set) var recoveryDiagnostics: [RecoveryDiagnostic] = []
 
     private(set) var currentProject: Project?
     var isDirty: Bool { isManifestDirty || !dirtySceneIds.isEmpty }
@@ -180,6 +204,9 @@ final class FileSystemProjectManager: ProjectManager {
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
+            self.isReadOnlyRecoveryMode = false
+            self.recoveryModeDetails = nil
+            self.recoveryDiagnostics = []
             isManifestDirty = false
             dirtySceneIds.removeAll()
 
@@ -198,6 +225,23 @@ final class FileSystemProjectManager: ProjectManager {
             self.isManifestDirty = previousManifestDirty
             throw error
         }
+    }
+
+    func openProjectInRecoveryMode(at url: URL, details: String) throws -> Project {
+        let rootURL = url
+        stopAutosave()
+        self.projectURL = rootURL
+        let recoveryState = try synthesizeRecoveryManifest(projectRoot: rootURL)
+        let recoveredManifest = recoveryState.manifest
+        self.manifest = recoveredManifest
+        self.currentProject = try makeProject(from: recoveredManifest, loadSceneContent: false)
+        self.currentProject?.name = "\(recoveredManifest.project.name) (Recovery)"
+        self.isReadOnlyRecoveryMode = true
+        self.recoveryModeDetails = details
+        self.recoveryDiagnostics = recoveryState.diagnostics
+        self.dirtySceneIds.removeAll()
+        self.isManifestDirty = false
+        return currentProject!
     }
 
     func openProject(at url: URL) throws -> Project {
@@ -247,6 +291,9 @@ final class FileSystemProjectManager: ProjectManager {
             self.projectURL = rootURL
             self.manifest = manifest
             self.currentProject = try makeProject(from: manifest, loadSceneContent: false)
+            self.isReadOnlyRecoveryMode = false
+            self.recoveryModeDetails = nil
+            self.recoveryDiagnostics = []
             isManifestDirty = false
             dirtySceneIds.removeAll()
 
@@ -276,11 +323,15 @@ final class FileSystemProjectManager: ProjectManager {
         currentProject = nil
         manifest = nil
         projectURL = nil
+        isReadOnlyRecoveryMode = false
+        recoveryModeDetails = nil
+        recoveryDiagnostics = []
         dirtySceneIds.removeAll()
         isManifestDirty = false
     }
 
     func saveManifest() throws {
+        try ensureWritable()
         guard let rootURL = projectURL, var manifest = manifest else {
             throw ProjectIOError.noOpenProject
         }
@@ -330,6 +381,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func saveSceneContent(sceneId: UUID, content: String) throws {
+        try ensureWritable()
         guard let rootURL = projectURL, var manifest = manifest else {
             throw ProjectIOError.noOpenProject
         }
@@ -352,6 +404,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func addScene(to chapterId: UUID, at index: Int?, title: String) throws -> Scene {
+        try ensureWritable()
         guard let rootURL = projectURL, var manifest = manifest else {
             throw ProjectIOError.noOpenProject
         }
@@ -412,6 +465,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func addChapter(to partId: UUID?, at index: Int?, title: String) throws -> Chapter {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
 
         if let partId, manifest.hierarchy.parts.contains(where: { $0.id == partId }) == false {
@@ -455,6 +509,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func addPart(at index: Int?, title: String) throws -> Part {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
 
         let partId = UUID()
@@ -480,6 +535,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func moveScene(sceneId: UUID, toChapterId: UUID, atIndex: Int) throws {
+        try ensureWritable()
         guard let rootURL = projectURL, var manifest = manifest else {
             throw ProjectIOError.noOpenProject
         }
@@ -491,19 +547,27 @@ final class FileSystemProjectManager: ProjectManager {
             throw ProjectIOError.sceneNotFound(sceneId)
         }
 
-        guard let sourceChapterIndex = manifest.hierarchy.chapters.firstIndex(where: { $0.scenes.contains(sceneId) }) else {
-            throw ProjectIOError.invalidHierarchy(details: "Scene has no parent chapter")
+        let sourceChapterIndex = manifest.hierarchy.chapters.firstIndex(where: { $0.scenes.contains(sceneId) })
+        let sourceChapterId = sourceChapterIndex.map { manifest.hierarchy.chapters[$0].id }
+        let oldIndex: Int
+        if let sourceChapterIndex {
+            oldIndex = manifest.hierarchy.chapters[sourceChapterIndex].scenes.firstIndex(of: sceneId) ?? 0
+        } else if let stagingIndex = manifest.hierarchy.stagingScenes.firstIndex(of: sceneId) {
+            oldIndex = stagingIndex
+        } else {
+            throw ProjectIOError.invalidHierarchy(details: "Scene has no parent chapter or staging entry")
         }
-
-        let sourceChapterId = manifest.hierarchy.chapters[sourceChapterIndex].id
-        let oldIndex = manifest.hierarchy.chapters[sourceChapterIndex].scenes.firstIndex(of: sceneId) ?? 0
         let normalizedTarget = max(0, min(atIndex, manifest.hierarchy.chapters[destinationChapterIndex].scenes.count))
 
         if sourceChapterId == toChapterId && oldIndex == normalizedTarget {
             return
         }
 
-        manifest.hierarchy.chapters[sourceChapterIndex].scenes.removeAll { $0 == sceneId }
+        if let sourceChapterIndex {
+            manifest.hierarchy.chapters[sourceChapterIndex].scenes.removeAll { $0 == sceneId }
+        } else {
+            manifest.hierarchy.stagingScenes.removeAll { $0 == sceneId }
+        }
         let adjustedTarget: Int
         if sourceChapterId == toChapterId && oldIndex < normalizedTarget {
             adjustedTarget = normalizedTarget - 1
@@ -519,7 +583,9 @@ final class FileSystemProjectManager: ProjectManager {
         let newPath = "content/\(newChapterFolder)/\(filename)"
         manifest.hierarchy.scenes[sceneManifestIndex].filePath = newPath
 
-        recalculateSceneSequenceIndices(in: &manifest, chapterId: sourceChapterId)
+        if let sourceChapterId {
+            recalculateSceneSequenceIndices(in: &manifest, chapterId: sourceChapterId)
+        }
         recalculateSceneSequenceIndices(in: &manifest, chapterId: toChapterId)
 
         let oldURL = rootURL.appendingPathComponent(oldPath)
@@ -540,6 +606,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func moveChapter(chapterId: UUID, toPartId: UUID?, atIndex: Int) throws {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
         guard let chapterIndex = manifest.hierarchy.chapters.firstIndex(where: { $0.id == chapterId }) else {
             throw ProjectIOError.chapterNotFound(chapterId)
@@ -573,6 +640,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func moveToStaging(sceneId: UUID) throws {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
         guard let sceneIndex = manifest.hierarchy.scenes.firstIndex(where: { $0.id == sceneId }) else {
             throw ProjectIOError.sceneNotFound(sceneId)
@@ -595,6 +663,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func deleteItem(id: UUID, type: TrashedItemType) throws {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
 
         switch type {
@@ -676,6 +745,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func restoreFromTrash(trashedItemId: UUID) throws {
+        try ensureWritable()
         guard var project = currentProject, var manifest = manifest else {
             throw ProjectIOError.noOpenProject
         }
@@ -751,6 +821,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func emptyTrash() throws {
+        try ensureWritable()
         guard let rootURL = projectURL else { throw ProjectIOError.noOpenProject }
         guard var project = currentProject else { throw ProjectIOError.noOpenProject }
 
@@ -768,6 +839,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func createBackup() throws {
+        try ensureWritable()
         guard let rootURL = projectURL, let project = currentProject else {
             throw ProjectIOError.noOpenProject
         }
@@ -790,6 +862,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func updateSceneMetadata(sceneId: UUID, updates: SceneMetadataUpdate) throws {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
         guard let sceneIndex = manifest.hierarchy.scenes.firstIndex(where: { $0.id == sceneId }) else {
             throw ProjectIOError.sceneNotFound(sceneId)
@@ -799,7 +872,11 @@ final class FileSystemProjectManager: ProjectManager {
         if let synopsis = updates.synopsis { manifest.hierarchy.scenes[sceneIndex].synopsis = synopsis }
         if let status = updates.status { manifest.hierarchy.scenes[sceneIndex].status = status }
         if let tags = updates.tags { manifest.hierarchy.scenes[sceneIndex].tags = tags }
-        if let colorLabel = updates.colorLabel { manifest.hierarchy.scenes[sceneIndex].colorLabel = colorLabel }
+        if updates.clearColorLabel {
+            manifest.hierarchy.scenes[sceneIndex].colorLabel = nil
+        } else if let colorLabel = updates.colorLabel {
+            manifest.hierarchy.scenes[sceneIndex].colorLabel = colorLabel
+        }
         if let metadata = updates.metadata { manifest.hierarchy.scenes[sceneIndex].metadata = metadata }
         manifest.hierarchy.scenes[sceneIndex].modifiedAt = Date()
 
@@ -809,6 +886,7 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func updateChapterMetadata(chapterId: UUID, updates: ChapterMetadataUpdate) throws {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
         guard let chapterIndex = manifest.hierarchy.chapters.firstIndex(where: { $0.id == chapterId }) else {
             throw ProjectIOError.chapterNotFound(chapterId)
@@ -817,7 +895,11 @@ final class FileSystemProjectManager: ProjectManager {
         if let title = updates.title { manifest.hierarchy.chapters[chapterIndex].title = title }
         if let synopsis = updates.synopsis { manifest.hierarchy.chapters[chapterIndex].synopsis = synopsis }
         if let status = updates.status { manifest.hierarchy.chapters[chapterIndex].status = status }
-        if let goalWordCount = updates.goalWordCount { manifest.hierarchy.chapters[chapterIndex].goalWordCount = goalWordCount }
+        if updates.clearGoalWordCount {
+            manifest.hierarchy.chapters[chapterIndex].goalWordCount = nil
+        } else if let goalWordCount = updates.goalWordCount {
+            manifest.hierarchy.chapters[chapterIndex].goalWordCount = goalWordCount
+        }
 
         self.manifest = manifest
         isManifestDirty = true
@@ -825,12 +907,107 @@ final class FileSystemProjectManager: ProjectManager {
     }
 
     func updateProjectName(_ name: String) throws {
+        try ensureWritable()
         guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
         manifest.project.name = name
         manifest.project.modifiedAt = Date()
         self.manifest = manifest
         isManifestDirty = true
         currentProject = try makeProject(from: manifest, loadSceneContent: false, existingTrash: currentProject?.trash ?? [])
+    }
+
+    func updateProjectSettings(_ settings: ProjectSettings) throws {
+        try ensureWritable()
+        guard var manifest = manifest else { throw ProjectIOError.noOpenProject }
+        manifest.settings = settings
+        manifest.project.modifiedAt = Date()
+        self.manifest = manifest
+        isManifestDirty = true
+        currentProject = try makeProject(from: manifest, loadSceneContent: false, existingTrash: currentProject?.trash ?? [])
+    }
+
+    func updateCompilePresets(_ presets: [CompilePreset]) throws {
+        try ensureWritable()
+        guard var project = currentProject else { throw ProjectIOError.noOpenProject }
+        project.compilePresets = presets
+        project.modifiedAt = Date()
+        currentProject = project
+        try writeAuxiliaryJSON(presets, named: "compile-presets.json")
+        if var manifest = manifest {
+            manifest.project.modifiedAt = project.modifiedAt
+            self.manifest = manifest
+        }
+        isManifestDirty = true
+    }
+
+    func updateEntities(_ entities: [Entity]) throws {
+        try ensureWritable()
+        guard var project = currentProject else { throw ProjectIOError.noOpenProject }
+        project.entities = entities
+        project.modifiedAt = Date()
+        currentProject = project
+        try writeAuxiliaryJSON(entities, named: "entities.json")
+        if var manifest = manifest {
+            manifest.project.modifiedAt = project.modifiedAt
+            self.manifest = manifest
+        }
+        isManifestDirty = true
+    }
+
+    func updateSources(_ sources: [Source]) throws {
+        try ensureWritable()
+        guard var project = currentProject else { throw ProjectIOError.noOpenProject }
+        project.sources = sources
+        project.modifiedAt = Date()
+        currentProject = project
+        try writeAuxiliaryJSON(sources, named: "sources.json")
+        if var manifest = manifest {
+            manifest.project.modifiedAt = project.modifiedAt
+            self.manifest = manifest
+        }
+        isManifestDirty = true
+    }
+
+    func updateTimelineEvents(_ timelineEvents: [TimelineEvent]) throws {
+        try ensureWritable()
+        guard var project = currentProject else { throw ProjectIOError.noOpenProject }
+        project.timelineEvents = timelineEvents
+        project.modifiedAt = Date()
+        currentProject = project
+        try writeAuxiliaryJSON(timelineEvents, named: "timeline.json")
+        if var manifest = manifest {
+            manifest.project.modifiedAt = project.modifiedAt
+            self.manifest = manifest
+        }
+        isManifestDirty = true
+    }
+
+    func updateNotes(_ notes: [Note]) throws {
+        try ensureWritable()
+        guard var project = currentProject else { throw ProjectIOError.noOpenProject }
+        project.notes = notes
+        project.modifiedAt = Date()
+        currentProject = project
+        try writeAuxiliaryJSON(notes, named: "notes.json")
+        if var manifest = manifest {
+            manifest.project.modifiedAt = project.modifiedAt
+            self.manifest = manifest
+        }
+        isManifestDirty = true
+    }
+
+    func updateScratchpadItems(_ items: [ScratchpadItem]) throws {
+        try ensureWritable()
+        guard var project = currentProject else { throw ProjectIOError.noOpenProject }
+        project.scratchpadItems = items
+        project.modifiedAt = Date()
+        currentProject = project
+        try writeAuxiliaryJSON(items, named: "scratchpad.json")
+        if var manifest = manifest {
+            manifest.project.modifiedAt = project.modifiedAt
+            self.manifest = manifest
+        }
+        isManifestDirty = true
     }
 
     func startAutosave(intervalSeconds: Int) {
@@ -861,13 +1038,22 @@ final class FileSystemProjectManager: ProjectManager {
         }
     }
 
+    private func ensureWritable() throws {
+        if isReadOnlyRecoveryMode {
+            throw ProjectIOError.readOnlyProject(details: recoveryModeDetails ?? "Recovered project content can be inspected but not modified.")
+        }
+    }
+
     private func saveSupportMetadataFiles(at projectURL: URL) throws {
         let metadataURL = projectURL.appendingPathComponent("metadata", isDirectory: true)
         try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("tags.json"))
         try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("entities.json"))
+        try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("notes.json"))
         try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("sources.json"))
         try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("timeline.json"))
+        try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("scratchpad.json"))
         try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("presets.json"))
+        try writeStringAtomically("[]", to: metadataURL.appendingPathComponent("compile-presets.json"))
     }
 
     private func createLockFileIfNeeded(at rootURL: URL) throws {
@@ -1120,6 +1306,12 @@ final class FileSystemProjectManager: ProjectManager {
             .compactMap { chaptersById[$0.id] }
 
         let stagingScenes = manifest.hierarchy.stagingScenes.compactMap { sceneById[$0] }
+        let compilePresets: [CompilePreset] = try readAuxiliaryJSON(named: "compile-presets.json", fallback: [])
+        let entities: [Entity] = try readAuxiliaryJSON(named: "entities.json", fallback: [])
+        let sources: [Source] = try readAuxiliaryJSON(named: "sources.json", fallback: [])
+        let timelineEvents: [TimelineEvent] = try readAuxiliaryJSON(named: "timeline.json", fallback: [])
+        let notes: [Note] = try readAuxiliaryJSON(named: "notes.json", fallback: [])
+        let scratchpadItems: [ScratchpadItem] = try readAuxiliaryJSON(named: "scratchpad.json", fallback: [])
 
         return Project(
             id: manifest.project.id,
@@ -1134,14 +1326,41 @@ final class FileSystemProjectManager: ProjectManager {
             settings: manifest.settings,
             tags: [],
             snapshots: [],
-            entities: [],
-            sources: [],
-            notes: [],
-            compilePresets: [],
+            entities: entities,
+            sources: sources,
+            timelineEvents: timelineEvents,
+            notes: notes,
+            scratchpadItems: scratchpadItems,
+            compilePresets: compilePresets,
             trash: existingTrash,
             createdAt: manifest.project.createdAt,
             modifiedAt: manifest.project.modifiedAt
         )
+    }
+
+    private func readAuxiliaryJSON<T: Decodable>(named filename: String, fallback: T) throws -> T {
+        let metadataURL = rootMetadataURL()
+        let url = metadataURL.appendingPathComponent(filename)
+        guard fileManager.fileExists(atPath: url.path) else { return fallback }
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(T.self, from: data)
+    }
+
+    private func writeAuxiliaryJSON<T: Encodable>(_ value: T, named filename: String) throws {
+        let metadataURL = rootMetadataURL()
+        try fileManager.createDirectory(at: metadataURL, withIntermediateDirectories: true)
+        let url = metadataURL.appendingPathComponent(filename)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(value)
+        try data.write(to: url, options: .atomic)
+    }
+
+    private func rootMetadataURL() -> URL {
+        (projectURL ?? URL(fileURLWithPath: "/")).appendingPathComponent("metadata", isDirectory: true)
     }
 
     private static func defaultSettings() -> ProjectSettings {
@@ -1159,6 +1378,210 @@ final class FileSystemProjectManager: ProjectManager {
             theme: .system,
             defaultColorLabelNames: defaultLabelNames
         )
+    }
+
+    private func synthesizeRecoveryManifest(projectRoot: URL) throws -> (manifest: Manifest, diagnostics: [RecoveryDiagnostic]) {
+        let contentURL = projectRoot.appendingPathComponent("content", isDirectory: true)
+        let createdAt = (try? fileManager.attributesOfItem(atPath: projectRoot.path)[.creationDate] as? Date) ?? Date()
+        let modifiedAt = Date()
+        var chapters: [ManifestChapter] = []
+        var scenes: [ManifestScene] = []
+        var stagingSceneIDs: [UUID] = []
+        var diagnostics: [RecoveryDiagnostic] = []
+        var untitledSceneCount = 0
+        var skippedNonMarkdownCount = 0
+
+        let chapterDirectories = (try? fileManager.contentsOfDirectory(
+            at: contentURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        if !fileManager.fileExists(atPath: contentURL.path) {
+            diagnostics.append(
+                RecoveryDiagnostic(
+                    severity: .error,
+                    message: "The `content/` folder is missing. Recovery could only reconstruct an empty project shell."
+                )
+            )
+        }
+
+        let orderedChapterDirectories = chapterDirectories
+            .filter { $0.lastPathComponent != "staging" }
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+
+        for (chapterIndex, chapterURL) in orderedChapterDirectories.enumerated() {
+            let chapterID = UUID()
+            let chapterTitle = "Recovered Chapter \(chapterIndex + 1)"
+            let sceneFiles = markdownSceneFiles(in: chapterURL)
+            skippedNonMarkdownCount += skippedNonMarkdownFiles(in: chapterURL, markdownFiles: sceneFiles)
+            var chapterSceneIDs: [UUID] = []
+            for (sceneIndex, sceneURL) in sceneFiles.enumerated() {
+                let content = (try? String(contentsOf: sceneURL, encoding: .utf8)) ?? ""
+                let sceneID = UUID()
+                let recoveredTitle = recoveredSceneTitle(from: content, fallbackURL: sceneURL, index: sceneIndex + 1)
+                if recoveredTitle.usedFallbackTitle {
+                    untitledSceneCount += 1
+                }
+                let attributes = try? fileManager.attributesOfItem(atPath: sceneURL.path)
+                let scene = ManifestScene(
+                    id: sceneID,
+                    title: recoveredTitle.title,
+                    synopsis: "[Recovery] Original manifest data unavailable.",
+                    status: .todo,
+                    tags: [],
+                    colorLabel: nil,
+                    metadata: ["Recovery Status": "Recovered from content files"],
+                    sequenceIndex: sceneIndex,
+                    parentChapterId: chapterID,
+                    wordCount: wordCount(for: content),
+                    filePath: "content/\(chapterURL.lastPathComponent)/\(sceneURL.lastPathComponent)",
+                    createdAt: (attributes?[.creationDate] as? Date) ?? createdAt,
+                    modifiedAt: (attributes?[.modificationDate] as? Date) ?? modifiedAt
+                )
+                scenes.append(scene)
+                chapterSceneIDs.append(sceneID)
+            }
+            chapters.append(
+                ManifestChapter(
+                    id: chapterID,
+                    title: chapterTitle,
+                    synopsis: "[Recovery] Chapter structure reconstructed from disk.",
+                    status: .todo,
+                    sequenceIndex: chapterIndex,
+                    parentPartId: nil,
+                    goalWordCount: nil,
+                    scenes: chapterSceneIDs
+                )
+            )
+        }
+
+        let stagingURL = contentURL.appendingPathComponent("staging", isDirectory: true)
+        let stagingFiles = markdownSceneFiles(in: stagingURL)
+        skippedNonMarkdownCount += skippedNonMarkdownFiles(in: stagingURL, markdownFiles: stagingFiles)
+        for (sceneIndex, sceneURL) in stagingFiles.enumerated() {
+            let content = (try? String(contentsOf: sceneURL, encoding: .utf8)) ?? ""
+            let sceneID = UUID()
+            let attributes = try? fileManager.attributesOfItem(atPath: sceneURL.path)
+            let recoveredTitle = recoveredSceneTitle(from: content, fallbackURL: sceneURL, index: sceneIndex + 1)
+            if recoveredTitle.usedFallbackTitle {
+                untitledSceneCount += 1
+            }
+            scenes.append(
+                ManifestScene(
+                    id: sceneID,
+                    title: recoveredTitle.title,
+                    synopsis: "[Recovery] Staging scene reconstructed from disk.",
+                    status: .todo,
+                    tags: [],
+                    colorLabel: nil,
+                    metadata: ["Recovery Status": "Recovered from staging files"],
+                    sequenceIndex: sceneIndex,
+                    parentChapterId: nil,
+                    wordCount: wordCount(for: content),
+                    filePath: "content/staging/\(sceneURL.lastPathComponent)",
+                    createdAt: (attributes?[.creationDate] as? Date) ?? createdAt,
+                    modifiedAt: (attributes?[.modificationDate] as? Date) ?? modifiedAt
+                )
+            )
+            stagingSceneIDs.append(sceneID)
+        }
+
+        diagnostics.append(
+            RecoveryDiagnostic(
+                severity: .warning,
+                message: "Recovered \(chapters.count) chapter folder(s) and \(scenes.count) scene file(s) from disk. Original metadata and exact ordering may be incomplete."
+            )
+        )
+        if !stagingSceneIDs.isEmpty {
+            diagnostics.append(
+                RecoveryDiagnostic(
+                    severity: .info,
+                    message: "Recovered \(stagingSceneIDs.count) staging scene(s) from `content/staging`."
+                )
+            )
+        }
+        if untitledSceneCount > 0 {
+            diagnostics.append(
+                RecoveryDiagnostic(
+                    severity: .warning,
+                    message: "\(untitledSceneCount) recovered scene(s) had no Markdown heading and were titled from filenames."
+                )
+            )
+        }
+        if skippedNonMarkdownCount > 0 {
+            diagnostics.append(
+                RecoveryDiagnostic(
+                    severity: .info,
+                    message: "Skipped \(skippedNonMarkdownCount) non-Markdown file(s) during recovery."
+                )
+            )
+        }
+        if scenes.isEmpty {
+            diagnostics.append(
+                RecoveryDiagnostic(
+                    severity: .error,
+                    message: "No Markdown scene files were found. Salvage export or duplication will produce an empty manuscript."
+                )
+            )
+        }
+
+        return (
+            manifest: Manifest(
+                schema: ManifestCoder.schemaVersion,
+                formatVersion: ManifestCoder.formatVersion,
+                project: ManifestProject(
+                    id: UUID(),
+                    name: projectRoot.lastPathComponent,
+                    createdAt: createdAt,
+                    modifiedAt: modifiedAt
+                ),
+                hierarchy: ManifestHierarchy(parts: [], chapters: chapters, scenes: scenes, stagingScenes: stagingSceneIDs),
+                settings: Self.defaultSettings()
+            ),
+            diagnostics: diagnostics
+        )
+    }
+
+    private func markdownSceneFiles(in directoryURL: URL) -> [URL] {
+        ((try? fileManager.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .creationDateKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? [])
+            .filter { $0.pathExtension == "md" }
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    private func skippedNonMarkdownFiles(in directoryURL: URL, markdownFiles: [URL]) -> Int {
+        guard let allFiles = try? fileManager.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return 0
+        }
+        let markdownNames = Set(markdownFiles.map(\.lastPathComponent))
+        return allFiles.filter { !markdownNames.contains($0.lastPathComponent) }.count
+    }
+
+    private func recoveredSceneTitle(from content: String, fallbackURL: URL, index: Int) -> (title: String, usedFallbackTitle: Bool) {
+        let rawHeading = content
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .first(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("#") })
+        let heading = rawHeading?
+            .replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let heading, !heading.isEmpty {
+            return (heading, false)
+        }
+        let stem = fallbackURL.deletingPathExtension().lastPathComponent
+        let normalizedStem = stem.replacingOccurrences(of: "-", with: " ")
+        if normalizedStem.isEmpty {
+            return ("Recovered Scene \(index)", true)
+        }
+        return (normalizedStem, true)
     }
 
     private func writeStringAtomically(_ value: String, to url: URL) throws {

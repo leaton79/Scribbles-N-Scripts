@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 @MainActor
 final class ModularModeTests: XCTestCase {
@@ -132,6 +132,34 @@ final class ModularModeTests: XCTestCase {
         let visible = state.visibleCards(viewportRange: 100..<130)
         XCTAssertLessThan(visible.count, 50)
         XCTAssertLessThan(state.renderedCardCount, 50)
+    }
+
+    func testOutlinerSectionsReflectGroupedSceneData() throws {
+        let fixture = try makeFixture(name: "Outliner")
+        let state = fixture.state
+
+        state.presentationMode = .outliner
+        state.reload()
+
+        let chapterSection = try XCTUnwrap(state.outlineSections.first(where: { $0.title == "Ch1" }))
+        let row = try XCTUnwrap(chapterSection.rows.first(where: { $0.title == "Test" }))
+
+        XCTAssertEqual(row.synopsis, "Summary")
+        XCTAssertEqual(row.chapterTitle, "Ch1")
+        XCTAssertEqual(row.status, .firstDraft)
+        XCTAssertEqual(row.wordCount, 500)
+        XCTAssertEqual(row.tagNames, ["Action"])
+    }
+
+    func testGroupingChangesReloadOutlineSections() throws {
+        let fixture = try makeFixture(name: "OutlinerGrouping")
+        let state = fixture.state
+
+        state.presentationMode = .outliner
+        state.grouping = .byStatus
+
+        XCTAssertTrue(state.outlineSections.contains(where: { $0.title == ContentStatus.todo.rawValue }))
+        XCTAssertTrue(state.outlineSections.contains(where: { $0.title == ContentStatus.firstDraft.rawValue }))
     }
 
     private func makeFixture(name: String) throws -> (manager: FileSystemProjectManager, nav: NavigationState, editor: EditorState, state: ModularModeState) {

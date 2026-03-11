@@ -1,5 +1,5 @@
 # Module 01: Project I/O
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Nothing (foundation module)

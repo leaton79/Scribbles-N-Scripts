@@ -10,7 +10,11 @@ struct WorkspaceCommandBindings {
     }
 
     var canCreateProjectContent: Bool {
-        workspace.hasOpenProject
+        workspace.hasOpenProject && !workspace.isRecoveryMode
+    }
+
+    var canShowImportExport: Bool {
+        workspace.canShowImportExport
     }
 
     var canReopenLastProject: Bool {
@@ -42,11 +46,11 @@ struct WorkspaceCommandBindings {
     }
 
     var canCreateBackup: Bool {
-        workspace.hasOpenProject
+        workspace.hasOpenProject && !workspace.isRecoveryMode
     }
 
     var canSaveAndBackup: Bool {
-        workspace.hasOpenProject
+        workspace.hasOpenProject && !workspace.isRecoveryMode
     }
 
     var canSwitchToLinearMode: Bool {
@@ -61,6 +65,10 @@ struct WorkspaceCommandBindings {
         workspace.canToggleSplitEditor
     }
 
+    var canToggleInspector: Bool {
+        workspace.canToggleInspector
+    }
+
     var canNavigateToPreviousScene: Bool {
         workspace.canNavigateToPreviousScene
     }
@@ -71,6 +79,42 @@ struct WorkspaceCommandBindings {
 
     var canSearchProject: Bool {
         workspace.hasOpenProject
+    }
+
+    var canUseModularPresentationControls: Bool {
+        workspace.canUseModularPresentationControls
+    }
+
+    var canCreateSceneBelow: Bool {
+        workspace.canCreateSceneBelow
+    }
+
+    var canDuplicateSelectedScene: Bool {
+        workspace.canDuplicateSelectedScene
+    }
+
+    var canMoveSelectedSceneUp: Bool {
+        workspace.canMoveSelectedSceneUp
+    }
+
+    var canMoveSelectedSceneDown: Bool {
+        workspace.canMoveSelectedSceneDown
+    }
+
+    var canRevealSelectionInSidebar: Bool {
+        workspace.canRevealSelectionInSidebar
+    }
+
+    var canSendSelectedSceneToStaging: Bool {
+        workspace.canSendSelectedSceneToStaging
+    }
+
+    var canMoveSelectedSceneToAnotherChapter: Bool {
+        workspace.canMoveSelectedSceneToAnotherChapter
+    }
+
+    var canOpenSelectionInSplit: Bool {
+        workspace.canOpenSelectionInSplit
     }
 
     var canToggleSearchHighlightDisplayMode: Bool {
@@ -89,6 +133,30 @@ struct WorkspaceCommandBindings {
         workspace.canBulkSelectReplaceScenes
     }
 
+    var canUndoLastReplaceBatch: Bool {
+        workspace.canUndoLastReplaceBatch
+    }
+
+    var canRedoLastReplaceBatch: Bool {
+        workspace.canRedoLastReplaceBatch
+    }
+
+    var replaceUndoMenuTitle: String {
+        let depth = workspace.replaceUndoDepth
+        if depth > 1 {
+            return "Undo Last Replace Batch (\(depth) available)"
+        }
+        return "Undo Last Replace Batch"
+    }
+
+    var replaceRedoMenuTitle: String {
+        let depth = workspace.replaceRedoDepth
+        if depth > 1 {
+            return "Redo Last Replace Batch (\(depth) available)"
+        }
+        return "Redo Last Replace Batch"
+    }
+
     var searchResultPositionText: String {
         workspace.searchResultPositionText
     }
@@ -99,6 +167,10 @@ struct WorkspaceCommandBindings {
 
     var splitToggleTitle: String {
         workspace.splitEditorState.isSplit ? "Close Split" : "Toggle Split"
+    }
+
+    var inspectorToggleTitle: String {
+        workspace.inspectorToggleTitle
     }
 
     @discardableResult
@@ -148,6 +220,16 @@ struct WorkspaceCommandBindings {
     }
 
     @discardableResult
+    func exportRecoveryProject(format: ExportFormat) -> String? {
+        workspace.exportRecoveryProject(format: format)
+    }
+
+    @discardableResult
+    func duplicateRecoveryProject() -> String? {
+        workspace.duplicateRecoveryProjectAsWritableCopy()
+    }
+
+    @discardableResult
     func createChapter() -> String? {
         workspace.createChapter()
     }
@@ -155,6 +237,77 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func createScene() -> String? {
         workspace.createScene()
+    }
+
+    @discardableResult
+    func createSceneBelow() -> String? {
+        workspace.createSceneBelowCurrent()
+    }
+
+    @discardableResult
+    func duplicateSelectedScene() -> String? {
+        workspace.duplicateSelectedScene()
+    }
+
+    @discardableResult
+    func moveSelectedSceneUp() -> String? {
+        workspace.moveSelectedSceneUp()
+    }
+
+    @discardableResult
+    func moveSelectedSceneDown() -> String? {
+        workspace.moveSelectedSceneDown()
+    }
+
+    func showCorkboardMode() {
+        workspace.setModularPresentationMode(.corkboard)
+    }
+
+    func showOutlinerMode() {
+        workspace.setModularPresentationMode(.outliner)
+    }
+
+    func groupModularByChapter() {
+        workspace.setModularGrouping(.byChapter)
+    }
+
+    func groupModularFlat() {
+        workspace.setModularGrouping(.flat)
+    }
+
+    func groupModularByStatus() {
+        workspace.setModularGrouping(.byStatus)
+    }
+
+    func setCorkboardDensityComfortable() {
+        workspace.setCorkboardDensity(.comfortable)
+    }
+
+    func setCorkboardDensityCompact() {
+        workspace.setCorkboardDensity(.compact)
+    }
+
+    func collapseAllModularGroups() {
+        workspace.collapseAllModularGroups()
+    }
+
+    func expandAllModularGroups() {
+        workspace.expandAllModularGroups()
+    }
+
+    @discardableResult
+    func revealSelectionInSidebar() -> String? {
+        workspace.revealSelectionInSidebar()
+    }
+
+    @discardableResult
+    func sendSelectedSceneToStaging() -> String? {
+        workspace.sendSelectedSceneToStaging()
+    }
+
+    @discardableResult
+    func moveSelectedScene(toChapter chapterID: UUID) -> String? {
+        workspace.moveSelectedScene(toChapter: chapterID)
     }
 
     @discardableResult
@@ -178,6 +331,15 @@ struct WorkspaceCommandBindings {
     @discardableResult
     func toggleSplit(defaultWindowWidth: CGFloat = 1200) -> String? {
         workspace.toggleSplitForCommand(defaultWindowWidth: defaultWindowWidth)
+    }
+
+    @discardableResult
+    func openSelectionInSplit(defaultWindowWidth: CGFloat = 1200) -> String? {
+        workspace.openSelectionInSplit(windowWidth: defaultWindowWidth)
+    }
+
+    func toggleInspector() {
+        workspace.toggleInspector()
     }
 
     @discardableResult
@@ -220,6 +382,10 @@ struct WorkspaceCommandBindings {
         workspace.selectSearchResult(at: index)
     }
 
+    func selectReplacePreviewMatch(sceneID: UUID, resultIndex: Int) {
+        workspace.selectReplacePreviewMatch(sceneID: sceneID, resultIndex: resultIndex)
+    }
+
     func navigateToNextSearchResult() {
         workspace.navigateToNextSearchResult()
     }
@@ -242,5 +408,28 @@ struct WorkspaceCommandBindings {
 
     func excludeAllReplaceScenes() {
         workspace.excludeAllReplaceScenes()
+    }
+
+    @discardableResult
+    func saveSelectedSearchChapterPreset() -> String? {
+        workspace.saveSelectedSearchChapterPreset()
+    }
+
+    func applySearchChapterPreset(_ presetID: UUID) {
+        workspace.applySearchChapterPreset(presetID)
+    }
+
+    func deleteSearchChapterPreset(_ presetID: UUID) {
+        workspace.deleteSearchChapterPreset(presetID)
+    }
+
+    @discardableResult
+    func undoLastReplaceBatch() -> String? {
+        workspace.undoLastReplaceBatch()
+    }
+
+    @discardableResult
+    func redoLastReplaceBatch() -> String? {
+        workspace.redoLastReplaceBatch()
     }
 }

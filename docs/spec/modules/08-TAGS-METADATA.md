@@ -1,5 +1,5 @@
 # Module 08: Tags & Metadata
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Module 01 (Project I/O) — reads/writes tags.json and manifest metadata; Module 03 (Sidebar) — shares filter predicates

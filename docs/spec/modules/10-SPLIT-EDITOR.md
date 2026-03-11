@@ -1,5 +1,5 @@
 # Module 10: Split Editor
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Module 02 (Editor) — embeds two `EditorView` instances; Module 04 (Linear Mode) — scene loading

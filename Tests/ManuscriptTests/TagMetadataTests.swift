@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 @MainActor
 final class TagMetadataTests: XCTestCase {
@@ -132,6 +132,101 @@ final class TagMetadataTests: XCTestCase {
         metadataManager.configureSingleSelectOptions(fieldId: field.id, options: ["Alice", "Bob"])
 
         XCTAssertThrowsError(try metadataManager.setSceneMetadata(sceneId: sceneId, field: "POV", value: "Charlie"))
+    }
+
+    func testAddFieldPersistsToProjectSettingsAndSeedsSceneValues() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "MetadataPersist", at: tempDir)
+        let sceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        let metadataManager = MetadataManager(projectManager: manager)
+
+        let field = CustomMetadataField(id: UUID(), name: "POV Character", fieldType: .text)
+        try metadataManager.addField(field)
+
+        XCTAssertEqual(manager.currentProject?.settings.customMetadataFields.map(\.name), ["POV Character"])
+        let scene = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first(where: { $0.id == sceneId }))
+        XCTAssertEqual(scene.metadata["POV Character"], "")
+    }
+
+    func testSingleSelectOptionsPersistToProjectSettings() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "SingleSelectPersist", at: tempDir)
+        let metadataManager = MetadataManager(projectManager: manager)
+
+        let field = CustomMetadataField(id: UUID(), name: "POV", fieldType: .singleSelect)
+        try metadataManager.addField(field)
+        metadataManager.configureSingleSelectOptions(fieldId: field.id, options: ["Alice", "Bob"])
+
+        let persistedField = try XCTUnwrap(manager.currentProject?.settings.customMetadataFields.first(where: { $0.id == field.id }))
+        XCTAssertEqual(persistedField.options, ["Alice", "Bob"])
+    }
+
+    func testRenameAndReorderFieldsPersistToProjectSettings() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "MetadataSchema", at: tempDir)
+        let metadataManager = MetadataManager(projectManager: manager)
+
+        let pov = CustomMetadataField(id: UUID(), name: "POV", fieldType: .text)
+        let location = CustomMetadataField(id: UUID(), name: "Location", fieldType: .text)
+        try metadataManager.addField(pov)
+        try metadataManager.addField(location)
+
+        try metadataManager.renameField(id: pov.id, newName: "Viewpoint")
+        try metadataManager.moveField(id: location.id, by: -1)
+
+        XCTAssertEqual(manager.currentProject?.settings.customMetadataFields.map(\.name), ["Location", "Viewpoint"])
+    }
+
+    func testUpdatingSingleSelectOptionsNormalizesInvalidSceneValues() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "MetadataOptionsNormalize", at: tempDir)
+        let sceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        let metadataManager = MetadataManager(projectManager: manager)
+
+        let field = CustomMetadataField(id: UUID(), name: "POV", fieldType: .singleSelect)
+        try metadataManager.addField(field)
+        metadataManager.configureSingleSelectOptions(fieldId: field.id, options: ["Alice", "Bob"])
+        try metadataManager.setSceneMetadata(sceneId: sceneId, field: "POV", value: "Bob")
+
+        metadataManager.configureSingleSelectOptions(fieldId: field.id, options: ["Alice", "Cara"])
+
+        let scene = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first(where: { $0.id == sceneId }))
+        XCTAssertEqual(scene.metadata["POV"], "Alice")
+        XCTAssertEqual(manager.currentProject?.settings.customMetadataFields.first?.options, ["Alice", "Cara"])
+    }
+
+    func testMultiSelectFieldValidatesAndNormalizesStoredValues() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "MultiSelectMetadata", at: tempDir)
+        let sceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        let metadataManager = MetadataManager(projectManager: manager)
+
+        let field = CustomMetadataField(id: UUID(), name: "Focus", fieldType: .multiSelect)
+        try metadataManager.addField(field)
+        metadataManager.configureOptions(fieldId: field.id, options: ["Plot", "Emotion", "Theme"])
+        try metadataManager.setSceneMetadata(sceneId: sceneId, field: "Focus", value: "Plot, Theme")
+
+        XCTAssertThrowsError(try metadataManager.setSceneMetadata(sceneId: sceneId, field: "Focus", value: "Plot, Invalid"))
+
+        metadataManager.configureOptions(fieldId: field.id, options: ["Plot", "Theme"])
+        let scene = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first(where: { $0.id == sceneId }))
+        XCTAssertEqual(scene.metadata["Focus"], "Plot, Theme")
+    }
+
+    func testNumberAndDateFieldsValidateValues() throws {
+        let manager = FileSystemProjectManager()
+        _ = try manager.createProject(name: "TypedMetadata", at: tempDir)
+        let sceneId = try XCTUnwrap(manager.getManifest().hierarchy.scenes.first?.id)
+        let metadataManager = MetadataManager(projectManager: manager)
+
+        try metadataManager.addField(CustomMetadataField(id: UUID(), name: "Draft", fieldType: .number))
+        try metadataManager.addField(CustomMetadataField(id: UUID(), name: "Due", fieldType: .date))
+
+        try metadataManager.setSceneMetadata(sceneId: sceneId, field: "Draft", value: "2")
+        try metadataManager.setSceneMetadata(sceneId: sceneId, field: "Due", value: "2026-03-10")
+
+        XCTAssertThrowsError(try metadataManager.setSceneMetadata(sceneId: sceneId, field: "Draft", value: "two"))
+        XCTAssertThrowsError(try metadataManager.setSceneMetadata(sceneId: sceneId, field: "Due", value: "03/10/2026"))
     }
 
     func testColorLabelAppearsInSidebarAndCards() throws {

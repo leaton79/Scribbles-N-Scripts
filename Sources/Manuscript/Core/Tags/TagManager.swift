@@ -9,7 +9,12 @@ final class TagManager: ObservableObject {
 
     init(projectManager: ProjectManager) {
         self.projectManager = projectManager
-        self.allTags = loadTags()
+        self.allTags = []
+        reloadFromProject()
+    }
+
+    func reloadFromProject() {
+        allTags = loadTags()
         allTags.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 

@@ -31,6 +31,13 @@ final class LinearModeState: ObservableObject {
     }
 
     func reloadSequence() {
+        guard projectManager.currentProject != nil else {
+            orderedSceneIds = []
+            boundaries = []
+            chapterBySceneId.removeAll()
+            chapterTitleById.removeAll()
+            return
+        }
         let manifest = projectManager.getManifest()
         let chaptersById = Dictionary(uniqueKeysWithValues: manifest.hierarchy.chapters.map { ($0.id, $0) })
 
@@ -128,6 +135,7 @@ final class LinearModeState: ObservableObject {
     }
 
     func sceneOrderWithTitles() -> [(UUID, String)] {
+        guard projectManager.currentProject != nil else { return [] }
         let sceneMap = Dictionary(uniqueKeysWithValues: projectManager.getManifest().hierarchy.scenes.map { ($0.id, $0.title) })
         return orderedSceneIds.map { ($0, sceneMap[$0] ?? "") }
     }

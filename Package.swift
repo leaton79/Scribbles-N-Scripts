@@ -2,24 +2,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "Manuscript",
+    name: "Scribbles-N-Scripts",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .executable(
-            name: "Manuscript",
-            targets: ["Manuscript"]
+            name: "Scribbles-N-Scripts",
+            targets: ["ScribblesNScripts"]
         )
     ],
     targets: [
         .executableTarget(
-            name: "Manuscript",
+            name: "ScribblesNScripts",
             path: "Sources/Manuscript"
         ),
         .testTarget(
-            name: "ManuscriptTests",
-            dependencies: ["Manuscript"],
+            name: "ScribblesNScriptsTests",
+            dependencies: ["ScribblesNScripts"],
             path: "Tests/ManuscriptTests"
         )
     ]

@@ -1,5 +1,5 @@
 # Module 02: Editor
-## Manuscript — Module Spec Card
+## Scribbles-N-Scripts — Module Spec Card
 
 > **Context**: Include `PROJECT-BIBLE.md` in the prompt alongside this card.
 > **Depends on**: Module 01 (Project I/O) — consumes `ProjectManager.loadSceneContent()`, `saveSceneContent()`

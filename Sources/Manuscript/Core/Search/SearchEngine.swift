@@ -16,6 +16,20 @@ protocol SearchEngine {
     func replaceAll(query: SearchQuery, replacement: String, inSceneIDs: [UUID]) throws -> ReplaceReport
 }
 
+struct SearchIndexStatus: Equatable {
+    let completed: Int
+    let total: Int
+
+    var isIndexing: Bool {
+        total > 0 && completed < total
+    }
+
+    var percentage: Int {
+        guard total > 0 else { return 100 }
+        return Int((Double(completed) / Double(total) * 100.0).rounded())
+    }
+}
+
 struct SearchQuery {
     var text: String
     var isRegex: Bool
@@ -78,6 +92,24 @@ struct ReplaceReport {
     let errors: [ReplaceError]
 }
 
+struct SearchReplaceProgress {
+    let completedScenes: Int
+    let totalScenes: Int
+    let replacementsCompleted: Int
+    let currentSceneTitle: String?
+}
+
+private struct ReplaceUndoEntry {
+    let id: UUID
+    let originalsByScene: [UUID: String]
+    let updatedByScene: [UUID: String]
+    let replacementCount: Int
+    let scenesAffected: Int
+    let searchText: String
+    let replacementText: String
+    let createdAt: Date
+}
+
 @MainActor
 final class IndexedSearchEngine: SearchEngine {
     private let projectManager: ProjectManager
@@ -88,9 +120,46 @@ final class IndexedSearchEngine: SearchEngine {
     private var sceneIndex: [UUID: String] = [:]
     private var hasBuiltIndex = false
     private var lastQuery: SearchQuery?
-    private var replaceUndoStack: [[UUID: String]] = []
+    private var replaceUndoStack: [ReplaceUndoEntry] = []
+    private var replaceRedoStack: [ReplaceUndoEntry] = []
 
     private(set) var lastErrorMessage: String?
+    var canUndoLastReplaceAll: Bool {
+        !replaceUndoStack.isEmpty
+    }
+    var replaceUndoDepth: Int {
+        replaceUndoStack.count
+    }
+    var canRedoLastReplaceAll: Bool {
+        !replaceRedoStack.isEmpty
+    }
+    var replaceRedoDepth: Int {
+        replaceRedoStack.count
+    }
+    var replaceUndoHistory: [ReplaceBatchHistoryItem] {
+        replaceUndoStack.reversed().map { entry in
+            ReplaceBatchHistoryItem(
+                id: entry.id,
+                replacementCount: entry.replacementCount,
+                scenesAffected: entry.scenesAffected,
+                searchText: entry.searchText,
+                replacementText: entry.replacementText,
+                createdAt: entry.createdAt
+            )
+        }
+    }
+    var replaceRedoHistory: [ReplaceBatchHistoryItem] {
+        replaceRedoStack.reversed().map { entry in
+            ReplaceBatchHistoryItem(
+                id: entry.id,
+                replacementCount: entry.replacementCount,
+                scenesAffected: entry.scenesAffected,
+                searchText: entry.searchText,
+                replacementText: entry.replacementText,
+                createdAt: entry.createdAt
+            )
+        }
+    }
 
     init(
         projectManager: ProjectManager,
@@ -105,11 +174,19 @@ final class IndexedSearchEngine: SearchEngine {
     }
 
     func buildIndex(for project: Project) async {
+        await buildIndex(for: project, progress: nil)
+    }
+
+    func buildIndex(for project: Project, progress: ((SearchIndexStatus) -> Void)? = nil) async {
         _ = project
         sceneIndex.removeAll()
-        for scene in projectManager.getManifest().hierarchy.scenes {
+        let scenes = projectManager.getManifest().hierarchy.scenes
+        let total = scenes.count
+        progress?(SearchIndexStatus(completed: 0, total: total))
+        for (index, scene) in scenes.enumerated() {
             let content = (try? projectManager.loadSceneContent(sceneId: scene.id)) ?? ""
             sceneIndex[scene.id] = content
+            progress?(SearchIndexStatus(completed: index + 1, total: total))
             await Task.yield()
         }
         hasBuiltIndex = true
@@ -189,24 +266,70 @@ final class IndexedSearchEngine: SearchEngine {
         try replaceAll(query: query, replacement: replacement, inSceneIDs: Set(inSceneIDs))
     }
 
+    func replaceAll(
+        query: SearchQuery,
+        replacement: String,
+        inSceneIDs: [UUID],
+        progress: ((SearchReplaceProgress) -> Void)?
+    ) throws -> ReplaceReport {
+        try replaceAll(query: query, replacement: replacement, inSceneIDs: Set(inSceneIDs), progress: progress)
+    }
+
     private func replaceAll(query: SearchQuery, replacement: String, inSceneIDs: Set<UUID>?) throws -> ReplaceReport {
+        try replaceAll(query: query, replacement: replacement, inSceneIDs: inSceneIDs, progress: nil)
+    }
+
+    private func replaceAll(
+        query: SearchQuery,
+        replacement: String,
+        inSceneIDs: Set<UUID>?,
+        progress: ((SearchReplaceProgress) -> Void)?
+    ) throws -> ReplaceReport {
         let manifest = projectManager.getManifest()
         var replacementCount = 0
         var scenesAffected = 0
         var errors: [ReplaceError] = []
         var originalsByScene: [UUID: String] = [:]
-
-        for sceneId in scopedSceneIds(for: query.scope, manifest: manifest) {
-            if let inSceneIDs, !inSceneIDs.contains(sceneId) {
-                continue
+        var updatedByScene: [UUID: String] = [:]
+        let candidateSceneIDs = scopedSceneIds(for: query.scope, manifest: manifest).filter { sceneId in
+            if let inSceneIDs {
+                return inSceneIDs.contains(sceneId)
             }
+            return true
+        }
+        let sceneTitleById = Dictionary(uniqueKeysWithValues: manifest.hierarchy.scenes.map { ($0.id, $0.title) })
+        let totalScenes = candidateSceneIDs.count
+        var completedScenes = 0
+
+        progress?(SearchReplaceProgress(
+            completedScenes: 0,
+            totalScenes: totalScenes,
+            replacementsCompleted: 0,
+            currentSceneTitle: nil
+        ))
+
+        for sceneId in candidateSceneIDs {
             let original = contentForSearch(sceneId: sceneId)
             guard let transform = transformedContent(original, query: query, replacement: replacement) else {
                 if lastErrorMessage != nil { break }
+                completedScenes += 1
+                progress?(SearchReplaceProgress(
+                    completedScenes: completedScenes,
+                    totalScenes: totalScenes,
+                    replacementsCompleted: replacementCount,
+                    currentSceneTitle: sceneTitleById[sceneId]
+                ))
                 continue
             }
 
             if transform.count == 0 {
+                completedScenes += 1
+                progress?(SearchReplaceProgress(
+                    completedScenes: completedScenes,
+                    totalScenes: totalScenes,
+                    replacementsCompleted: replacementCount,
+                    currentSceneTitle: sceneTitleById[sceneId]
+                ))
                 continue
             }
 
@@ -214,15 +337,35 @@ final class IndexedSearchEngine: SearchEngine {
             do {
                 try projectManager.saveSceneContent(sceneId: sceneId, content: transform.content)
                 updateIndex(sceneId: sceneId, content: transform.content)
+                updatedByScene[sceneId] = transform.content
                 replacementCount += transform.count
                 scenesAffected += 1
             } catch {
                 errors.append(ReplaceError(sceneId: sceneId, message: error.localizedDescription))
             }
+            completedScenes += 1
+            progress?(SearchReplaceProgress(
+                completedScenes: completedScenes,
+                totalScenes: totalScenes,
+                replacementsCompleted: replacementCount,
+                currentSceneTitle: sceneTitleById[sceneId]
+            ))
         }
 
         if !originalsByScene.isEmpty {
-            replaceUndoStack.append(originalsByScene)
+            replaceUndoStack.append(
+                ReplaceUndoEntry(
+                    id: UUID(),
+                    originalsByScene: originalsByScene,
+                    updatedByScene: updatedByScene,
+                    replacementCount: replacementCount,
+                    scenesAffected: scenesAffected,
+                    searchText: query.text,
+                    replacementText: replacement,
+                    createdAt: Date()
+                )
+            )
+            replaceRedoStack.removeAll()
         }
 
         return ReplaceReport(replacementCount: replacementCount, scenesAffected: scenesAffected, errors: errors)
@@ -230,10 +373,20 @@ final class IndexedSearchEngine: SearchEngine {
 
     func undoLastReplaceAll() throws {
         guard let snapshot = replaceUndoStack.popLast() else { return }
-        for (sceneId, originalContent) in snapshot {
+        for (sceneId, originalContent) in snapshot.originalsByScene {
             try projectManager.saveSceneContent(sceneId: sceneId, content: originalContent)
             updateIndex(sceneId: sceneId, content: originalContent)
         }
+        replaceRedoStack.append(snapshot)
+    }
+
+    func redoLastReplaceAll() throws {
+        guard let snapshot = replaceRedoStack.popLast() else { return }
+        for (sceneId, updatedContent) in snapshot.updatedByScene {
+            try projectManager.saveSceneContent(sceneId: sceneId, content: updatedContent)
+            updateIndex(sceneId: sceneId, content: updatedContent)
+        }
+        replaceUndoStack.append(snapshot)
     }
 
     private func contentForSearch(sceneId: UUID) -> String {

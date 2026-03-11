@@ -11,7 +11,9 @@ struct Project: Codable, Identifiable {
     var snapshots: [Snapshot]
     var entities: [Entity]
     var sources: [Source]
+    var timelineEvents: [TimelineEvent] = []
     var notes: [Note]
+    var scratchpadItems: [ScratchpadItem] = []
     var compilePresets: [CompilePreset]
     var trash: [TrashedItem]
     let createdAt: Date
@@ -90,12 +92,15 @@ struct CustomMetadataField: Codable, Identifiable {
     let id: UUID
     var name: String
     var fieldType: MetadataFieldType
+    var options: [String] = []
 }
 
 enum MetadataFieldType: String, Codable, CaseIterable {
     case text
     case singleSelect
     case multiSelect
+    case number
+    case date
 }
 
 // MARK: - Version Control
@@ -230,6 +235,49 @@ struct Source: Codable, Identifiable {
     var doi: String?
     var notes: String
     var citationKey: String
+    var attachments: [ResearchAttachment] = []
+    var linkedSceneIds: [UUID] = []
+    var linkedEntityIds: [UUID] = []
+    var linkedNoteIds: [UUID] = []
+}
+
+extension Source {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case author
+        case date
+        case url
+        case publication
+        case volume
+        case pages
+        case doi
+        case notes
+        case citationKey
+        case attachments
+        case linkedSceneIds
+        case linkedEntityIds
+        case linkedNoteIds
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        author = try container.decodeIfPresent(String.self, forKey: .author)
+        date = try container.decodeIfPresent(String.self, forKey: .date)
+        url = try container.decodeIfPresent(String.self, forKey: .url)
+        publication = try container.decodeIfPresent(String.self, forKey: .publication)
+        volume = try container.decodeIfPresent(String.self, forKey: .volume)
+        pages = try container.decodeIfPresent(String.self, forKey: .pages)
+        doi = try container.decodeIfPresent(String.self, forKey: .doi)
+        notes = try container.decode(String.self, forKey: .notes)
+        citationKey = try container.decode(String.self, forKey: .citationKey)
+        attachments = try container.decodeIfPresent([ResearchAttachment].self, forKey: .attachments) ?? []
+        linkedSceneIds = try container.decodeIfPresent([UUID].self, forKey: .linkedSceneIds) ?? []
+        linkedEntityIds = try container.decodeIfPresent([UUID].self, forKey: .linkedEntityIds) ?? []
+        linkedNoteIds = try container.decodeIfPresent([UUID].self, forKey: .linkedNoteIds) ?? []
+    }
 }
 
 // MARK: - Notes (v2.0)
@@ -241,6 +289,7 @@ struct Note: Codable, Identifiable {
     var folder: String?
     var tags: [UUID]
     var linkedSceneIds: [UUID]
+    var linkedEntityIds: [UUID]
     var attachments: [NoteAttachment]
     let createdAt: Date
     var modifiedAt: Date
@@ -250,6 +299,31 @@ struct NoteAttachment: Codable, Identifiable {
     let id: UUID
     var filename: String
     var mimeType: String
+}
+
+// MARK: - Scratchpad / Clipboard (v2.0)
+
+struct ScratchpadItem: Codable, Identifiable {
+    let id: UUID
+    var title: String
+    var content: String
+    var kind: ScratchpadItemKind
+    let createdAt: Date
+    var modifiedAt: Date
+    var lastUsedAt: Date?
+}
+
+enum ScratchpadItemKind: String, Codable, CaseIterable {
+    case scratch
+    case clipboard
+}
+
+struct ResearchAttachment: Codable, Identifiable {
+    let id: UUID
+    var filename: String
+    var storedFilename: String
+    var mimeType: String
+    let importedAt: Date
 }
 
 // MARK: - Export & Compile (v1.1 basic -> v2.0 full)
@@ -279,7 +353,30 @@ struct StyleConfig: Codable {
     var paragraphIndent: Double
     var chapterHeadingStyle: String
     var sceneBreakMarker: String
+    var htmlTheme: CompileHTMLTheme
+    var pageSize: CompilePageSize
+    var templateStyle: CompileTemplateStyle
     var pageMargins: Margins
+    var stylesheetName: String?
+    var customCSS: String?
+}
+
+enum CompileHTMLTheme: String, Codable, CaseIterable {
+    case parchment
+    case midnight
+    case editorial
+}
+
+enum CompilePageSize: String, Codable, CaseIterable {
+    case letter
+    case a4
+    case trade
+}
+
+enum CompileTemplateStyle: String, Codable, CaseIterable {
+    case classic
+    case modern
+    case manuscript
 }
 
 struct Margins: Codable {
@@ -294,6 +391,9 @@ struct FrontMatterConfig: Codable {
     var includeCopyright: Bool
     var includeDedication: Bool
     var includeTableOfContents: Bool
+    var includeStagingArea: Bool
+    var languageCode: String?
+    var publisherName: String?
     var titlePageContent: TitlePageContent?
     var copyrightText: String?
     var dedicationText: String?
@@ -309,13 +409,135 @@ struct BackMatterConfig: Codable {
     var includeAppendices: Bool
     var includeAboutAuthor: Bool
     var includeBibliography: Bool
+    var sectionOrder: CompileSectionOrder
     var aboutAuthorText: String?
+    var bibliographyText: String?
     var appendices: [AppendixEntry]
+}
+
+enum CompileSectionOrder: String, Codable, CaseIterable {
+    case manuscript
+    case reverse
+    case alphabetical
 }
 
 struct AppendixEntry: Codable {
     var title: String
     var content: String
+}
+
+extension Note {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case content
+        case folder
+        case tags
+        case linkedSceneIds
+        case linkedEntityIds
+        case attachments
+        case createdAt
+        case modifiedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        content = try container.decode(String.self, forKey: .content)
+        folder = try container.decodeIfPresent(String.self, forKey: .folder)
+        tags = try container.decodeIfPresent([UUID].self, forKey: .tags) ?? []
+        linkedSceneIds = try container.decodeIfPresent([UUID].self, forKey: .linkedSceneIds) ?? []
+        linkedEntityIds = try container.decodeIfPresent([UUID].self, forKey: .linkedEntityIds) ?? []
+        attachments = try container.decodeIfPresent([NoteAttachment].self, forKey: .attachments) ?? []
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try container.decode(Date.self, forKey: .modifiedAt)
+    }
+}
+
+extension StyleConfig {
+    private enum CodingKeys: String, CodingKey {
+        case fontFamily
+        case fontSize
+        case lineSpacing
+        case paragraphIndent
+        case chapterHeadingStyle
+        case sceneBreakMarker
+        case htmlTheme
+        case pageSize
+        case templateStyle
+        case pageMargins
+        case stylesheetName
+        case customCSS
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fontFamily = try container.decode(String.self, forKey: .fontFamily)
+        fontSize = try container.decode(Int.self, forKey: .fontSize)
+        lineSpacing = try container.decode(Double.self, forKey: .lineSpacing)
+        paragraphIndent = try container.decodeIfPresent(Double.self, forKey: .paragraphIndent) ?? 0
+        chapterHeadingStyle = try container.decode(String.self, forKey: .chapterHeadingStyle)
+        sceneBreakMarker = try container.decode(String.self, forKey: .sceneBreakMarker)
+        htmlTheme = try container.decodeIfPresent(CompileHTMLTheme.self, forKey: .htmlTheme) ?? .parchment
+        pageSize = try container.decodeIfPresent(CompilePageSize.self, forKey: .pageSize) ?? .letter
+        templateStyle = try container.decodeIfPresent(CompileTemplateStyle.self, forKey: .templateStyle) ?? .classic
+        pageMargins = try container.decodeIfPresent(Margins.self, forKey: .pageMargins) ?? Margins(top: 1, bottom: 1, left: 1, right: 1)
+        stylesheetName = try container.decodeIfPresent(String.self, forKey: .stylesheetName)
+        customCSS = try container.decodeIfPresent(String.self, forKey: .customCSS)
+    }
+}
+
+extension FrontMatterConfig {
+    private enum CodingKeys: String, CodingKey {
+        case includeTitlePage
+        case includeCopyright
+        case includeDedication
+        case includeTableOfContents
+        case includeStagingArea
+        case languageCode
+        case publisherName
+        case titlePageContent
+        case copyrightText
+        case dedicationText
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        includeTitlePage = try container.decode(Bool.self, forKey: .includeTitlePage)
+        includeCopyright = try container.decode(Bool.self, forKey: .includeCopyright)
+        includeDedication = try container.decode(Bool.self, forKey: .includeDedication)
+        includeTableOfContents = try container.decode(Bool.self, forKey: .includeTableOfContents)
+        includeStagingArea = try container.decodeIfPresent(Bool.self, forKey: .includeStagingArea) ?? false
+        languageCode = try container.decodeIfPresent(String.self, forKey: .languageCode)
+        publisherName = try container.decodeIfPresent(String.self, forKey: .publisherName)
+        titlePageContent = try container.decodeIfPresent(TitlePageContent.self, forKey: .titlePageContent)
+        copyrightText = try container.decodeIfPresent(String.self, forKey: .copyrightText)
+        dedicationText = try container.decodeIfPresent(String.self, forKey: .dedicationText)
+    }
+}
+
+extension BackMatterConfig {
+    private enum CodingKeys: String, CodingKey {
+        case includeAppendices
+        case includeAboutAuthor
+        case includeBibliography
+        case sectionOrder
+        case aboutAuthorText
+        case bibliographyText
+        case appendices
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        includeAppendices = try container.decode(Bool.self, forKey: .includeAppendices)
+        includeAboutAuthor = try container.decode(Bool.self, forKey: .includeAboutAuthor)
+        includeBibliography = try container.decode(Bool.self, forKey: .includeBibliography)
+        sectionOrder = try container.decodeIfPresent(CompileSectionOrder.self, forKey: .sectionOrder) ?? .manuscript
+        aboutAuthorText = try container.decodeIfPresent(String.self, forKey: .aboutAuthorText)
+        bibliographyText = try container.decodeIfPresent(String.self, forKey: .bibliographyText)
+        appendices = try container.decodeIfPresent([AppendixEntry].self, forKey: .appendices) ?? []
+    }
 }
 
 // MARK: - Project Settings

@@ -1,6 +1,6 @@
 import SwiftUI
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 @MainActor
 final class WorkspaceCoordinatorTests: XCTestCase {
@@ -11,6 +11,7 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightCap")
         UserDefaults.standard.removeObject(forKey: "workspace.searchHighlightSafetyThreshold")
+        UserDefaults.standard.removeObject(forKey: "workspace.replaceSceneSelectionMode")
     }
 
     override func tearDownWithError() throws {
@@ -249,6 +250,55 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.projectManager.projectRootURL, targetURL)
     }
 
+    func testCorruptProjectCanOpenInRecoveryMode() throws {
+        let creator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RecoverySeed")
+        let rootURL = try XCTUnwrap(creator.projectManager.projectRootURL)
+        try creator.projectManager.closeProject()
+        try FileManager.default.removeItem(at: rootURL.appendingPathComponent("manifest.json"))
+
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RecoverySeed")
+        XCTAssertNotNil(coordinator.recoveryCandidateURL)
+        XCTAssertFalse(coordinator.hasOpenProject)
+
+        let notice = coordinator.openRecoveryModeForFailedProject()
+        XCTAssertTrue(notice?.contains("recovery mode") == true)
+        XCTAssertTrue(coordinator.hasOpenProject)
+        XCTAssertTrue(coordinator.isRecoveryMode)
+        XCTAssertFalse(coordinator.editorState.isEditable)
+    }
+
+    func testRecoveryModeSurfacesDiagnosticsAndSafeSalvageActions() throws {
+        let creator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RecoveryActions")
+        let rootURL = try XCTUnwrap(creator.projectManager.projectRootURL)
+        let chapterFolder = try XCTUnwrap(
+            FileManager.default.contentsOfDirectory(
+                at: rootURL.appendingPathComponent("content", isDirectory: true),
+                includingPropertiesForKeys: [.isDirectoryKey]
+            ).first(where: { $0.lastPathComponent != "staging" })
+        )
+        let strayFileURL = chapterFolder.appendingPathComponent("notes.txt")
+        try "ignore me".write(to: strayFileURL, atomically: true, encoding: .utf8)
+        try creator.projectManager.closeProject()
+        try FileManager.default.removeItem(at: rootURL.appendingPathComponent("manifest.json"))
+
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RecoveryActions")
+        XCTAssertTrue(coordinator.openRecoveryModeForFailedProject()?.contains("recovery mode") == true)
+        XCTAssertFalse(coordinator.recoveryDiagnostics.isEmpty)
+        XCTAssertTrue(coordinator.recoveryDiagnostics.contains(where: { $0.message.contains("Skipped") }))
+
+        XCTAssertTrue(coordinator.exportRecoveryProject(format: .markdown)?.contains("Exported MARKDOWN") == true)
+        let exportFolder = tempDir.appendingPathComponent("RecoveryActions-recovery-exports", isDirectory: true)
+        let exportedFiles = try FileManager.default.contentsOfDirectory(at: exportFolder, includingPropertiesForKeys: nil)
+        XCTAssertEqual(exportedFiles.filter { $0.pathExtension == "md" }.count, 1)
+
+        XCTAssertTrue(coordinator.duplicateRecoveryProjectAsWritableCopy()?.contains("writable recovery copy") == true)
+        XCTAssertFalse(coordinator.isRecoveryMode)
+        XCTAssertTrue(coordinator.projectDisplayName.contains("Recovered"))
+        let duplicatedRoot = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        XCTAssertNotEqual(duplicatedRoot, rootURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: duplicatedRoot.appendingPathComponent("manifest.json").path))
+    }
+
     func testRecentProjectsTrackMostRecentFirstAndDeduplicate() throws {
         let suiteName = "WorkspaceCoordinatorTests.RecentList.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -269,6 +319,869 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(names[0], "RecentA")
         XCTAssertEqual(names[1], "RecentB")
         XCTAssertEqual(names.filter { $0 == "RecentA" }.count, 1)
+    }
+
+    func testInspectorSceneAndChapterReflectCurrentSelection() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "InspectorSelection")
+
+        let scene = try XCTUnwrap(coordinator.inspectorScene)
+        let chapter = try XCTUnwrap(coordinator.inspectorChapter)
+
+        XCTAssertEqual(scene.id, coordinator.navigationState.selectedSceneId)
+        XCTAssertTrue(chapter.scenes.contains(scene.id))
+    }
+
+    func testInspectorEditsTagsMetadataAndChapterGoal() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "InspectorEdits")
+        let sceneID = try XCTUnwrap(coordinator.inspectorScene?.id)
+        let chapterID = try XCTUnwrap(coordinator.inspectorChapter?.id)
+
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "POV", type: .singleSelect, options: ["Alice", "Bob"]))
+        XCTAssertNil(coordinator.setInspectorSceneMetadata(field: "POV", value: "Alice"))
+        XCTAssertNil(coordinator.addInspectorTag(named: "Action"))
+        XCTAssertNil(coordinator.setInspectorSceneTitle("Opening Scene"))
+        XCTAssertNil(coordinator.setInspectorSceneStatus(.revised))
+        XCTAssertNil(coordinator.setInspectorSceneSynopsis("Scene summary"))
+        XCTAssertNil(coordinator.setInspectorSceneColorLabel(.blue))
+        XCTAssertNil(coordinator.setInspectorChapterTitle("Act One"))
+        XCTAssertNil(coordinator.setInspectorChapterStatus(.inProgress))
+        XCTAssertNil(coordinator.setInspectorChapterSynopsis("Chapter summary"))
+        XCTAssertNil(coordinator.setInspectorChapterGoal(2400))
+
+        let manifest = coordinator.projectManager.getManifest()
+        let scene = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.id == sceneID }))
+        let chapter = try XCTUnwrap(manifest.hierarchy.chapters.first(where: { $0.id == chapterID }))
+        let tag = try XCTUnwrap(coordinator.tagManager.allTags.first(where: { $0.name == "Action" }))
+
+        XCTAssertEqual(scene.metadata["POV"], "Alice")
+        XCTAssertEqual(scene.title, "Opening Scene")
+        XCTAssertEqual(scene.status, .revised)
+        XCTAssertEqual(scene.synopsis, "Scene summary")
+        XCTAssertEqual(scene.colorLabel, .blue)
+        XCTAssertTrue(scene.tags.contains(tag.id))
+        XCTAssertEqual(chapter.title, "Act One")
+        XCTAssertEqual(chapter.status, .inProgress)
+        XCTAssertEqual(chapter.synopsis, "Chapter summary")
+        XCTAssertEqual(chapter.goalWordCount, 2400)
+        XCTAssertEqual(coordinator.projectManager.currentProject?.settings.customMetadataFields.map(\.name), ["POV"])
+        XCTAssertEqual(coordinator.projectManager.currentProject?.settings.customMetadataFields.first?.options, ["Alice", "Bob"])
+
+        XCTAssertNil(coordinator.removeInspectorTag(tag.id))
+        XCTAssertNil(coordinator.deleteInspectorMetadataField(try XCTUnwrap(coordinator.metadataManager.customFields.first?.id)))
+        XCTAssertNil(coordinator.setInspectorChapterGoal(nil))
+
+        let updatedManifest = coordinator.projectManager.getManifest()
+        let updatedScene = try XCTUnwrap(updatedManifest.hierarchy.scenes.first(where: { $0.id == sceneID }))
+        let updatedChapter = try XCTUnwrap(updatedManifest.hierarchy.chapters.first(where: { $0.id == chapterID }))
+
+        XCTAssertFalse(updatedScene.tags.contains(tag.id))
+        XCTAssertNil(updatedScene.metadata["POV"])
+        XCTAssertNil(updatedChapter.goalWordCount)
+    }
+
+    func testProjectSettingsUpdatePersistsEditorAndBackupPreferences() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ProjectSettings")
+
+        XCTAssertNil(
+            coordinator.updateProjectSettings(
+                autosaveIntervalSeconds: 45,
+                backupIntervalMinutes: 60,
+                backupRetentionCount: 12,
+                editorFont: "Menlo",
+                editorFontSize: 16,
+                editorLineHeight: 1.8,
+                theme: .dark
+            )
+        )
+
+        let settings = try XCTUnwrap(coordinator.projectSettings)
+        XCTAssertEqual(settings.autosaveIntervalSeconds, 45)
+        XCTAssertEqual(settings.backupIntervalMinutes, 60)
+        XCTAssertEqual(settings.backupRetentionCount, 12)
+        XCTAssertEqual(settings.editorFont, "Menlo")
+        XCTAssertEqual(settings.editorFontSize, 16)
+        XCTAssertEqual(settings.editorLineHeight, 1.8, accuracy: 0.001)
+        XCTAssertEqual(settings.theme, .dark)
+        XCTAssertEqual(coordinator.editorPresentationSettings.fontName, "Menlo")
+        XCTAssertEqual(coordinator.editorPresentationSettings.fontSize, 16, accuracy: 0.001)
+        XCTAssertEqual(coordinator.editorPresentationSettings.lineHeight, 1.8, accuracy: 0.001)
+        XCTAssertEqual(coordinator.preferredColorScheme, .dark)
+    }
+
+    func testExportProjectWritesMarkdownToExportsFolder() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ExportProject")
+        let sceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: sceneID, content: "Hello export world")
+
+        let message = coordinator.exportProject(format: .markdown)
+
+        XCTAssertEqual(message?.contains("Exported MARKDOWN"), true)
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil)
+        let exportedFile = try XCTUnwrap(contents.first(where: { $0.pathExtension == "md" }))
+        let exportedText = try String(contentsOf: exportedFile, encoding: .utf8)
+        XCTAssertTrue(exportedText.contains("# ExportProject"))
+        XCTAssertTrue(exportedText.contains("Hello export world"))
+    }
+
+    func testImportScenesCreatesMultipleScenesFromMarkdownHeadings() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ImportProject")
+        let importURL = tempDir.appendingPathComponent("ImportSource.md")
+        try """
+        ## Arrival
+        First imported scene.
+
+        ## Departure
+        Second imported scene.
+        """.write(to: importURL, atomically: true, encoding: .utf8)
+
+        let beforeCount = coordinator.projectManager.getManifest().hierarchy.scenes.count
+        let message = coordinator.importScenes(from: importURL)
+
+        XCTAssertEqual(message, "Imported 2 scene(s) from ImportSource.md.")
+        let manifest = coordinator.projectManager.getManifest()
+        XCTAssertEqual(manifest.hierarchy.scenes.count, beforeCount + 2)
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Arrival" }))
+        XCTAssertTrue(manifest.hierarchy.scenes.contains(where: { $0.title == "Departure" }))
+    }
+
+    func testCompilePresetPersistsAndExportsScopedSections() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CompilePreset")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let chapterB = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Chapter B")
+        let secondScene = try coordinator.projectManager.addScene(to: chapterB.id, at: nil, title: "Second Chapter Scene")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "Chapter B content")
+
+        XCTAssertNil(
+            coordinator.saveCompilePreset(
+                name: "Subset",
+                format: .markdown,
+                includedSectionIds: [chapterA],
+                fontFamily: "Menlo",
+                fontSize: 14,
+                lineSpacing: 1.6,
+                includeTitlePage: true,
+                includeTableOfContents: false
+            )
+        )
+        let preset = try XCTUnwrap(coordinator.compilePresets.first(where: { $0.name == "Subset" }))
+        let message = coordinator.exportProject(using: preset.id)
+
+        XCTAssertEqual(message?.contains("Exported MARKDOWN"), true)
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil)
+        let exportedFile = try XCTUnwrap(contents.first(where: { $0.pathExtension == "md" && $0.lastPathComponent.contains("Subset") }))
+        let exportedText = try String(contentsOf: exportedFile, encoding: .utf8)
+        XCTAssertFalse(exportedText.contains("Chapter B"))
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CompilePreset")
+        XCTAssertTrue(reopened.compilePresets.contains(where: { $0.name == "Subset" }))
+    }
+
+    func testCompilePresetExportsDedicationAndAboutAuthorContent() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CompileFrontBack")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+
+        XCTAssertNil(
+            coordinator.saveCompilePreset(
+                name: "FrontBack",
+                format: .markdown,
+                includedSectionIds: [chapterA],
+                fontFamily: "Menlo",
+                fontSize: 14,
+                lineSpacing: 1.6,
+                chapterHeadingStyle: "h1",
+                sceneBreakMarker: "~~~",
+                includeTitlePage: true,
+                includeTableOfContents: true,
+                dedicationText: "For the night shift.",
+                includeAboutAuthor: true,
+                aboutAuthorText: "Written in Boston."
+            )
+        )
+
+        let preset = try XCTUnwrap(coordinator.compilePresets.first(where: { $0.name == "FrontBack" }))
+        let exportMessage = coordinator.exportProject(using: preset.id)
+        XCTAssertTrue(exportMessage?.contains("Exported MARKDOWN") == true)
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil)
+        let exportedFile = try XCTUnwrap(contents.first(where: { $0.lastPathComponent.contains("FrontBack") }))
+        let exportedText = try String(contentsOf: exportedFile, encoding: .utf8)
+        XCTAssertTrue(exportedText.contains("Dedication"))
+        XCTAssertTrue(exportedText.contains("For the night shift."))
+        XCTAssertTrue(exportedText.contains("About the Author"))
+        XCTAssertTrue(exportedText.contains("Written in Boston."))
+    }
+
+    func testInspectorMetadataSchemaCanRenameReorderAndUpdateOptions() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "InspectorSchema")
+        let sceneID = try XCTUnwrap(coordinator.inspectorScene?.id)
+
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "POV", type: .singleSelect, options: ["Alice", "Bob"]))
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "Location", type: .text, options: []))
+        XCTAssertNil(coordinator.setInspectorSceneMetadata(field: "POV", value: "Bob"))
+
+        let povID = try XCTUnwrap(coordinator.metadataManager.customFields.first(where: { $0.name == "POV" })?.id)
+        let locationID = try XCTUnwrap(coordinator.metadataManager.customFields.first(where: { $0.name == "Location" })?.id)
+
+        XCTAssertNil(coordinator.renameInspectorMetadataField(povID, to: "Viewpoint"))
+        XCTAssertNil(coordinator.moveInspectorMetadataField(locationID, by: -1))
+        XCTAssertNil(coordinator.updateInspectorMetadataFieldOptions(povID, options: ["Alice", "Cara"]))
+
+        XCTAssertEqual(coordinator.projectManager.currentProject?.settings.customMetadataFields.map(\.name), ["Location", "Viewpoint"])
+        let scene = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.scenes.first(where: { $0.id == sceneID }))
+        XCTAssertEqual(scene.metadata["Viewpoint"], "Alice")
+        XCTAssertNil(scene.metadata["POV"])
+    }
+
+    func testInspectorSupportsTypedMetadataValues() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "TypedInspectorMetadata")
+        let sceneID = try XCTUnwrap(coordinator.inspectorScene?.id)
+
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "Focus", type: .multiSelect, options: ["Plot", "Theme"]))
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "Draft", type: .number, options: []))
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "Due", type: .date, options: []))
+
+        XCTAssertNil(coordinator.setInspectorSceneMetadata(field: "Focus", value: "Plot, Theme"))
+        XCTAssertNil(coordinator.setInspectorSceneMetadata(field: "Draft", value: "3"))
+        XCTAssertNil(coordinator.setInspectorSceneMetadata(field: "Due", value: "2026-03-10"))
+        XCTAssertNotNil(coordinator.setInspectorSceneMetadata(field: "Draft", value: "three"))
+        XCTAssertNotNil(coordinator.setInspectorSceneMetadata(field: "Due", value: "03/10/2026"))
+
+        let scene = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.scenes.first(where: { $0.id == sceneID }))
+        XCTAssertEqual(scene.metadata["Focus"], "Plot, Theme")
+        XCTAssertEqual(scene.metadata["Draft"], "3")
+        XCTAssertEqual(scene.metadata["Due"], "2026-03-10")
+    }
+
+    func testCreateSceneBelowCurrentInsertsAfterActiveScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SceneBelow")
+        let before = coordinator.linearState.orderedSceneIds
+        let current = try XCTUnwrap(coordinator.editorState.currentSceneId)
+
+        XCTAssertNil(coordinator.createSceneBelowCurrent(title: "Inserted Below"))
+
+        let after = coordinator.linearState.orderedSceneIds
+        let currentIndex = try XCTUnwrap(before.firstIndex(of: current))
+        let insertedID = after[currentIndex + 1]
+        let insertedScene = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.scenes.first(where: { $0.id == insertedID }))
+        XCTAssertEqual(insertedScene.title, "Inserted Below")
+        XCTAssertEqual(coordinator.editorState.currentSceneId, insertedID)
+    }
+
+    func testDuplicateSelectedSceneCopiesContentAndMetadataBelowOriginal() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DuplicateScene")
+        let sourceSceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        XCTAssertNil(coordinator.addInspectorMetadataField(named: "POV", type: .singleSelect, options: ["Alice", "Bob"]))
+        XCTAssertNil(coordinator.setInspectorSceneMetadata(field: "POV", value: "Bob"))
+        XCTAssertNil(coordinator.addInspectorTag(named: "Action"))
+        XCTAssertNil(coordinator.setInspectorSceneStatus(.revised))
+        XCTAssertNil(coordinator.setInspectorSceneSynopsis("Original synopsis"))
+        XCTAssertNil(coordinator.setInspectorSceneColorLabel(.green))
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "Original content")
+
+        XCTAssertNil(coordinator.duplicateSelectedScene())
+
+        let manifest = coordinator.projectManager.getManifest()
+        let chapter = try XCTUnwrap(manifest.hierarchy.chapters.first)
+        let sourceIndex = try XCTUnwrap(chapter.scenes.firstIndex(of: sourceSceneID))
+        let duplicatedID = chapter.scenes[sourceIndex + 1]
+        let duplicatedScene = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.id == duplicatedID }))
+        let sourceScene = try XCTUnwrap(manifest.hierarchy.scenes.first(where: { $0.id == sourceSceneID }))
+
+        XCTAssertEqual(duplicatedScene.title, "\(sourceScene.title) Copy")
+        XCTAssertEqual(duplicatedScene.synopsis, sourceScene.synopsis)
+        XCTAssertEqual(duplicatedScene.status, sourceScene.status)
+        XCTAssertEqual(duplicatedScene.colorLabel, sourceScene.colorLabel)
+        XCTAssertEqual(duplicatedScene.metadata, sourceScene.metadata)
+        XCTAssertEqual(duplicatedScene.tags, sourceScene.tags)
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: duplicatedID), "Original content")
+        XCTAssertEqual(coordinator.editorState.currentSceneId, duplicatedID)
+    }
+
+    func testMoveSelectedSceneUpAndDownReordersWithinChapter() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "MoveScene")
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Second")
+        let thirdScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Third")
+        coordinator.navigateToScene(secondScene.id)
+
+        XCTAssertNil(coordinator.moveSelectedSceneDown())
+        var chapter = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first(where: { $0.id == chapterID }))
+        XCTAssertEqual(chapter.scenes, [coordinator.linearState.orderedSceneIds[0], thirdScene.id, secondScene.id])
+
+        XCTAssertNil(coordinator.moveSelectedSceneUp())
+        chapter = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first(where: { $0.id == chapterID }))
+        XCTAssertEqual(chapter.scenes, [coordinator.linearState.orderedSceneIds[0], secondScene.id, thirdScene.id])
+        XCTAssertEqual(coordinator.editorState.currentSceneId, secondScene.id)
+    }
+
+    func testRevealSelectionInSidebarExpandsParentAndSelectsScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "RevealScene")
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Reveal Me")
+
+        XCTAssertNil(coordinator.revealSelectionInSidebar())
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, coordinator.editorState.currentSceneId)
+
+        coordinator.navigationState.selectedSceneId = secondScene.id
+        XCTAssertNil(coordinator.revealSelectionInSidebar())
+        XCTAssertEqual(coordinator.navigationState.selectedSceneId, secondScene.id)
+        XCTAssertTrue(coordinator.navigationState.expandedNodes.contains(chapterID))
+    }
+
+    func testSendSelectedSceneToStagingAndMoveBackToChapter() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "StageAndMove")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let chapterB = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Chapter B")
+        let secondScene = try coordinator.projectManager.addScene(to: chapterA, at: nil, title: "Stage Me")
+        coordinator.navigateToScene(secondScene.id)
+
+        XCTAssertNil(coordinator.sendSelectedSceneToStaging())
+        XCTAssertTrue(coordinator.projectManager.currentProject?.manuscript.stagingArea.contains(where: { $0.id == secondScene.id }) == true)
+        XCTAssertTrue(coordinator.canMoveSelectedSceneToAnotherChapter)
+
+        XCTAssertNil(coordinator.moveSelectedScene(toChapter: chapterB.id))
+        XCTAssertTrue(coordinator.projectManager.currentProject?.manuscript.stagingArea.contains(where: { $0.id == secondScene.id }) == false)
+        XCTAssertTrue(coordinator.projectManager.currentProject?.manuscript.chapters.first(where: { $0.id == chapterB.id })?.scenes.contains(where: { $0.id == secondScene.id }) == true)
+    }
+
+    func testMoveAllStagingScenesToChapterRestoresBatch() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "StageBatchMove")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let chapterB = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Chapter B")
+        let secondScene = try coordinator.projectManager.addScene(to: chapterA, at: nil, title: "Stage Me Too")
+        let thirdScene = try coordinator.projectManager.addScene(to: chapterA, at: nil, title: "Stage Me Three")
+
+        coordinator.navigateToScene(secondScene.id)
+        XCTAssertNil(coordinator.sendSelectedSceneToStaging())
+        coordinator.navigateToScene(thirdScene.id)
+        XCTAssertNil(coordinator.sendSelectedSceneToStaging())
+        XCTAssertEqual(coordinator.stagingSceneCount, 2)
+
+        XCTAssertNil(coordinator.moveAllStagingScenes(toChapter: chapterB.id))
+        XCTAssertEqual(coordinator.stagingSceneCount, 0)
+        let restoredChapter = try XCTUnwrap(coordinator.projectManager.currentProject?.manuscript.chapters.first(where: { $0.id == chapterB.id }))
+        XCTAssertTrue(restoredChapter.scenes.contains(where: { $0.id == secondScene.id }))
+        XCTAssertTrue(restoredChapter.scenes.contains(where: { $0.id == thirdScene.id }))
+    }
+
+    func testBatchSendAndMoveSelectedModularScenes() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ModularBatchStage")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let chapterB = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Chapter B")
+        let secondScene = try coordinator.projectManager.addScene(to: chapterA, at: nil, title: "Second")
+        let thirdScene = try coordinator.projectManager.addScene(to: chapterA, at: nil, title: "Third")
+        coordinator.modeController.switchTo(.modular)
+        coordinator.modularState.selectCard(sceneId: secondScene.id)
+        coordinator.modularState.selectCard(sceneId: thirdScene.id, multiSelect: true)
+
+        XCTAssertNil(coordinator.batchSendSelectedScenesToStaging())
+        XCTAssertEqual(coordinator.stagingSceneCount, 2)
+
+        XCTAssertNil(coordinator.batchMoveSelectedScenes(toChapter: chapterB.id))
+        XCTAssertEqual(coordinator.stagingSceneCount, 0)
+        let restoredChapter = try XCTUnwrap(coordinator.projectManager.currentProject?.manuscript.chapters.first(where: { $0.id == chapterB.id }))
+        XCTAssertEqual(restoredChapter.scenes.count, 2)
+    }
+
+    func testEntitiesPersistAndLinkSelectedScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Entities")
+        let sceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+
+        XCTAssertNil(coordinator.addEntity(name: "Ava", type: .character, notes: "Lead", linkSelectedScene: true))
+        let entity = try XCTUnwrap(coordinator.entities.first)
+        XCTAssertTrue(entity.sceneMentions.contains(sceneID))
+        XCTAssertNil(coordinator.linkSelectedSceneToEntity(entity.id))
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Entities")
+        XCTAssertTrue(reopened.entities.contains(where: { $0.name == "Ava" }))
+    }
+
+    func testEntityUpdateAndMentionScanUseAliasesAndCustomFields() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "EntityScan")
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Second")
+        let firstSceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneID, content: "Captain Ava arrives.")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "The commander surveys the room.")
+
+        XCTAssertNil(
+            coordinator.addEntity(
+                name: "Ava",
+                type: .character,
+                aliases: ["Commander"],
+                fields: ["Role": "Captain"],
+                notes: "Lead",
+                linkSelectedScene: false
+            )
+        )
+        let entityID = try XCTUnwrap(coordinator.entities.first?.id)
+        XCTAssertNil(
+            coordinator.updateEntity(
+                entityID,
+                name: "Ava Mercer",
+                type: .character,
+                aliases: ["Commander"],
+                fields: ["Role": "Captain", "Faction": "Survey"],
+                notes: "Updated"
+            )
+        )
+        let scanMessage = coordinator.scanEntityMentions(entityID)
+
+        XCTAssertEqual(scanMessage, "Found 2 scene mention(s) for Ava Mercer.")
+        let entity = try XCTUnwrap(coordinator.entities.first(where: { $0.id == entityID }))
+        XCTAssertEqual(entity.fields["Role"], "Captain")
+        XCTAssertEqual(entity.fields["Faction"], "Survey")
+        XCTAssertEqual(Set(entity.sceneMentions), Set([firstSceneID, secondScene.id]))
+    }
+
+    func testEntityRelationshipsAndLinkedScenesAreTracked() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "EntityRelations")
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Harbor")
+        let firstSceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneID, content: "Ava Mercer arrives in the city.")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "Mercer meets Ilex at the harbor.")
+
+        XCTAssertNil(coordinator.addEntity(name: "Ava Mercer", type: .character, aliases: ["Mercer"], notes: "", linkSelectedScene: false))
+        XCTAssertNil(coordinator.addEntity(name: "Ilex", type: .location, aliases: [], notes: "", linkSelectedScene: false))
+
+        let avaID = try XCTUnwrap(coordinator.entities.first(where: { $0.name == "Ava Mercer" })?.id)
+        let ilexID = try XCTUnwrap(coordinator.entities.first(where: { $0.name == "Ilex" })?.id)
+
+        XCTAssertEqual(coordinator.scanEntityMentions(avaID), "Found 2 scene mention(s) for Ava Mercer.")
+        XCTAssertNil(coordinator.addEntityRelationship(from: avaID, to: ilexID, label: "seeks", bidirectional: true))
+
+        XCTAssertEqual(Set(coordinator.entityLinkedScenes(avaID).map(\.id)), Set([firstSceneID, secondScene.id]))
+        XCTAssertEqual(coordinator.entityRelationships(avaID).first?.target.id, ilexID)
+        XCTAssertEqual(coordinator.entityRelationships(ilexID).first?.target.id, avaID)
+    }
+
+    func testCompilePresetExportsRichFrontAndBackMatterToHtml() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CompileRichHTML")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let sceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: sceneID, content: "Opening paragraph.\n\nSecond paragraph.")
+
+        XCTAssertNil(
+            coordinator.saveCompilePreset(
+                name: "RichHTML",
+                format: .html,
+                includedSectionIds: [chapterA],
+                fontFamily: "Georgia",
+                fontSize: 15,
+                lineSpacing: 1.8,
+                chapterHeadingStyle: "h1",
+                sceneBreakMarker: "//",
+                subtitle: "A Harbor Novel",
+                authorName: "L. Eaton",
+                includeTitlePage: true,
+                includeTableOfContents: true,
+                copyrightText: "Copyright 2026",
+                dedicationText: "For the midnight draft.",
+                includeAboutAuthor: true,
+                aboutAuthorText: "Lives near the harbor.",
+                bibliographyText: "Harbor Maps, 1922.",
+                appendixTitle: "Appendix A",
+                appendixContent: "Tide tables."
+            )
+        )
+
+        let preset = try XCTUnwrap(coordinator.compilePresets.first(where: { $0.name == "RichHTML" }))
+        XCTAssertTrue(coordinator.exportProject(using: preset.id)?.contains("Exported HTML") == true)
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil)
+        let exportedFile = try XCTUnwrap(contents.first(where: { $0.pathExtension == "html" && $0.lastPathComponent.contains("RichHTML") }))
+        let exportedText = try String(contentsOf: exportedFile, encoding: .utf8)
+
+        XCTAssertTrue(exportedText.contains("<section class=\"title-page\">"))
+        XCTAssertTrue(exportedText.contains("A Harbor Novel"))
+        XCTAssertTrue(exportedText.contains("Copyright 2026"))
+        XCTAssertTrue(exportedText.contains("Bibliography"))
+        XCTAssertTrue(exportedText.contains("Appendix A"))
+        XCTAssertTrue(exportedText.contains("<section class=\"scene\">"))
+        XCTAssertTrue(exportedText.contains("font-family: \"Georgia\""))
+    }
+
+    func testNotesPersistAndRetainSceneAndEntityLinks() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ProjectNotes")
+        let sceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        XCTAssertNil(coordinator.addEntity(name: "Ava", type: .character, notes: "", linkSelectedScene: false))
+        let entityID = try XCTUnwrap(coordinator.entities.first?.id)
+
+        XCTAssertNil(
+            coordinator.addNote(
+                title: "Scene Fix",
+                content: "Tighten the opening beat.",
+                folder: "Draft Pass",
+                linkedSceneIDs: [sceneID],
+                linkedEntityIDs: [entityID]
+            )
+        )
+        let noteID = try XCTUnwrap(coordinator.notes.first?.id)
+        XCTAssertNil(
+            coordinator.updateNote(
+                noteID,
+                title: "Scene Fixes",
+                content: "Tighten the opening beat and mention Ava earlier.",
+                folder: "Revision",
+                linkedSceneIDs: [sceneID],
+                linkedEntityIDs: [entityID]
+            )
+        )
+
+        XCTAssertEqual(coordinator.notesLinkedToScene(sceneID).count, 1)
+        XCTAssertEqual(coordinator.notesLinkedToEntity(entityID).count, 1)
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "ProjectNotes")
+        let reopenedNote = try XCTUnwrap(reopened.notes.first)
+        XCTAssertEqual(reopenedNote.title, "Scene Fixes")
+        XCTAssertEqual(reopenedNote.folder, "Revision")
+        XCTAssertEqual(reopenedNote.linkedSceneIds, [sceneID])
+        XCTAssertEqual(reopenedNote.linkedEntityIds, [entityID])
+    }
+
+    func testTimelineEventsPersistAndRetainLinkedScenes() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Timeline")
+        let firstSceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Harbor")
+
+        XCTAssertNil(
+            coordinator.addTimelineEvent(
+                title: "Arrival",
+                description: "Ava reaches the harbor.",
+                track: "Main Plot",
+                position: .relative(order: 2),
+                linkedSceneIDs: [firstSceneID, secondScene.id],
+                color: "#336699"
+            )
+        )
+
+        let event = try XCTUnwrap(coordinator.timelineEvents.first)
+        XCTAssertEqual(Set(event.linkedSceneIds), Set([firstSceneID, secondScene.id]))
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Timeline")
+        let reopenedEvent = try XCTUnwrap(reopened.timelineEvents.first)
+        XCTAssertEqual(reopenedEvent.title, "Arrival")
+        XCTAssertEqual(Set(reopenedEvent.linkedSceneIds), Set([firstSceneID, secondScene.id]))
+    }
+
+    func testSourcesPersistAndInsertCitationsIntoEditor() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Sources")
+
+        XCTAssertNil(
+            coordinator.addSource(
+                title: "Harbor Log",
+                author: "M. Vale",
+                date: "2025",
+                url: "https://example.com/log",
+                notes: "Primary harbor reference.",
+                citationKey: "harborlog"
+            )
+        )
+        let sourceID = try XCTUnwrap(coordinator.sources.first?.id)
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "Reference ")
+        coordinator.editorState.cursorPosition = coordinator.editorState.getCurrentContent().count
+
+        XCTAssertNil(coordinator.insertCitation(sourceID))
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "Reference [@harborlog]")
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Sources")
+        let reopenedSource = try XCTUnwrap(reopened.sources.first)
+        XCTAssertEqual(reopenedSource.title, "Harbor Log")
+        XCTAssertEqual(reopenedSource.citationKey, "harborlog")
+    }
+
+    func testSourceLibrarySupportsResearchAttachmentsLinksAndCitationNavigation() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SourceResearch")
+        let sceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        XCTAssertNil(coordinator.addNote(title: "Dock Note", content: "Reference note", folder: nil, linkedSceneIDs: [], linkedEntityIDs: []))
+        let noteID = try XCTUnwrap(coordinator.notes.first?.id)
+        XCTAssertNil(coordinator.addEntity(name: "Harbor", type: .location, aliases: [], notes: "", linkSelectedScene: false))
+        let entityID = try XCTUnwrap(coordinator.entities.first?.id)
+
+        XCTAssertNil(
+            coordinator.addSource(
+                title: "Dock Registry",
+                author: "J. North",
+                date: "2024",
+                url: "https://example.com/dock",
+                publication: "Port Archive",
+                volume: "7",
+                pages: "11-19",
+                doi: "10.1234/dock",
+                notes: "Tie to harbor scenes",
+                citationKey: "dockreg",
+                linkedSceneIDs: [sceneID],
+                linkedEntityIDs: [entityID],
+                linkedNoteIDs: [noteID]
+            )
+        )
+
+        let sourceID = try XCTUnwrap(coordinator.sources.first?.id)
+        let researchFile = tempDir.appendingPathComponent("registry.txt")
+        try "harbor ledger".write(to: researchFile, atomically: true, encoding: .utf8)
+        XCTAssertTrue(coordinator.importResearchFile(from: researchFile, into: sourceID)?.contains("Imported research file") == true)
+
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "Use [@dockreg] in the harbor draft.")
+        XCTAssertNil(coordinator.openFirstCitationMention(for: sourceID))
+        XCTAssertEqual(coordinator.editorState.currentSceneId, sceneID)
+
+        let updatedSource = try XCTUnwrap(coordinator.sources.first)
+        XCTAssertEqual(updatedSource.linkedSceneIds, [sceneID])
+        XCTAssertEqual(updatedSource.linkedEntityIds, [entityID])
+        XCTAssertEqual(updatedSource.linkedNoteIds, [noteID])
+        XCTAssertEqual(updatedSource.attachments.count, 1)
+        let attachmentID = try XCTUnwrap(updatedSource.attachments.first?.id)
+        let attachmentURL = try XCTUnwrap(coordinator.researchAttachmentURL(sourceID: sourceID, attachmentID: attachmentID))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: attachmentURL.path))
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SourceResearch")
+        XCTAssertEqual(reopened.sources.first?.attachments.count, 1)
+        XCTAssertEqual(reopened.sources.first?.linkedNoteIds, [noteID])
+    }
+
+    func testScratchpadPersistsAndInsertsIntoEditor() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Scratchpad")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "Reusable phrase")
+        coordinator.editorState.selection = 0..<8
+
+        XCTAssertNil(coordinator.captureSelectionToScratchpad(title: "Phrase", as: .clipboard))
+        let itemID = try XCTUnwrap(coordinator.scratchpadItems.first?.id)
+
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "")
+        XCTAssertNil(coordinator.insertScratchpadItem(itemID))
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "Reusable")
+
+        try coordinator.projectManager.closeProject()
+        let reopened = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "Scratchpad")
+        XCTAssertEqual(reopened.scratchpadItems.first?.title, "Phrase")
+        XCTAssertEqual(reopened.scratchpadItems.first?.kind, .clipboard)
+    }
+
+    func testNotesFocusAndEntityMentionHelpersTrackCurrentContext() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "NoteFocus")
+        let sceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "Ava Mercer studies the chart.")
+        XCTAssertNil(coordinator.addEntity(name: "Ava Mercer", type: .character, aliases: ["Mercer"], notes: "", linkSelectedScene: false))
+        let entityID = try XCTUnwrap(coordinator.entities.first?.id)
+        _ = coordinator.scanEntityMentions(entityID)
+        XCTAssertNil(coordinator.addNote(title: "Chart note", content: "Track the harbor chart.", folder: "Research", linkedSceneIDs: [sceneID], linkedEntityIDs: [entityID]))
+
+        coordinator.focusNotes(onScene: sceneID)
+        XCTAssertEqual(coordinator.notesFocusSceneID, sceneID)
+        XCTAssertNil(coordinator.notesFocusEntityID)
+
+        coordinator.focusNotes(onEntity: entityID)
+        XCTAssertEqual(coordinator.notesFocusEntityID, entityID)
+        XCTAssertNil(coordinator.notesFocusSceneID)
+
+        let mentions = coordinator.highlightedEntityMentions(in: sceneID)
+        XCTAssertEqual(mentions.first?.entity.id, entityID)
+        XCTAssertTrue(mentions.first?.snippet.contains("Ava Mercer") == true)
+        XCTAssertFalse(coordinator.editorState.entityMentionRanges.isEmpty)
+    }
+
+    func testCompilePresetSupportsThemeOrderingAndDocumentFormats() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "CompileGroundwork")
+        let chapterA = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let chapterB = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Alpha Chapter")
+        let sceneB = try coordinator.projectManager.addScene(to: chapterB.id, at: nil, title: "Alpha Scene")
+        try coordinator.projectManager.saveSceneContent(sceneId: sceneB.id, content: "Alpha export content.")
+        coordinator.navigateToScene(sceneB.id)
+        XCTAssertNil(coordinator.sendSelectedSceneToStaging())
+
+        XCTAssertNil(
+            coordinator.saveCompilePreset(
+                name: "DocxPrep",
+                format: .docx,
+                includedSectionIds: [chapterA, chapterB.id],
+                fontFamily: "Menlo",
+                fontSize: 14,
+                lineSpacing: 1.6,
+                htmlTheme: .midnight,
+                pageSize: .a4,
+                templateStyle: .modern,
+                pageMargins: Margins(top: 1.25, bottom: 1, left: 0.75, right: 0.75),
+                includeTitlePage: true,
+                includeTableOfContents: false,
+                includeStagingArea: true,
+                sectionOrder: .alphabetical
+            )
+        )
+        let preset = try XCTUnwrap(coordinator.compilePresets.first(where: { $0.name == "DocxPrep" }))
+        XCTAssertEqual(preset.styleOverrides.htmlTheme, .midnight)
+        XCTAssertEqual(preset.styleOverrides.pageSize, .a4)
+        XCTAssertEqual(preset.styleOverrides.templateStyle, .modern)
+        XCTAssertEqual(preset.backMatter.sectionOrder, .alphabetical)
+        XCTAssertTrue(coordinator.exportProject(using: preset.id)?.contains("Exported DOCX") == true)
+        XCTAssertTrue(coordinator.exportProject(format: .pdf)?.contains("Exported PDF") == true)
+        let preview = coordinator.compilePreview(
+            format: .pdf,
+            includedSectionIds: [chapterA, chapterB.id],
+            fontFamily: "Menlo",
+            fontSize: 14,
+            lineSpacing: 1.6,
+            chapterHeadingStyle: "h2",
+            sceneBreakMarker: "***",
+            htmlTheme: .midnight,
+            pageSize: .a4,
+            templateStyle: .modern,
+            pageMargins: Margins(top: 1.25, bottom: 1, left: 0.75, right: 0.75),
+            subtitle: "",
+            authorName: coordinator.projectDisplayName,
+            includeTitlePage: true,
+            includeTableOfContents: false,
+            includeStagingArea: true,
+            copyrightText: "",
+            dedicationText: "",
+            includeAboutAuthor: false,
+            aboutAuthorText: "",
+            sectionOrder: .alphabetical,
+            bibliographyText: "",
+            appendixTitle: "",
+            appendixContent: ""
+        )
+        XCTAssertTrue(preview?.contains("@page") == true)
+        XCTAssertTrue(preview?.contains("size: A4") == true)
+
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil)
+        XCTAssertNotNil(contents.first(where: { $0.lastPathComponent.contains("DocxPrep") && $0.pathExtension == "docx" }))
+        XCTAssertNotNil(contents.first(where: { $0.pathExtension == "pdf" }))
+    }
+
+    func testCompilePresetSupportsStylesheetOverridesAndEPUBExport() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "EPUBExport")
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        XCTAssertNil(
+            coordinator.saveCompilePreset(
+                name: "EPUBPreset",
+                format: .epub,
+                includedSectionIds: [chapterID],
+                fontFamily: "Georgia",
+                fontSize: 12,
+                lineSpacing: 1.7,
+                htmlTheme: .editorial,
+                pageSize: .trade,
+                templateStyle: .manuscript,
+                includeTitlePage: true,
+                includeTableOfContents: true,
+                stylesheetName: "Bookish",
+                customCSS: ".chapter { color: #123456; }"
+            )
+        )
+
+        let preset = try XCTUnwrap(coordinator.compilePresets.first(where: { $0.name == "EPUBPreset" }))
+        XCTAssertEqual(preset.styleOverrides.stylesheetName, "Bookish")
+        XCTAssertEqual(preset.styleOverrides.customCSS, ".chapter { color: #123456; }")
+        XCTAssertTrue(coordinator.exportProject(using: preset.id)?.contains("Exported EPUB") == true)
+
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let epubURL = try XCTUnwrap(try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil).first(where: { $0.pathExtension == "epub" }))
+        let unpackedURL = tempDir.appendingPathComponent("epub-unpacked", isDirectory: true)
+        try FileManager.default.createDirectory(at: unpackedURL, withIntermediateDirectories: true)
+        let unzip = Process()
+        unzip.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        unzip.arguments = ["-q", epubURL.path, "-d", unpackedURL.path]
+        try unzip.run()
+        unzip.waitUntilExit()
+        XCTAssertEqual(unzip.terminationStatus, 0)
+        let stylesheet = try String(contentsOf: unpackedURL.appendingPathComponent("OEBPS/stylesheet.css"), encoding: .utf8)
+        let opf = try String(contentsOf: unpackedURL.appendingPathComponent("OEBPS/content.opf"), encoding: .utf8)
+        XCTAssertTrue(stylesheet.contains("Stylesheet: Bookish"))
+        XCTAssertTrue(stylesheet.contains(".chapter { color: #123456; }"))
+        XCTAssertTrue(opf.contains("<dc:language>en</dc:language>"))
+        XCTAssertTrue(opf.contains("<dc:publisher>"))
+    }
+
+    func testExportProjectDraftWritesUnsavedPresetOutput() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "DraftExport")
+        let chapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+
+        let message = coordinator.exportProjectDraft(
+            format: .html,
+            includedSectionIds: [chapterID],
+            fontFamily: "Georgia",
+            fontSize: 13,
+            lineSpacing: 1.8,
+            chapterHeadingStyle: "h2",
+            sceneBreakMarker: "***",
+            htmlTheme: .editorial,
+            pageSize: .trade,
+            templateStyle: .modern,
+            pageMargins: Margins(top: 1, bottom: 1, left: 1, right: 1),
+            subtitle: "Preview Run",
+            authorName: "Tester",
+            includeTitlePage: true,
+            includeTableOfContents: true,
+            includeStagingArea: false,
+            languageCode: "en",
+            publisherName: "North Dock Press",
+            copyrightText: "",
+            dedicationText: "",
+            includeAboutAuthor: false,
+            aboutAuthorText: "",
+            sectionOrder: .manuscript,
+            bibliographyText: "",
+            appendixTitle: "",
+            appendixContent: "",
+            stylesheetName: "Release",
+            customCSS: ".manuscript { letter-spacing: 0.02em; }"
+        )
+
+        XCTAssertTrue(message?.contains("Exported HTML") == true)
+        let rootURL = try XCTUnwrap(coordinator.projectManager.projectRootURL)
+        let exportsURL = rootURL.appendingPathComponent("exports", isDirectory: true)
+        let exportedFile = try XCTUnwrap(
+            try FileManager.default.contentsOfDirectory(at: exportsURL, includingPropertiesForKeys: nil)
+                .first(where: { $0.pathExtension == "html" && $0.lastPathComponent.contains("Draft-Export") })
+        )
+        let exportedText = try String(contentsOf: exportedFile, encoding: .utf8)
+        XCTAssertTrue(exportedText.contains("Preview Run"))
+        XCTAssertTrue(exportedText.contains("Tester"))
+    }
+
+    func testInsertEntityMentionWritesIntoActiveEditor() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "EntityInsert")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "Captain ")
+        coordinator.editorState.cursorPosition = coordinator.editorState.getCurrentContent().count
+        XCTAssertNil(coordinator.addEntity(name: "Ava Mercer", type: .character, aliases: ["Mercer"], notes: "", linkSelectedScene: false))
+        let entityID = try XCTUnwrap(coordinator.entities.first?.id)
+
+        XCTAssertNil(coordinator.insertEntityMention(entityID))
+
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "Captain Ava Mercer")
+        XCTAssertTrue(coordinator.editorState.isModified)
+    }
+
+    func testOpenSelectionInSplitUsesSelectedSceneAsSecondaryPane() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SelectionSplit")
+        let manifest = coordinator.projectManager.getManifest()
+        let chapterID = try XCTUnwrap(manifest.hierarchy.chapters.first?.id)
+        let primarySceneID = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterID, at: nil, title: "Target Split")
+        coordinator.navigationState.navigateTo(sceneId: secondScene.id)
+
+        XCTAssertNil(coordinator.openSelectionInSplit(windowWidth: 1200))
+        XCTAssertTrue(coordinator.splitEditorState.isSplit)
+        XCTAssertEqual(coordinator.splitEditorState.primarySceneId, primarySceneID)
+        XCTAssertEqual(coordinator.splitEditorState.secondarySceneId, secondScene.id)
+        XCTAssertEqual(coordinator.splitEditorState.activePaneIndex, 1)
     }
 
     func testSwitchableProjectsPrioritizeCurrentThenRecentsWithoutDuplication() throws {
@@ -388,6 +1301,32 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isSceneIncludedForReplace(secondScene.id))
     }
 
+    func testReplaceSceneSelectionModePreferencePersistsAcrossCoordinatorInstances() throws {
+        let suiteName = "WorkspaceCoordinatorTests.ReplaceSelectionMode.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "ReplaceSelectionModePrefs",
+            splitSettingsStore: defaults,
+            recentProjectStore: defaults,
+            searchPreferenceStore: defaults
+        )
+        first.replaceSceneSelectionMode = .keepManualSelection
+        try first.projectManager.closeProject()
+
+        let second = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "ReplaceSelectionModePrefs",
+            splitSettingsStore: defaults,
+            recentProjectStore: defaults,
+            searchPreferenceStore: defaults
+        )
+
+        XCTAssertEqual(second.replaceSceneSelectionMode, .keepManualSelection)
+    }
+
     func testReplaceSceneSelectionModeResetOnSearchResetsSelection() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchSelectionModeReset")
         let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
@@ -428,6 +1367,69 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.selectedReplaceSceneCount, 1)
     }
 
+    func testReplacePreviewItemsSupportFilterAndSort() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchPreviewSortFilter")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let betaScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Beta Scene")
+        let alphaScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Alpha Scene")
+
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "token")
+        try coordinator.projectManager.saveSceneContent(sceneId: betaScene.id, content: "token token token")
+        try coordinator.projectManager.saveSceneContent(sceneId: alphaScene.id, content: "token token")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "token"
+        coordinator.runSearch()
+        coordinator.setSceneIncludedForReplace(betaScene.id, included: false)
+
+        let excluded = coordinator.replacePreviewItems(filter: .excluded, sort: .manuscriptOrder)
+        XCTAssertEqual(excluded.map(\.id), [betaScene.id])
+
+        let sortedByMatches = coordinator.replacePreviewItems(sort: .matchCountDescending)
+        XCTAssertEqual(sortedByMatches.map(\.id), [betaScene.id, alphaScene.id, firstSceneId])
+
+        let sortedByTitle = coordinator.replacePreviewItems(sort: .sceneTitle)
+        XCTAssertEqual(sortedByTitle.map(\.sceneTitle), ["Alpha Scene", "Beta Scene", "Untitled Scene"])
+        XCTAssertTrue(sortedByMatches.allSatisfy { !$0.matchTargets.isEmpty })
+    }
+
+    func testReplacePreviewItemsCollectMultipleDistinctSnippetsPerScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchPreviewSnippets")
+        coordinator.editorState.replaceText(
+            in: 0..<coordinator.editorState.getCurrentContent().count,
+            with: "alpha one middle filler alpha two distant filler alpha three"
+        )
+        coordinator.showInlineSearchPanel()
+        coordinator.searchQueryText = "alpha"
+        coordinator.runSearch()
+
+        let item = try XCTUnwrap(coordinator.replacePreviewItems().first)
+        XCTAssertEqual(item.matchCount, 3)
+        XCTAssertEqual(item.matchTargets.count, 3)
+        XCTAssertTrue(item.matchTargets.allSatisfy { $0.snippet.localizedCaseInsensitiveContains("alpha") })
+    }
+
+    func testSelectReplacePreviewMatchNavigatesToStoredResult() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchPreviewMatchNavigation")
+        coordinator.editorState.replaceText(
+            in: 0..<coordinator.editorState.getCurrentContent().count,
+            with: "alpha one middle alpha two"
+        )
+        coordinator.showInlineSearchPanel()
+        coordinator.searchQueryText = "alpha"
+        coordinator.runSearch()
+
+        let item = try XCTUnwrap(coordinator.replacePreviewItems().first)
+        let target = try XCTUnwrap(item.matchTargets.last)
+
+        coordinator.selectReplacePreviewMatch(sceneID: item.id, resultIndex: target.resultIndex)
+
+        XCTAssertEqual(coordinator.currentSearchResultIndex, target.resultIndex)
+        XCTAssertEqual(coordinator.editorState.selection, coordinator.searchResults[target.resultIndex].matchRange)
+    }
+
     func testReplaceNextSearchResultUpdatesCurrentMatchOnly() throws {
         let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceNext")
         coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "color color color")
@@ -441,6 +1443,294 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertEqual(message, "Replaced next match.")
         XCTAssertEqual(coordinator.editorState.getCurrentContent(), "colour color color")
         XCTAssertEqual(coordinator.searchResults.count, 2)
+    }
+
+    func testRegexReplacementWarningFlagsMissingCaptureGroups() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchRegexWarnings")
+        coordinator.showInlineSearchPanel()
+        coordinator.searchIsRegex = true
+        coordinator.searchQueryText = "(\\w+)"
+        coordinator.searchReplacementText = "$2"
+
+        XCTAssertEqual(coordinator.regexReplacementHelpText, "Regex replace supports capture groups like $1 through $1.")
+        XCTAssertEqual(coordinator.regexReplacementWarning, "Replacement references $2, but the current regex exposes only 1 capture group(s).")
+    }
+
+    func testGroupedSearchResultsOrganizeByChapterAndScene() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchGroupedResults")
+        let firstChapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondChapter = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Second")
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        let firstChapterExtraScene = try coordinator.projectManager.addScene(to: firstChapterId, at: nil, title: "Scene B")
+        let secondChapterScene = try coordinator.projectManager.addScene(to: secondChapter.id, at: nil, title: "Scene C")
+
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "dragon here")
+        try coordinator.projectManager.saveSceneContent(sceneId: firstChapterExtraScene.id, content: "dragon there")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondChapterScene.id, content: "dragon elsewhere")
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "dragon"
+        coordinator.runSearch()
+
+        let sections = coordinator.groupedSearchResults
+        XCTAssertEqual(sections.count, 2)
+        XCTAssertEqual(Set(sections.map(\.chapterTitle)), Set(["Chapter 1", "Second"]))
+        let chapterOne = try XCTUnwrap(sections.first(where: { $0.chapterTitle == "Chapter 1" }))
+        let second = try XCTUnwrap(sections.first(where: { $0.chapterTitle == "Second" }))
+        XCTAssertEqual(chapterOne.matchCount, 1)
+        XCTAssertEqual(chapterOne.scenes.count, 1)
+        XCTAssertEqual(second.matchCount, 1)
+        XCTAssertEqual(second.scenes.count, 1)
+    }
+
+    func testUndoLastReplaceBatchRestoresOnlyAffectedSelectedScenes() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceUndoBatch")
+        let chapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondScene = try coordinator.projectManager.addScene(to: chapterId, at: nil, title: "Second")
+
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "color color")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "color")
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchQueryText = "color"
+        coordinator.searchReplacementText = "colour"
+        coordinator.runSearch()
+        coordinator.setSceneIncludedForReplace(secondScene.id, included: false)
+
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+        XCTAssertTrue(coordinator.canUndoLastReplaceBatch)
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: firstSceneId), "colour colour")
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "color")
+
+        XCTAssertEqual(coordinator.undoLastReplaceBatch(), "Undid last replace batch.")
+        XCTAssertFalse(coordinator.canUndoLastReplaceBatch)
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: firstSceneId), "color color")
+        XCTAssertEqual(try coordinator.projectManager.loadSceneContent(sceneId: secondScene.id), "color")
+    }
+
+    func testUndoLastReplaceBatchSupportsChainedUndo() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceUndoChain")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "alpha alpha")
+
+        coordinator.showInlineSearchPanel()
+        coordinator.searchQueryText = "alpha"
+        coordinator.searchReplacementText = "beta"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+        XCTAssertEqual(coordinator.replaceUndoDepth, 1)
+
+        coordinator.searchQueryText = "beta"
+        coordinator.searchReplacementText = "gamma"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+        XCTAssertEqual(coordinator.replaceUndoDepth, 2)
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "gamma gamma")
+
+        XCTAssertEqual(coordinator.undoLastReplaceBatch(), "Undid last replace batch. 1 batch(es) still available.")
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "beta beta")
+        XCTAssertEqual(coordinator.replaceUndoDepth, 1)
+
+        XCTAssertEqual(coordinator.undoLastReplaceBatch(), "Undid last replace batch.")
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "alpha alpha")
+        XCTAssertEqual(coordinator.replaceUndoDepth, 0)
+    }
+
+    func testRedoLastReplaceBatchRestoresUndoneBatch() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceRedo")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "alpha alpha")
+
+        coordinator.showInlineSearchPanel()
+        coordinator.searchQueryText = "alpha"
+        coordinator.searchReplacementText = "beta"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+
+        XCTAssertEqual(coordinator.undoLastReplaceBatch(), "Undid last replace batch.")
+        XCTAssertTrue(coordinator.canRedoLastReplaceBatch)
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "alpha alpha")
+
+        XCTAssertEqual(coordinator.redoLastReplaceBatch(), "Redid last replace batch.")
+        XCTAssertFalse(coordinator.canRedoLastReplaceBatch)
+        XCTAssertEqual(coordinator.editorState.getCurrentContent(), "beta beta")
+    }
+
+    func testSelectedChapterSearchScopeLimitsResultsToChosenChapters() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchSelectedChapterScope")
+        let firstChapterId = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondChapter = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Second")
+        let firstSceneId = try XCTUnwrap(coordinator.editorState.currentSceneId)
+        let secondScene = try coordinator.projectManager.addScene(to: secondChapter.id, at: nil, title: "Second Scene")
+
+        try coordinator.projectManager.saveSceneContent(sceneId: firstSceneId, content: "alpha in first")
+        try coordinator.projectManager.saveSceneContent(sceneId: secondScene.id, content: "alpha in second")
+        coordinator.editorState.navigateToScene(id: firstSceneId)
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchScope = .selectedChapters
+        coordinator.selectedSearchChapterIDs = [secondChapter.id]
+        coordinator.searchQueryText = "alpha"
+        coordinator.runSearch()
+
+        XCTAssertEqual(coordinator.searchResults.count, 1)
+        XCTAssertEqual(coordinator.searchResults.first?.sceneId, secondScene.id)
+        XCTAssertNotEqual(firstChapterId, secondChapter.id)
+    }
+
+    func testSearchChapterScopePresetsPersistAcrossCoordinatorInstances() throws {
+        let suiteName = "WorkspaceCoordinatorTests.SearchChapterPresets.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "SearchScopePresets",
+            searchPreferenceStore: defaults
+        )
+        let secondChapter = try first.projectManager.addChapter(to: nil, at: nil, title: "Second")
+        first.searchScope = .selectedChapters
+        first.selectedSearchChapterIDs = [secondChapter.id]
+
+        XCTAssertEqual(first.saveSelectedSearchChapterPreset(), "Saved chapter scope preset: Second.")
+        XCTAssertEqual(first.searchChapterPresets.count, 1)
+        try first.projectManager.saveManifest()
+        try first.projectManager.closeProject()
+
+        let second = WorkspaceCoordinator(
+            bootstrapRootURL: tempDir,
+            bootstrapProjectName: "SearchScopePresets",
+            searchPreferenceStore: defaults
+        )
+
+        XCTAssertEqual(second.searchChapterPresets.count, 1)
+        XCTAssertEqual(second.searchChapterPresets.first?.chapterIDs, [secondChapter.id])
+        XCTAssertEqual(second.searchChapterPresets.first?.name, "Second")
+    }
+
+    func testApplyAndDeleteSearchChapterScopePresetUpdatesSelection() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchScopePresetApply")
+        let firstChapterID = try XCTUnwrap(coordinator.projectManager.getManifest().hierarchy.chapters.first?.id)
+        let secondChapter = try coordinator.projectManager.addChapter(to: nil, at: nil, title: "Second")
+        coordinator.searchScope = .selectedChapters
+        coordinator.selectedSearchChapterIDs = [firstChapterID, secondChapter.id]
+
+        XCTAssertTrue(coordinator.saveSelectedSearchChapterPreset()?.contains("Saved chapter scope preset:") == true)
+        let presetID = try XCTUnwrap(coordinator.searchChapterPresets.first?.id)
+
+        coordinator.clearSearchChapterSelection()
+        coordinator.applySearchChapterPreset(presetID)
+        XCTAssertEqual(coordinator.selectedSearchChapterIDs, Set([firstChapterID, secondChapter.id]))
+
+        coordinator.deleteSearchChapterPreset(presetID)
+        XCTAssertTrue(coordinator.searchChapterPresets.isEmpty)
+    }
+
+    func testReplaceUndoHistoryReflectsRecentBatches() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceUndoHistory")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "alpha alpha")
+
+        coordinator.showInlineSearchPanel()
+        coordinator.searchQueryText = "alpha"
+        coordinator.searchReplacementText = "beta"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+
+        coordinator.searchQueryText = "beta"
+        coordinator.searchReplacementText = "gamma"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+
+        let history = coordinator.replaceUndoHistory
+        XCTAssertEqual(history.count, 2)
+        XCTAssertEqual(history[0].title, "\"beta\" -> \"gamma\"")
+        XCTAssertEqual(history[0].summary, "2 replacements across 1 scene(s)")
+        XCTAssertEqual(history[1].title, "\"alpha\" -> \"beta\"")
+    }
+
+    func testReplaceRedoHistoryReflectsUndoneBatches() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchReplaceRedoHistory")
+        coordinator.editorState.replaceText(in: 0..<coordinator.editorState.getCurrentContent().count, with: "alpha alpha")
+
+        coordinator.showInlineSearchPanel()
+        coordinator.searchQueryText = "alpha"
+        coordinator.searchReplacementText = "beta"
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.replaceAllSearchResults(), "Replaced 2 matches across 1 scenes.")
+        XCTAssertEqual(coordinator.undoLastReplaceBatch(), "Undid last replace batch.")
+
+        let history = coordinator.replaceRedoHistory
+        XCTAssertEqual(history.count, 1)
+        XCTAssertEqual(history[0].title, "\"alpha\" -> \"beta\"")
+        XCTAssertEqual(history[0].summary, "2 replacements across 1 scene(s)")
+    }
+
+    func testFormattingWorkspaceScopesRunFormattingSearches() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchFormattingScopes")
+        coordinator.editorState.replaceText(
+            in: 0..<coordinator.editorState.getCurrentContent().count,
+            with: "# Heading\nSome **bold** text and *italic* text."
+        )
+
+        coordinator.showProjectSearchPanel()
+        coordinator.searchScope = .formattingItalic
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["italic"])
+
+        coordinator.searchScope = .formattingBold
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["bold"])
+
+        coordinator.searchScope = .formattingHeadings
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["Heading"])
+    }
+
+    func testAdditionalFormattingWorkspaceScopesRunFormattingSearches() throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchMoreFormattingScopes")
+        coordinator.editorState.replaceText(
+            in: 0..<coordinator.editorState.getCurrentContent().count,
+            with: """
+            ~~cut~~ `inline`
+            > quote
+            [link](https://example.com) [^foot]
+            """
+        )
+
+        coordinator.showProjectSearchPanel()
+
+        coordinator.searchScope = .formattingStrikethrough
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["cut"])
+
+        coordinator.searchScope = .formattingInlineCode
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["inline"])
+
+        coordinator.searchScope = .formattingBlockQuotes
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["quote"])
+
+        coordinator.editorState.replaceText(
+            in: 0..<coordinator.editorState.getCurrentContent().count,
+            with: "[link](https://example.com) [^foot]"
+        )
+        coordinator.searchScope = .formattingLinks
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["link"])
+
+        coordinator.searchScope = .formattingFootnotes
+        coordinator.runSearch()
+        XCTAssertEqual(coordinator.searchResults.map(\.matchText), ["foot"])
+    }
+
+    func testSearchIndexStatusCompletesAfterCoordinatorBuild() async throws {
+        let coordinator = WorkspaceCoordinator(bootstrapRootURL: tempDir, bootstrapProjectName: "SearchIndexStatus")
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertFalse(coordinator.isSearchIndexing)
+        XCTAssertGreaterThanOrEqual(coordinator.searchIndexStatus.total, 1)
+        XCTAssertEqual(coordinator.searchIndexStatus.completed, coordinator.searchIndexStatus.total)
+        XCTAssertEqual(coordinator.searchIndexStatus.percentage, 100)
     }
 
     func testSearchResultNavigationWrapsAndUpdatesCursorSelection() throws {

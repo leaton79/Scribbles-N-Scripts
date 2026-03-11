@@ -1,13 +1,26 @@
 import AppKit
 import SwiftUI
 
+struct EditorPresentationSettings: Equatable {
+    var fontName: String
+    var fontSize: CGFloat
+    var lineHeight: CGFloat
+
+    static let `default` = EditorPresentationSettings(
+        fontName: "Menlo",
+        fontSize: 14,
+        lineHeight: 1.6
+    )
+}
+
 @MainActor
 struct EditorView: View {
     @ObservedObject var state: EditorState
+    var presentation = EditorPresentationSettings.default
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            SearchHighlightingTextView(state: state)
+            SearchHighlightingTextView(state: state, presentation: presentation)
 
             if state.placeholderVisible {
                 Text("Start writing...")
@@ -21,9 +34,10 @@ struct EditorView: View {
 @MainActor
 private struct SearchHighlightingTextView: NSViewRepresentable {
     @ObservedObject var state: EditorState
+    let presentation: EditorPresentationSettings
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(state: state)
+        Coordinator(state: state, presentation: presentation)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -49,17 +63,20 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.state = state
+        context.coordinator.presentation = presentation
         context.coordinator.applyStateToView()
     }
 
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var state: EditorState
+        var presentation: EditorPresentationSettings
         weak var textView: NSTextView?
         private var isApplyingState = false
 
-        init(state: EditorState) {
+        init(state: EditorState, presentation: EditorPresentationSettings) {
             self.state = state
+            self.presentation = presentation
         }
 
         func applyStateToView() {
@@ -72,6 +89,8 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
                 isApplyingState = false
             }
 
+            applyPresentation(to: textView)
+            textView.isEditable = state.isEditable
             applyHighlightAttributes(on: textView, content: content)
             syncSelection(on: textView)
         }
@@ -104,6 +123,24 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
             }
         }
 
+        private func applyPresentation(to textView: NSTextView) {
+            let font = resolvedFont()
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = max(0, (presentation.lineHeight - 1.0) * font.pointSize)
+
+            textView.font = font
+            textView.defaultParagraphStyle = paragraphStyle
+            textView.typingAttributes[.font] = font
+            textView.typingAttributes[.paragraphStyle] = paragraphStyle
+
+            guard let storage = textView.textStorage else { return }
+            let fullRange = NSRange(location: 0, length: storage.length)
+            storage.beginEditing()
+            storage.addAttribute(.font, value: font, range: fullRange)
+            storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+            storage.endEditing()
+        }
+
         private func applyHighlightAttributes(on textView: NSTextView, content: String) {
             guard let storage = textView.textStorage else { return }
             let fullRange = NSRange(location: 0, length: storage.length)
@@ -111,6 +148,16 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
             isApplyingState = true
             storage.beginEditing()
             storage.removeAttribute(.backgroundColor, range: fullRange)
+
+            for range in state.entityMentionRanges {
+                let nsRange = nsRange(for: range, in: content)
+                guard nsRange.length > 0 else { continue }
+                storage.addAttribute(
+                    .backgroundColor,
+                    value: NSColor.systemTeal.withAlphaComponent(0.18),
+                    range: nsRange
+                )
+            }
 
             for range in state.searchHighlightRanges {
                 let nsRange = nsRange(for: range, in: content)
@@ -143,6 +190,13 @@ private struct SearchHighlightingTextView: NSViewRepresentable {
             let start = content.index(content.startIndex, offsetBy: lower)
             let end = content.index(content.startIndex, offsetBy: upper)
             return NSRange(start..<end, in: content)
+        }
+
+        private func resolvedFont() -> NSFont {
+            if let custom = NSFont(name: presentation.fontName, size: presentation.fontSize) {
+                return custom
+            }
+            return .monospacedSystemFont(ofSize: presentation.fontSize, weight: .regular)
         }
     }
 }

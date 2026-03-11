@@ -1,4 +1,4 @@
-# Manuscript — Project Bible
+# Scribbles-N-Scripts — Project Bible
 ## Core Reference for AI-Assisted Development
 
 > **Purpose**: This document is the single source of truth included as context in every AI prompt during development. It contains the data model, file format specification, design constraints, glossary, and dependency map. Individual module specs reference this document rather than redefining shared concepts.
@@ -7,7 +7,7 @@
 
 ## 1. Product Identity
 
-**Name**: Manuscript
+**Name**: Scribbles-N-Scripts
 **Platform**: macOS (primary), Windows (future)
 **Language**: Swift + SwiftUI
 **Architecture**: Monolithic, local-only, no network dependencies

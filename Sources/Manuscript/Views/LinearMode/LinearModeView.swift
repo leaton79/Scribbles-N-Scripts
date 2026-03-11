@@ -4,6 +4,7 @@ struct LinearModeView: View {
     @ObservedObject var navigationState: NavigationState
     @ObservedObject var editorState: EditorState
     @ObservedObject var linearState: LinearModeState
+    var presentation = EditorPresentationSettings.default
 
     func goToNextScene() {
         linearState.goToNextScene()
@@ -25,7 +26,7 @@ struct LinearModeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            EditorView(state: editorState)
+            EditorView(state: editorState, presentation: presentation)
 
             ForEach(linearState.boundaries, id: \.followingSceneId) { boundary in
                 Divider()

@@ -1,5 +1,5 @@
 import XCTest
-@testable import Manuscript
+@testable import ScribblesNScripts
 
 final class ProjectIOTests: XCTestCase {
     private var tempDir: URL!
@@ -268,6 +268,42 @@ final class ProjectIOTests: XCTestCase {
         XCTAssertThrowsError(try opener.saveManifest()) { error in
             guard case ProjectIOError.noOpenProject = error else {
                 return XCTFail("Expected noOpenProject after failed open")
+            }
+        }
+    }
+
+    func testOpenProjectInRecoveryModeIsReadOnly() throws {
+        let manager = FileSystemProjectManager()
+        let project = try manager.createProject(name: "RecoveryOnly", at: tempDir)
+        let root = tempDir.appendingPathComponent(project.name)
+        let manifestURL = root.appendingPathComponent("manifest.json")
+        try manager.closeProject()
+        try FileManager.default.removeItem(at: manifestURL)
+
+        let opener = FileSystemProjectManager()
+        let recovered = try opener.openProjectInRecoveryMode(at: root, details: "manifest missing")
+        let recoveredSceneId = try XCTUnwrap(opener.getManifest().hierarchy.scenes.first?.id)
+        let recoveredChapterId = try XCTUnwrap(opener.getManifest().hierarchy.chapters.first?.id)
+        XCTAssertTrue(opener.isReadOnlyRecoveryMode)
+        XCTAssertTrue(recovered.name.contains("Recovery"))
+        XCTAssertThrowsError(try opener.saveManifest()) { error in
+            guard case ProjectIOError.readOnlyProject = error else {
+                return XCTFail("Expected readOnlyProject, got \(error)")
+            }
+        }
+        XCTAssertThrowsError(try opener.saveSceneContent(sceneId: recoveredSceneId, content: "Changed")) { error in
+            guard case ProjectIOError.readOnlyProject = error else {
+                return XCTFail("Expected readOnlyProject for scene save, got \(error)")
+            }
+        }
+        XCTAssertThrowsError(try opener.addScene(to: recoveredChapterId, at: nil, title: "Blocked")) { error in
+            guard case ProjectIOError.readOnlyProject = error else {
+                return XCTFail("Expected readOnlyProject for addScene, got \(error)")
+            }
+        }
+        XCTAssertThrowsError(try opener.updateSceneMetadata(sceneId: recoveredSceneId, updates: SceneMetadataUpdate(title: "Blocked", synopsis: nil, status: nil, tags: nil, colorLabel: nil, metadata: nil))) { error in
+            guard case ProjectIOError.readOnlyProject = error else {
+                return XCTFail("Expected readOnlyProject for metadata update, got \(error)")
             }
         }
     }

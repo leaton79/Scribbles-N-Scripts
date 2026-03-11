@@ -128,7 +128,7 @@ final class GoalsManager: ObservableObject {
     func clearChapterGoal(chapterId: UUID) {
         try? projectManager.updateChapterMetadata(
             chapterId: chapterId,
-            updates: ChapterMetadataUpdate(title: nil, synopsis: nil, status: nil, goalWordCount: nil)
+            updates: ChapterMetadataUpdate(title: nil, synopsis: nil, status: nil, goalWordCount: nil, clearGoalWordCount: true)
         )
     }
 
@@ -156,6 +156,31 @@ final class GoalsManager: ObservableObject {
             sum += index[dayKey(for: day)] ?? 0
         }
         return Double(sum) / Double(lastNDays)
+    }
+
+    func todayWordsWritten(referenceDate: Date = Date()) -> Int {
+        let todayKey = dayKey(for: referenceDate)
+        return writingHistory.first(where: { $0.date == todayKey })?.wordsWritten ?? 0
+    }
+
+    func recordsForLastNDays(_ days: Int, referenceDate: Date = Date()) -> [DailyWritingRecord] {
+        guard days > 0 else { return [] }
+        let recordIndex = Dictionary(uniqueKeysWithValues: writingHistory.map { ($0.date, $0) })
+        let today = calendar.startOfDay(for: referenceDate)
+
+        return (0..<days).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -(days - 1 - offset), to: today) else {
+                return nil
+            }
+            let key = dayKey(for: day)
+            return recordIndex[key] ?? DailyWritingRecord(
+                date: key,
+                wordsWritten: 0,
+                wordsGross: 0,
+                timeSpentSeconds: 0,
+                sessionsCount: 0
+            )
+        }
     }
 
     func bind(to editorState: EditorState, clock: @escaping () -> Date = Date.init) {
@@ -210,6 +235,7 @@ final class GoalsManager: ObservableObject {
     }
 
     func chapterGoalProgressText(chapterId: UUID) -> String? {
+        guard projectManager.currentProject != nil else { return nil }
         let manifest = projectManager.getManifest()
         guard let chapter = manifest.hierarchy.chapters.first(where: { $0.id == chapterId }),
               let goal = chapter.goalWordCount else {
@@ -268,6 +294,10 @@ final class GoalsManager: ObservableObject {
     }
 
     private func refreshCurrentTotalWordCount() {
+        guard projectManager.currentProject != nil else {
+            currentTotalWordCount = 0
+            return
+        }
         let manifest = projectManager.getManifest()
         currentTotalWordCount = manifest.hierarchy.scenes.reduce(0) { $0 + $1.wordCount }
     }
