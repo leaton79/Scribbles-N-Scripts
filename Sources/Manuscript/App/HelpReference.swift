@@ -1376,6 +1376,10 @@ struct HelpReferenceSheet: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("Guided Path")
                                     .font(.headline)
+                                Text("Step \(guidedSelectionIndex + 1) of \(guidedPathIDs.count)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                ProgressView(value: Double(guidedSelectionIndex + 1), total: Double(guidedPathIDs.count))
                                 HStack(spacing: 10) {
                                     if guidedSelectionIndex > 0,
                                        let previousEntry = HelpReferenceLibrary.entry(for: guidedPathIDs[guidedSelectionIndex - 1]) {
